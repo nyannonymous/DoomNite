@@ -123,9 +123,16 @@ GAMES = [
     ("QuakinDoom: Total 3-D Edition", "Quake's guns and monsters, Doom's maps.",
      [("DOOM2.WAD", BD + r"\QuakinDoomT3DE.pk3"),
       ("DOOM2.WAD", BD + r"\QuakinDoomT3DE.pk3", BD + r"\QuakinMobs.pk3")]),
-    ("Shadow Warrior", "Full conversion with the music pack.",
-     [("DOOM2.WAD", BD + r"\SWMapPack.pk3", BD + r"\ShadowWarriorMusic.pk3"),
-      ("DOOM2.WAD", BD + r"\SWMapPack.pk3")]),
+    # SWMapPack is maps + ACS + a few sprites. It carries no weapons, monsters or
+    # sounds, so on its own every map ran with stock Doom weapons and missing
+    # enemy sprites. ShadowWarriorBackup.pk3 is the asset half -- 1973 sprites,
+    # 179 sounds, actors and voxels, no maps -- and was sitting unused in the
+    # GAMES folder. Base first so the map pack can override it.
+    ("Shadow Warrior", "Full conversion with the music pack. Needs the asset "
+     "pack -- the map pack alone has no weapons or enemy sprites.",
+     [("DOOM2.WAD", BD + r"\ShadowWarriorBackup.pk3", BD + r"\SWMapPack.pk3",
+       BD + r"\ShadowWarriorMusic.pk3"),
+      ("DOOM2.WAD", BD + r"\ShadowWarriorBackup.pk3", BD + r"\SWMapPack.pk3")]),
     ("DBP37: Auger;Zenith", "2023 community hit. Maps only.",
      [("DOOM2.WAD", BD + r"\DBP37_AUGZEN.wad")]),
     ("MoonMan", "Vanilla-friendly. Uses the pk3: ZDoom cannot load the zip.",
