@@ -2950,3 +2950,48 @@ kbd {
 .tile:hover .tile-inpack {
   opacity: 0.8;
 }
+
+/* ------------------------------------------------ ghost buttons (base rule) */
+
+/* .btn-ghost existed only as variants (.is-sm, .is-danger:hover) with no base
+   rule, so every ghost button rendered as an unstyled browser default. The
+   sidebar UNINSTALL was the visible symptom: a plain grey OS button sitting in
+   a themed panel, next to a card trash icon that WAS styled. Same class of bug
+   as .btn-primary having no rule at all.
+
+   Ghost = outlined and secondary. It is for actions you might want (uninstall,
+   cancel) rather than the ones you came for. */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.55em 1em;
+  font: 700 0.72rem/1 var(--d-display);
+  letter-spacing: 0.12em;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    color 0.15s var(--ease),
+    background 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.btn-ghost:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-1);
+}
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The destructive variant. Tints the resting state too -- a ghost outline in
+   neutral grey on an UNINSTALL button understates what the button does. */
+.btn-ghost.is-danger {
+  color: #ff7a7a;
+  border-color: color-mix(in srgb, var(--blood) 60%, transparent);
+}
