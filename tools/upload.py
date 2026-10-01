@@ -41,9 +41,12 @@ import sys
 PACK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCES = os.path.join(PACK, "sources.json")
 
-# R2's S3-compatible endpoint. account_id is substituted by boto3 from the
-# access key, so this is the same string for every R2 account.
-ENDPOINT = "https://<accountid>.r2.cloudflarestorage.com"
+# R2's S3-compatible endpoint. The account id is part of the hostname, so it
+# cannot be derived from the access key the way some providers allow; it comes
+# from R2_ACCOUNT_ID in the environment. boto3's default endpoint would be
+# AWS S3, which is the wrong account and would either fail or -- worse -- send
+# the pack somewhere the user did not intend.
+ENDPOINT_TMPL = "https://{acct}.r2.cloudflarestorage.com"
 
 CHUNK = 1024 * 1024
 
@@ -80,6 +83,7 @@ def client(bucket):
 
     aid = os.environ.get("AWS_ACCESS_KEY_ID")
     secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    acct = os.environ.get("R2_ACCOUNT_ID", "").strip()
     if not aid or not secret:
         sys.exit(
             "missing R2 credentials.\n"
@@ -87,16 +91,20 @@ def client(bucket):
             "Tokens, then in this shell:\n"
             "  export AWS_ACCESS_KEY_ID=<key id>\n"
             "  export AWS_SECRET_ACCESS_KEY=<secret>")
+    if not acct:
+        sys.exit(
+            "missing R2_ACCOUNT_ID.\n"
+            "It is part of the S3 endpoint hostname and cannot be derived from\n"
+            "the access key. dash.cloudflare.com > R2 > Account > Account ID")
 
     # R2 needs addressing_style=virtual or the bucket lands in the hostname
     # wrong; retries handle a laptop that drops wifi mid-transfer.
     return boto3.client(
         "s3",
-        endpoint_url=ENDPOINT,
+        endpoint_url=ENDPOINT_TMPL.format(acct=acct),
         aws_access_key_id=aid,
         aws_secret_access_key=secret,
         config=Config(signature_version="s3v4",
-                      addressing_style="virtual",
                       retries={"max_attempts": 5, "mode": "adaptive"}),
     )
 

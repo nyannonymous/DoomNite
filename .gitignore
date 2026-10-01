@@ -18,3 +18,7 @@ playnite-data/
 
 __pycache__/
 *.pyc
+
+# R2 upload transcript: machine-specific paths, and nothing here
+# belongs in the repo. The manifests it is derived from are committed.
+upload.log
