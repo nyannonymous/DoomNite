@@ -17,7 +17,7 @@ Security model, deliberate and narrow:
   resolved to a known launcher .bat (or a known standalone exe) server-side,
   so the worst a malicious page on localhost can do is start a game that was
   already going to be in the menu.
-* The launcher .bat files are what actually start ZDoom; the server shells out
+* The launcher .bat files are what actually start UZDoom; the server shells out
   to cmd /c on a path it built itself, never one supplied by a request.
 * /api/dryrun does the same resolution but only prints the command, so the UI
   can show what an entry runs without launching anything.
@@ -42,16 +42,50 @@ INDEX = os.path.join(PACK, "index.html")
 ENTRIES = []
 
 
+def _variant_label(mods, shared_base, iwads_differ):
+    """A short human label for one variant of a game.
+
+    When every variant of a game shares the same leading mod, that mod is the
+    base and the rest are optional extras -- label it "base" or "+ extra". When
+    the leading mods differ the variants are genuinely different games wearing
+    one name (DukeBoomem ships 2.5D, Aliens-Only and 2.5D+Textures), so fall
+    back to naming the mods rather than pretending one is a superset.
+    """
+    base = mods[0] if mods else ""
+    label = ""
+    if shared_base and base:
+        extras = mods[1:]
+        label = "base" if not extras else "with " + ", ".join(extras)
+    else:
+        label = ", ".join(mods) or "no mod"
+    if iwads_differ:
+        label += "  [Doom 1]" if iwads_differ == "DOOM.WAD" else "  [Doom 2]"
+    return label
+
+
 def load_entries():
-    """Build the flat entry list from the manifest."""
+    """Build the flat entry list from the manifest.
+
+    A game with several launch configurations (Brutal Doom on either IWAD,
+    QuakinDoom with or without QuakinMobs) becomes ONE entry per configuration
+    still -- the index has to stay stable for /api/launch -- but they carry a
+    shared group id so the UI can show a single card and offer the
+    configurations as options instead of three near-identical cards.
+    """
     ENTRIES.clear()
     man = json.load(open(MANIFEST, encoding="utf-8"))
     for g in man.get("games", []):
         acts = g.get("actions", [])
-        variants = {a["iwad"] for a in acts}
+        iwads = {a["iwad"] for a in acts}
+        iwads_differ = next(iter(iwads)) if (len(iwads) == 1 and len(acts) > 1) else \
+            ("DOOM.WAD" if "DOOM.WAD" in iwads else "DOOM2.WAD")
+        # Shared base = every variant starts with the same mod.
+        firsts = {tuple(a.get("mods", []))[:1] for a in acts}
+        shared_base = len(firsts) == 1
+        start = len(ENTRIES)
         for a in acts:
             label = g["name"]
-            if len(acts) > 1 and len(variants) > 1:
+            if len(acts) > 1 and len(iwads) > 1:
                 label += " [Doom 1]" if a["iwad"] == "DOOM.WAD" else " [Doom 2]"
             ENTRIES.append({
                 "kind": "pack",
@@ -65,7 +99,25 @@ def load_entries():
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
                 "exists": os.path.isfile(os.path.join(PACK, "launchers", a["bat"])),
+                "group": g["name"],
+                "variant": _variant_label(
+                    [os.path.basename(m) for m in a.get("mods", [])],
+                    shared_base, iwads_differ if len(iwads) > 1 else None),
+                "primary": False,
             })
+        # Point every member of the group at all of its configurations, so the
+        # UI can offer them without a second request.
+        members = list(range(start, len(ENTRIES)))
+        variants = [{"index": i,
+                     "label": ENTRIES[i]["variant"],
+                     "mods": ENTRIES[i]["mods"],
+                     "iwad": ENTRIES[i]["iwad"],
+                     "exists": ENTRIES[i]["exists"]}
+                    for i in members]
+        for i in members:
+            ENTRIES[i]["group_size"] = len(members)
+            ENTRIES[i]["variants"] = variants
+            ENTRIES[i]["primary"] = (i == start)
     for s in man.get("standalone_games", []):
         ENTRIES.append({
             "kind": "standalone",

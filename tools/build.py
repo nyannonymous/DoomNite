@@ -31,6 +31,7 @@ import sys
 
 PACK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BD = r"Z:\GAMES\BRUTAL_DOOM (uwu)"
+BDBE = BD + r"\BDBE 3.38 Build v3 by RaZZoR"
 GZ = r"Z:\GAMES\GZDOOM"
 HD = r"Z:\GAMES\HEXEN HD"
 HO = r"Z:\GAMES\Hocus Doom"
@@ -38,14 +39,25 @@ HL = r"Z:\GAMES\DOOM HALF LIFE"
 
 # Files that must exist and be copied. These are the IWADs and the runtime.
 #
-# The runtime is copied as a WHOLE SET, not a file list. GZDoom loads openal32,
+# The runtime is copied as a WHOLE SET, not a file list. UZDoom loads openal32,
 # libsndfile, libfluidsynth and friends from its own directory; copy the exe
 # without them and it dies at startup with STATUS_DLL_NOT_FOUND (0xC0000135),
 # which surfaces as "nothing happens" because there is no console output. So:
-# copy every .dll sitting next to uzdoom.exe, and fail loudly if it is missing.
-RUNTIME_EXE = "uzdoom.exe"
+# copy every .dll sitting next to the exe, and fail loudly if it is missing.
+#
+# The exe is named doom.exe to match the copy in the Playnite library at
+# Z:\GAMES\BRUTAL_DOOM (uwu)\doom.exe. It is the same binary (verified by
+# sha256), and UZDoom's own release names it uzdoom.exe -- the identical hash
+# is why this was confusing enough to document. Nothing in the pack runs
+# GZDoom; that engine is not used here.
+RUNTIME_EXE = "doom.exe"
+# The file as it is named in the source folder. Z:\GAMES\GZDOOM is a mixed
+# directory holding both engines -- gzdoom.exe (GZDoom) and uzdoom.exe (UZDoom).
+# The pack uses the UZDoom build, copied in under the pack's own name so it
+# matches the doom.exe the Playnite library launches.
+SOURCE_EXE = "uzdoom.exe"
 RUNTIME_REQUIRED = ["game_support.pk3", "zmusic.dll", "openal32.dll"]
-# GZDoom's own data pk3s. Deliberately NOT every .pk3 in the GZDOOM folder:
+# UZDoom's own data pk3s. Deliberately NOT every .pk3 in the source folder:
 # mod pk3s (Brutal Doom, DN3DooM, SWMapPack) live there too and must not be
 # auto-loaded for every entry.
 RUNTIME_PK3 = ["uzdoom.pk3", "game_support.pk3", "brightmaps.pk3", "lights.pk3",
@@ -53,15 +65,19 @@ RUNTIME_PK3 = ["uzdoom.pk3", "game_support.pk3", "brightmaps.pk3", "lights.pk3",
 
 
 def runtime_files():
-    """Every file GZDoom needs beside uzdoom.exe: itself, its pk3s and all DLLs."""
-    names = {RUNTIME_EXE, *RUNTIME_PK3}
+    """Every file UZDoom needs beside the exe: itself, its pk3s and all DLLs.
+
+    Names are the SOURCE names, as they exist in the GZDOOM folder; the exe is
+    renamed to RUNTIME_EXE on the way into the pack.
+    """
+    names = {SOURCE_EXE, *RUNTIME_PK3}
     for n in os.listdir(GZ):
         if n.lower().endswith(".dll"):
             names.add(n)
     missing = [n for n in RUNTIME_REQUIRED if n not in names]
     if missing:
         sys.exit(f"runtime incomplete at {GZ}: missing {', '.join(missing)}\n"
-                 "GZDoom will not start without these (STATUS_DLL_NOT_FOUND).")
+                 "UZDoom will not start without these (STATUS_DLL_NOT_FOUND).")
     return sorted(names)
 
 
@@ -73,6 +89,12 @@ GAMES = [
     ("Brutal Doom v22 test 6", "Brutal Doom 22. Loads first, so combos list it first.",
      [("DOOM2.WAD", BD + r"\brutal22test6.pk3"),
       ("DOOM.WAD", BD + r"\brutal22test6.pk3")]),
+    ("Brutal Doom Black Edition (Enhanced Episode 1)",
+     "RaZZoR's Black Edition, Episode 1. Standalone -file wad, runs on the Doom 1 IWAD.",
+     [("DOOM.WAD", BDBE + r"\enh_e1v1.8c.wad")]),
+    ("Brutal Doom Black Edition (HontE Remastered)",
+     "HontE Remastered, experimental REV1.103. Standalone -file wad on the Doom 1 IWAD.",
+     [("DOOM.WAD", BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
     ("Brutal Doom + Doom Metal vol 5", "Adds the heavy-metal sound pack.",
      [("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad")]),
     ("Beautiful Doom", "HD 16:9 retexture of the original sprites.",
@@ -91,9 +113,6 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3")]),
     ("The Bikini Bottom Massacre", "SpongeBob, but in Doom.",
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
-    ("Doom III: Dusk 'til Dawn", "Doom 3's Rogue-like gameplay in Doom II.",
-     [("DOOM2.WAD", BD + r"\D3.pk3"),
-      ("DOOM2.WAD", BD + r"\D3.pk3", BD + r"\D3_UltraWide.pk3")]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
      [("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad"),
       ("DOOM2.WAD", BD + r"\Duke-Boomem-Aliens-Only.wad"),
@@ -141,7 +160,7 @@ def q(p):
 
 def launcher_line(slug, iwad, mods):
     """The engine invocation. Relative to the pack root, so it stays portable."""
-    parts = ['start "" "runtime\\uzdoom.exe"']
+    parts = ['start "" "runtime\\doom.exe"']
     for sub, fname in mods:
         parts.append(f'"mods\\{sub}\\{fname}"')
     parts.append(f'-iwad "iwads\\{iwad}"')
@@ -184,11 +203,12 @@ def build():
     rt = runtime_files()
     for n in rt:
         src = os.path.join(GZ, n)
-        dest = os.path.join(PACK, "runtime", n)
+        dest = os.path.join(PACK, "runtime", RUNTIME_EXE if n == SOURCE_EXE else n)
         if not (os.path.exists(dest)
                 and os.path.getsize(dest) == os.path.getsize(src)):
             shutil.copy2(src, dest)
-    manifest["runtime"] = rt
+    manifest["runtime"] = sorted(
+        RUNTIME_EXE if n == SOURCE_EXE else n for n in rt)
 
     for n in IWADS:
         src = os.path.join(GZ, n)
@@ -220,7 +240,7 @@ def build():
                 mods.append((sub, fname))
             if not ok:
                 continue
-            # One launcher per action. Mod order matters: GZDoom loads -file
+            # One launcher per action. Mod order matters: ZDoom loads -file
             # entries in sequence, so a combo lists its base mod first.
             suffix = "" if i == 0 else f"-d{i}"
             bat = f"{slugify(name)}{suffix}.bat"
@@ -278,11 +298,11 @@ def check():
     # its DLLs passes every file-exists check and still dies instantly with
     # STATUS_DLL_NOT_FOUND, so run it and read the exit code.
     #
-    # -norun makes GZDoom load the IWAD, init sound and video, then exit without
+    # -norun makes ZDoom load the IWAD, init sound and video, then exit without
     # opening a window. Plain -version is no good here: on this build it opens a
     # window and waits for a keypress, so it would always "hang".
     #
-    # Exit code 1337 is GZDoom's own "quit requested" result for -norun, so it
+    # Exit code 1337 is ZDoom's own "quit requested" result for -norun, so it
     # is success here, not a failure. Anything non-zero that is NOT 1337, and
     # any NTSTATUS crash code, is a real problem.
     DLL_NOT_FOUND = {0xC0000135, -1073741515}
@@ -296,7 +316,7 @@ def check():
                                capture_output=True, timeout=120)
             if r.returncode in DLL_NOT_FOUND:
                 problems.append("runtime cannot start: STATUS_DLL_NOT_FOUND "
-                                "(a DLL beside uzdoom.exe is missing)")
+                                "(a DLL beside doom.exe is missing)")
             elif r.returncode in ACCESS_VIOLATION:
                 problems.append("runtime crashed: STATUS_ACCESS_VIOLATION")
             elif r.returncode not in (0, 1337):
