@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchEntries, groupEntries, FILTERS, launchIndex } from "./api";
+import { fetchEntries, groupEntries, FILTERS, launchIndex, artUrl } from "./api";
+import { posterFor } from "./poster";
 import Tile from "./Tile";
 import Panel from "./Panel";
 import EmberField from "./EmberField";
 import VariantMenu from "./VariantMenu";
+import CRTOverlay, { LaunchFlash } from "./CRTOverlay";
 
 function Toast({ msg, bad }) {
   if (!msg) return null;
@@ -45,6 +47,9 @@ export default function App() {
   }, [pinned]);
   // Which game's build menu is open, and where. Null key means closed.
   const [menu, setMenu] = useState(null);
+  // Drives the screen-wide flash + glitch bars on launch. Purely decorative and
+  // never gates the actual launch -- see LaunchFlash.
+  const [flashing, setFlashing] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
   const [toastBad, setToastBad] = useState(false);
   const [count, setCount] = useState(0); // entrance animation trigger
@@ -145,10 +150,14 @@ export default function App() {
         toast(`Cannot launch ${group.label}: files are missing.`, true);
         return;
       }
+      // Fire the flash before awaiting, so it overlaps the engine's startup
+      // rather than playing after it.
+      setFlashing(true);
       try {
         const r = await launchIndex(cfg.index);
         toast(`Launched: ${r.label}`);
       } catch (e) {
+        setFlashing(false);
         toast(`Failed: ${e.message}`, true);
       }
     },
@@ -248,8 +257,27 @@ export default function App() {
 
   const nVariants = merged.filter((g) => g.cfgs.length > 1).length;
 
+  // The selected game's own art, blown up and blurred behind everything. Uses
+  // the extracted title screen when the mod ships one and the generated poster
+  // otherwise -- same source the card uses, so it is always in sync.
+  const heroArt = current?.art ? artUrl(current.art) : current ? posterFor(current.label, current.note) : null;
+
   return (
-    <div className="app">
+    // uac-root is what switches the native cursor off for the crosshair, and
+    // d-noise is the app-wide film grain.
+    <div className="app uac-root">
+      {heroArt && (
+        <>
+          <div
+            className="d-hero"
+            style={{ backgroundImage: `url("${heroArt}")` }}
+            aria-hidden="true"
+          />
+          <div className="d-hero-veil" aria-hidden="true" />
+        </>
+      )}
+      <CRTOverlay />
+      {flashing && <LaunchFlash onDone={() => setFlashing(false)} />}
       <EmberField />
       <div className="vignette" aria-hidden="true" />
       <header className="topbar">

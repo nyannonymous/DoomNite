@@ -1,3 +1,779 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===================================================================
+   DoomNite -- UAC terminal skin.
+
+   Tailwind handles layout and spacing; this layer handles the things
+   utilities cannot express: generated noise, scanlines, the vignette,
+   jagged clip-path borders and chromatic aberration. All of it is drawn
+   from CSS gradients and blend modes -- no image files, so the app stays
+   a self-contained bundle that works offline.
+
+   The pre-redesign stylesheet follows below unchanged. It is the working
+   UI, so it stays until the new components prove themselves.
+   =================================================================== */
+
+@layer base {
+  :root {
+    /* Doom palette. Duplicated from tailwind.config.js because the layer
+       below reads them at runtime; keep the two in step. */
+    --d-void:      #08090b;
+    --d-gun-900:   #0e1013;
+    --d-gun-800:   #16191d;
+    --d-gun-700:   #1e2227;
+    --d-gun-600:   #2a2f36;
+    --d-gun-400:   #3a4149;
+    --d-gun-200:   #7c848e;
+    --d-rust-600:  #7a3b18;
+    --d-rust-500:  #a5521f;
+    --d-rust-400:  #c76a2c;
+    --d-rust-300:  #e08a45;
+    --d-toxic-500: #5b942e;
+    --d-toxic-400: #7fc23c;
+    --d-toxic-300: #a3e05c;
+    --d-blood-700: #6b0f14;
+    --d-blood-500: #b71c1c;
+    --d-blood-400: #e02f2f;
+    --d-blood-300: #ff5c5c;
+
+    --d-display: "Black Ops One", "Oswald", Impact, sans-serif;
+    --d-head:    "Oswald", "Arial Narrow", sans-serif;
+    --d-mono:    "JetBrains Mono", "Fira Code", Consolas, monospace;
+  }
+
+  html, body, #root { height: 100%; }
+
+  body {
+    background: var(--d-void);
+    color: #d8dce1;
+    font-family: var(--d-mono);
+    /* Kill the iOS/Android tap highlight so the custom cursor is the only
+       pointer feedback on touch devices too. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Doom crosshair cursor. Two crossed bars plus a centre gap, drawn with
+     gradients so there is no image to load. `cursor` is set on the app
+     shell; native cursors are kept for form fields and text so typing and
+     text selection still work normally. */
+  .uac-root,
+  .uac-root .tile,
+  .uac-root button:not(.keep-cursor) {
+    cursor: none;
+  }
+  .uac-root input,
+  .uac-root textarea,
+  .uac-root .keep-cursor {
+    cursor: auto;
+  }
+}
+
+@layer components {
+  /* ---------- metal, not flat ---------- */
+
+  /* A bevel is a light top edge and a dark bottom edge. Paired with the
+     noise overlay below it stops any panel reading as a flat fill. */
+  .d-bevel {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.09),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+  }
+
+  .d-panel {
+    background:
+      linear-gradient(180deg, rgba(42, 47, 54, 0.82) 0%, rgba(14, 16, 19, 0.9) 100%);
+    border: 1px solid var(--d-gun-600);
+    backdrop-filter: blur(2px);
+  }
+
+  /* Brushed-metal striping, used behind headers and the terminal readout. */
+  .d-brushed {
+    background-image: repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.022) 0px,
+      rgba(255, 255, 255, 0.022) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  }
+
+  /* ---------- generated noise ---------- */
+
+  /* Two offset fractal-noise SVG data URIs composited together. A single
+     layer looks like a repeating pattern; the two different scales are
+     what make it read as film grain. */
+  .d-noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.16;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
+  }
+
+  /* ---------- CRT ---------- */
+
+  /* Scanlines: a 3px repeating linear gradient at low alpha. The mask
+     gradient fades the effect toward the edges so the centre stays
+     readable -- uniform scanlines across a wide screen are genuinely
+     hard to read text through. */
+  .d-scanlines {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.28) 0px,
+      rgba(0, 0, 0, 0.28) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
+  }
+
+  /* A brighter band rolling slowly down the screen, like a CRT refresh. */
+  .d-scan-sweep {
+    position: fixed;
+    inset: 0;
+    z-index: 61;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .d-scan-sweep::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 22vh;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(127, 194, 60, 0.045),
+      transparent
+    );
+    animation: d-sweep 7s linear infinite;
+  }
+  @keyframes d-sweep {
+    0%   { transform: translateY(-22vh); }
+    100% { transform: translateY(100vh); }
+  }
+
+  /* Vignette. Inset box-shadow rather than a gradient so it can sit above
+     the hero art without a second element. */
+  .d-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 180px 40px rgba(0, 0, 0, 0.82),
+      inset 0 0 60px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  /* Very low-alpha colour fringing on the whole screen. Kept subtle on
+     purpose; at higher values it makes text look broken rather than CRT. */
+  .d-aberration {
+    position: fixed;
+    inset: 0;
+    z-index: 62;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    opacity: 0.05;
+    background:
+      linear-gradient(90deg, rgba(224, 47, 47, 0.5), transparent 12%),
+      linear-gradient(270deg, rgba(127, 194, 60, 0.5), transparent 12%);
+  }
+
+  /* ---------- jagged clip-path borders ---------- */
+
+  /* A notched rectangle. Eight points, alternating long and short edges,
+     which reads as a torn metal plate. clip-path clips the border itself,
+     so the element's own border would be cut through -- the visible edge
+     comes from a drop-shadow filter instead. */
+  .d-jagged {
+    clip-path: polygon(
+      0 6px, 6px 0,
+      calc(100% - 10px) 0, 100% 8px,
+      100% calc(100% - 6px), calc(100% - 6px) 100%,
+      10px 100%, 0 calc(100% - 8px)
+    );
+  }
+
+  /* Heavier notch for the selected card. */
+  .d-jagged-lg {
+    clip-path: polygon(
+      0 12px, 12px 0,
+      calc(100% - 18px) 0, 100% 14px,
+      100% calc(100% - 12px), calc(100% - 12px) 100%,
+      18px 100%, 0 calc(100% - 14px)
+    );
+  }
+
+  /* Glow that traces a clip-path edge. Two offset drop-shadows in the
+     toxic green, blurred, read as the notches lighting up. */
+  .d-jag-glow {
+    filter:
+      drop-shadow(0 0 1px var(--d-toxic-400))
+      drop-shadow(0 0 6px color-mix(in srgb, var(--d-toxic-500) 70%, transparent));
+  }
+  .d-jag-glow-blood {
+    filter:
+      drop-shadow(0 0 1px var(--d-blood-400))
+      drop-shadow(0 0 8px color-mix(in srgb, var(--d-blood-500) 75%, transparent));
+  }
+
+  /* ---------- glitch text ---------- */
+
+  /* Chromatic aberration by offsetting two copies of the same text in red
+     and cyan behind the real one. The element needs position:relative and
+     its own text colour for the copies to be hidden behind it. */
+  .d-glitch { position: relative; display: inline-block; }
+  .d-glitch::before,
+  .d-glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .d-glitch::before { color: var(--d-blood-400); }
+  .d-glitch::after  { color: var(--d-toxic-300); }
+
+  .d-glitch:hover::before,
+  .d-glitch.is-glitching::before {
+    opacity: 0.85;
+    animation: d-glitch-a 0.42s steps(2) infinite;
+  }
+  .d-glitch:hover::after,
+  .d-glitch.is-glitching::after {
+    opacity: 0.7;
+    animation: d-glitch-b 0.42s steps(2) infinite;
+  }
+
+  @keyframes d-glitch-a {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-2px, 1px); }
+    50% { transform: translate(2px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+  }
+  @keyframes d-glitch-b {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(2px, -1px); }
+    50% { transform: translate(-2px, 1px); }
+    75% { transform: translate(1px, 1px); }
+  }
+
+  /* A hard horizontal slice, the other half of a glitch: one band of the
+     text jumps sideways. */
+  .d-glitch-slice::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 22%;
+    top: 34%;
+    background: var(--d-void);
+    opacity: 0;
+    mix-blend-mode: difference;
+  }
+  .d-glitch-slice:hover::after {
+    opacity: 0.5;
+    animation: d-slice 0.5s steps(3) infinite;
+  }
+  @keyframes d-slice {
+    0%, 100% { transform: translateX(0); }
+    33% { transform: translateX(-4px); }
+    66% { transform: translateX(5px); }
+  }
+
+  /* ---------- terminal readout ---------- */
+
+  .d-term {
+    font-family: var(--d-mono);
+    background:
+      linear-gradient(180deg, rgba(10, 26, 8, 0.72) 0%, rgba(6, 12, 6, 0.86) 100%);
+    border: 1px solid color-mix(in srgb, var(--d-toxic-500) 40%, transparent);
+    box-shadow:
+      inset 0 0 40px rgba(0, 0, 0, 0.9),
+      0 0 18px -6px color-mix(in srgb, var(--d-toxic-500) 45%, transparent);
+    color: var(--d-toxic-300);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--d-toxic-400) 55%, transparent);
+  }
+
+  /* Blinking block cursor at the end of typed text. */
+  .d-caret::after {
+    content: "\2588";
+    margin-left: 1px;
+    color: var(--d-toxic-300);
+    animation: d-blink 1s steps(2) infinite;
+  }
+  @keyframes d-blink { 50% { opacity: 0; } }
+
+  /* UAC boot-sequence bar: segmented, so it reads as filling in discrete
+     steps rather than sliding smoothly. */
+  .d-bootbar {
+    height: 10px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid color-mix(in srgb, var(--d-toxic-500) 45%, transparent);
+    overflow: hidden;
+  }
+  .d-bootbar-fill {
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--d-toxic-400) 0 6px,
+      transparent 6px 8px
+    );
+    box-shadow: 0 0 12px color-mix(in srgb, var(--d-toxic-400) 70%, transparent);
+  }
+
+  /* "Data streams": falling characters. The streaks are gradients, not
+     glyphs, so they cost nothing to animate. */
+  .d-streams {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+  .d-streams::before,
+  .d-streams::after {
+    content: "";
+    position: absolute;
+    top: -100%;
+    width: 2px;
+    height: 200%;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      var(--d-toxic-400),
+      transparent
+    );
+    animation: d-fall 1.6s linear infinite;
+  }
+  .d-streams::before { left: 12%; animation-duration: 1.9s; }
+  .d-streams::after  { left: 78%; animation-duration: 1.4s; animation-delay: 0.5s; }
+  @keyframes d-fall {
+    0%   { transform: translateY(-50%); opacity: 0; }
+    20%  { opacity: 0.8; }
+    100% { transform: translateY(50%); opacity: 0; }
+  }
+
+  /* ---------- hero ---------- */
+
+  /* The selected game's art, filling the screen behind everything. */
+  .d-hero {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(14px) saturate(0.55) brightness(0.42);
+    transform: scale(1.08); /* hides the blur's soft edge */
+  }
+  /* Dark overlay so text over the art keeps contrast. */
+  .d-hero-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(8, 9, 11, 0.82) 0%, rgba(8, 9, 11, 0.6) 45%, rgba(8, 9, 11, 0.92) 100%);
+  }
+
+  /* ---------- launch flash ---------- */
+
+  .d-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    pointer-events: none;
+    background: var(--d-blood-300);
+  }
+
+  /* Glitch bars during launch: horizontal slices that displace. */
+  .d-glitchbars {
+    position: fixed;
+    inset: 0;
+    z-index: 81;
+    pointer-events: none;
+    overflow: hidden;
+    mix-blend-mode: difference;
+  }
+  .d-glitchbars::before,
+  .d-glitchbars::after {
+    content: "";
+    position: absolute;
+    left: -10%;
+    right: -10%;
+    background: var(--d-toxic-300);
+  }
+  .d-glitchbars::before { height: 12%; top: 30%; animation: d-bar 0.28s steps(3) 3; }
+  .d-glitchbars::after  { height: 8%;  top: 66%; animation: d-bar 0.28s steps(3) 3 reverse; }
+  @keyframes d-bar {
+    0%, 100% { transform: translateX(0); }
+    33% { transform: translateX(-6%); }
+    66% { transform: translateX(7%); }
+  }
+
+  /* ---------- crosshair cursor ---------- */
+
+  /* Positioned by transform from CRTOverlay's pointermove handler. The
+     negative margins centre the crosshair on the pointer rather than putting
+     its top-left there. */
+  .d-crosshair {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 95;
+    width: 26px;
+    height: 26px;
+    margin: -13px 0 0 -13px;
+    pointer-events: none;
+    will-change: transform;
+    transition: opacity var(--fast) var(--ease);
+    /* The crosshair is the only pointer feedback, so it needs to stay legible
+       over both the pale hero art and the dark UI. */
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9));
+  }
+  .d-crosshair.is-out { opacity: 0; }
+
+  .d-xh {
+    position: absolute;
+    background: var(--d-toxic-300);
+    box-shadow: 0 0 6px var(--d-toxic-400);
+  }
+  .d-xh-t, .d-xh-b { left: 50%; width: 2px; height: 8px; margin-left: -1px; }
+  .d-xh-l, .d-xh-r { top: 50%; height: 2px; width: 8px; margin-top: -1px; }
+  .d-xh-t { top: 0; }
+  .d-xh-b { bottom: 0; }
+  .d-xh-l { left: 0; }
+  .d-xh-r { right: 0; }
+
+  .d-xh-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 3px;
+    height: 3px;
+    margin: -1.5px 0 0 -1.5px;
+    background: var(--d-blood-400);
+    box-shadow: 0 0 6px var(--d-blood-400);
+  }
+
+  /* ---------- card: notch glow, tags, glitch ---------- */
+
+  /* The notch glow. Sits behind the card body and fades in on hover, so the
+     jagged edge reads as lighting up rather than being permanently drawn.
+     Pointer-events off so it never intercepts the card click. */
+  .tile-jag {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+    background:
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--d-toxic-500) 22%, transparent),
+        transparent 40%);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--d-toxic-400) 55%, transparent),
+      inset 0 0 22px -6px color-mix(in srgb, var(--d-toxic-400) 60%, transparent);
+  }
+  .tile:hover .tile-jag,
+  .tile:focus-within .tile-jag { opacity: 1; }
+  .tile.is-sel .tile-jag {
+    opacity: 1;
+    background:
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--d-blood-600, #8c1418) 26%, transparent),
+        transparent 45%);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--d-blood-400) 65%, transparent),
+      inset 0 0 26px -6px color-mix(in srgb, var(--d-blood-500) 65%, transparent);
+  }
+
+  /* The noise overlay is a ::before, so the content needs to sit above it. */
+  .tile > * { position: relative; z-index: 1; }
+  .tile .tile-jag { z-index: 2; }
+  .tile .tile-playwrap { z-index: 3; }
+
+  /* Chrome Petch is already the display face; the glitch offsets assume a
+     tight line box, so give the title one. */
+  .tile-name { position: relative; }
+
+  .tile-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 3px;
+  }
+
+  .tile-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font: 700 0.55rem/1 var(--d-mono);
+    letter-spacing: 0.1em;
+    padding: 3px 5px;
+    border-radius: 2px;
+    color: var(--d-void);
+  }
+  .tile-tag.is-hd  { background: var(--d-toxic-400); }
+  .tile-tag.is-pin { background: var(--d-rust-400); }
+  .tile-tag.is-bad { background: var(--d-blood-400); }
+
+  /* Framer Motion writes transform on the tile for the spring. The tilt also
+     wants a transform, so the tilt moves to an inner wrapper-free property:
+     rotate is applied via the custom props on a child, keeping the two from
+     fighting over the same declaration. */
+  .tile { --tilt-x: 0deg; --tilt-y: 0deg; }
+  .tile .cover,
+  .tile .tile-body {
+    transform: rotateX(calc(var(--my) * -5deg)) rotateY(calc(var(--mx) * 7deg));
+    transform-style: preserve-3d;
+  }
+
+  /* ---------- terminal pane internals ---------- */
+
+  .d-termpane {
+    position: relative;
+    padding: 14px 16px 16px;
+    overflow: hidden;
+  }
+
+  /* The streams sit behind the text, so the pane needs its own stacking
+     context for them not to escape. */
+  .d-streamwrap { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  .d-termpane > *:not(.d-streamwrap) { position: relative; z-index: 1; }
+
+  /* Offset the second stream pair so they do not fall in lockstep. */
+  .d-streams-2 { transform: scaleX(-1); opacity: 0.3; }
+
+  .d-termpane-head { margin-bottom: 12px; }
+
+  .d-termpane-title {
+    margin: 0 0 3px;
+    font-size: clamp(1.05rem, 2.2vw, 1.4rem);
+    line-height: 1.1;
+    color: #e8ecef;
+  }
+
+  .d-termpane-sub {
+    margin: 0 0 9px;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: color-mix(in srgb, var(--d-toxic-300) 70%, #fff 0%);
+    opacity: 0.85;
+  }
+
+  .d-termpane-body { display: flex; flex-direction: column; gap: 3px; }
+
+  /* A readout row: key, dotted leader, value. The leader is a repeating
+     gradient rather than a literal "......" so it aligns to the value edge at
+     any panel width. */
+  .d-termrow {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 0.72rem;
+    line-height: 1.7;
+  }
+
+  .d-termkey {
+    flex: none;
+    color: color-mix(in srgb, var(--d-toxic-400) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .d-termdots {
+    flex: 1;
+    min-width: 8px;
+    height: 1px;
+    align-self: center;
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--d-toxic-500) 45%, transparent) 0 2px,
+      transparent 2px 4px
+    );
+    background-size: 4px 1px;
+    opacity: 0.7;
+  }
+
+  .d-termval {
+    flex: none;
+    max-width: 62%;
+    text-align: right;
+    color: var(--d-toxic-200, #c9f58c);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .d-termval.is-accent {
+    color: var(--d-rust-300);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--d-rust-500) 60%, transparent);
+  }
+
+  .d-bootwrap { display: flex; flex-direction: column; gap: 6px; }
+
+  .d-bootlabel {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    color: color-mix(in srgb, var(--d-toxic-400) 75%, transparent);
+  }
+
+  /* ---------- panel: industrial switch + terminal rows ---------- */
+
+  /* The panel's own play button is the heavy industrial switch the brief
+     asks for: a thick bottom edge that collapses on press, and a pulsing
+     blood/rust glow on hover. The edge is real geometry (a 5px inset shadow
+     plus a matching offset), not a blur, so it reads as metal thickness. */
+  .panel .play {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    padding: 0.85em 1.6em;
+    font: 700 1rem/1 "Chakra Petch", system-ui, sans-serif;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(180deg, #8c1418 0%, #4a0b0e 100%);
+    border: 1px solid #b71c1c;
+    border-radius: 3px;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow:
+      0 5px 0 #2b0608,
+      0 12px 26px -8px rgba(224, 47, 47, 0.7),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.4);
+    transition:
+      transform var(--fast) var(--ease),
+      box-shadow var(--fast) var(--ease),
+      filter var(--fast) var(--ease);
+  }
+
+  .panel .play:hover:not(:disabled) {
+    filter: brightness(1.18);
+    /* Pulse: the glow breathes rather than sitting static. */
+    animation: d-switch-pulse 1.5s ease-in-out infinite;
+  }
+
+  .panel .play:active:not(:disabled) {
+    /* Press down: the 5px bottom edge collapses to 0. */
+    transform: translateY(5px);
+    box-shadow:
+      0 0 0 #2b0608,
+      0 4px 10px -4px rgba(224, 47, 47, 0.6),
+      inset 0 3px 6px rgba(0, 0, 0, 0.55);
+  }
+
+  .panel .play:disabled { cursor: not-allowed; filter: grayscale(0.85) brightness(0.55); }
+
+  .panel .play:focus-visible {
+    outline: 2px solid var(--d-toxic-300);
+    outline-offset: 3px;
+  }
+
+  .panel .play svg { fill: currentColor; flex: none; }
+
+  @keyframes d-switch-pulse {
+    0%, 100% { box-shadow: 0 5px 0 #2b0608, 0 12px 26px -8px rgba(224, 47, 47, 0.6), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 0 rgba(0,0,0,0.4); }
+    50%      { box-shadow: 0 5px 0 #2b0608, 0 16px 34px -6px rgba(255, 92, 92, 0.85), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 0 rgba(0,0,0,0.4); }
+  }
+
+  /* Boot overlay: covers the panel body for ~half a second on game switch. */
+  .panel-boot {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    padding: 0 18px;
+    background: linear-gradient(180deg, rgba(6, 12, 6, 0.9), rgba(4, 8, 4, 0.96));
+    backdrop-filter: blur(1px);
+  }
+
+  .panel-termrows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px 0 4px;
+    padding: 9px 11px;
+    background: rgba(4, 10, 5, 0.5);
+    border-left: 2px solid color-mix(in srgb, var(--d-toxic-500) 55%, transparent);
+  }
+
+  /* The panel body is the terminal: green-on-black with a glow, matching the
+     .d-term recipe but softer, since the whole pane already sits on a
+     terminal-tinted background. */
+  .panel-note.d-term {
+    margin: 0 0 10px;
+    padding: 7px 9px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    border-radius: 2px;
+  }
+
+  /* The panel must sit above the hero art and its veil. */
+  .panel, .stage, .statusbar, .topbar { position: relative; z-index: 2; }
+
+  /* ---------- headers ---------- */
+
+  .d-head {
+    font-family: var(--d-display);
+    letter-spacing: 0.04em;
+    /* Chunky display type needs a hard shadow to feel stamped rather than
+       printed. Two offsets, no blur. */
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.85),
+      0 0 18px color-mix(in srgb, var(--d-rust-500) 35%, transparent);
+  }
+
+  .d-label {
+    font-family: var(--d-head);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: var(--d-rust-300);
+  }
+
+  /* Faint horizontal rule with a bright segment, like a UAC divider. */
+  .d-rule {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--d-gun-600) 15%,
+      var(--d-rust-600) 50%,
+      var(--d-gun-600) 85%,
+      transparent
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .d-scan-sweep::after,
+  .d-streams::before,
+  .d-streams::after,
+  .d-caret::after { animation: none; }
+  .d-glitch::before, .d-glitch::after { opacity: 0 !important; }
+  .panel .play:hover { animation: none; }
+}
+
 /* DoomNite UI
  *
  * Inspiration: the Nexus Oracle card archive -- a dark void, a live canvas that
@@ -474,19 +1250,30 @@ kbd {
   --my: 0;
   --gx: 50%;
   --gy: 50%;
-  transform: rotateX(calc(var(--my) * -6deg)) rotateY(calc(var(--mx) * 8deg))
-    translateZ(0);
-  transform-style: preserve-3d;
+  /* transform, transform-style and the entrance animation all used to live
+     here. They belong to Framer Motion now:
+       - transform is written by the spring (whileHover/whileTap/entrance),
+         so a CSS transform here is overwritten every frame and the two
+         systems fight over the same property.
+       - the pointer tilt moved to .cover/.tile-body, which rotate on their
+         own axes and leave the card's transform free for the spring.
+       - tile-in was a CSS keyframe entrance; Framer's `rise` variant does it
+         now, so the stagger is spring-driven rather than eased. */
+  transform-style: flat;
   box-shadow:
     var(--shadow-1),
     inset 0 1px 0 var(--bevel-lt),
     inset 0 -1px 0 var(--bevel-dk);
   transition:
-    transform var(--med) var(--ease),
     border-color var(--med) var(--ease),
-    box-shadow var(--med) var(--ease);
-  animation: tile-in var(--slow) var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 24ms);
+    box-shadow var(--med) var(--ease),
+    background var(--med) var(--ease);
+  /* The notch profile comes from a clip-path in the UAC layer, so the rounded
+     corners have to go or the two shapes fight. */
+  border-radius: 0;
+  /* Hover lift, expressed as a shadow change rather than a transform, because
+     transform now belongs to the spring. */
+  will-change: transform;
 }
 
 @keyframes tile-in {

@@ -1,6 +1,9 @@
+import { motion, useReducedMotion } from "framer-motion";
+import { Play, Terminal as TerminalIcon, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dryrun, launchIndex } from "./api";
 import { Cover } from "./Tile";
+import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
 
 function bytes(n) {
   if (!n) return "";
@@ -8,7 +11,16 @@ function bytes(n) {
 }
 
 export default function Panel({ group, onPick, toast }) {
+  const reduced = useReducedMotion();
   const [busy, setBusy] = useState(false);
+  // Brief boot readout on every game switch. Purely presentational: the details
+  // below are already mounted, this just covers them for half a second.
+  const [booting, setBooting] = useState(true);
+  useEffect(() => {
+    setBooting(true);
+    const t = setTimeout(() => setBooting(false), 480);
+    return () => clearTimeout(t);
+  }, [group?.key]);
   const [cmd, setCmd] = useState(null);
   const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -55,12 +67,39 @@ export default function Panel({ group, onPick, toast }) {
   }
 
   return (
-    <aside className="panel" key={group.key}>
+    // key={group.key} remounts on every switch, which is what replays the
+    // entrance. x offset plus a slight skew reads as a mechanical slide rather
+    // than a fade.
+    <motion.aside
+      className="panel"
+      key={group.key}
+      initial={reduced ? false : { opacity: 0, x: 34, skewX: -1.6 }}
+      animate={reduced ? undefined : { opacity: 1, x: 0, skewX: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 26, mass: 0.8 }}
+    >
       <Cover group={group} className="panel-cover" />
+      {/* Falling data streams behind the readout. Decorative only, so it is
+          aria-hidden and pointer-transparent in the component. */}
+      <DataStreams />
+      {/* UAC boot sequence, shown once per game switch. The panel remounts on
+          key change, so a fresh mount is a fresh boot -- no extra state. */}
+      {booting ? (
+        <div className="panel-boot">
+          <BootBar ms={520} label="LOADING" />
+        </div>
+      ) : null}
 
       <div className="panel-scroll">
-        <h2 className="panel-title">{group.label}</h2>
-        {group.note && <p className="panel-note">{group.note}</p>}
+        <h2 className="panel-title d-head d-glitch" data-text={group.label}>
+          {group.label}
+        </h2>
+        {/* The description types itself out, keyed on the game so switching
+            games replays it. That replay is the mechanical feel. */}
+        {group.note && (
+          <p className="panel-note d-term">
+            <Typed text={group.note} speed={10} />
+          </p>
+        )}
 
         {group.cfgs.length > 1 && (
           <section className="panel-section">
@@ -124,6 +163,18 @@ export default function Panel({ group, onPick, toast }) {
           )}
         </section>
 
+        {/* Terminal summary strip. TermRow gives the dotted-leader readout
+            look; this is the same info the old <dl> carried, restated in the
+            UAC idiom. */}
+        <div className="panel-termrows">
+          <TermRow k="build" v={cfg.label || `#${cfg.index + 1}`} accent={cfg.hd} />
+          <TermRow k="iwad" v={(cfg.iwad || "standalone").replace(/\.WAD$/i, "")} />
+          <TermRow k="mods" v={cfg.mods.length || "none"} />
+          {group.cfgs.length > 1 && (
+            <TermRow k="builds" v={`${group.cfgs.length} available`} />
+          )}
+        </div>
+
         <div className="panel-actions">
           <button
             type="button"
@@ -132,6 +183,7 @@ export default function Panel({ group, onPick, toast }) {
             disabled={disabled}
           >
             <span className="play-glow" aria-hidden="true" />
+            <Play size={18} strokeWidth={2.5} aria-hidden="true" />
             <span className="play-label">{busy ? "Starting…" : "Play"}</span>
             <span className="play-key">↵</span>
           </button>
@@ -158,6 +210,6 @@ export default function Panel({ group, onPick, toast }) {
           <p className="warn">This config&apos;s files are missing from the pack.</p>
         )}
       </div>
-    </aside>
+    </motion.aside>
   );
 }

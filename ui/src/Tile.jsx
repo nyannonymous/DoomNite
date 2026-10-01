@@ -1,6 +1,34 @@
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { Play, Swords, Skull, Radio } from "lucide-react";
 import { artUrl } from "./api";
 import { posterFor } from "./poster";
+
+/** Entrance: cards rise from below, staggered like loading into a level. */
+const rise = {
+  hidden: { opacity: 0, y: 34, scale: 0.97 },
+  show: (i) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      // Spring, not a fixed duration: the overshoot is the mechanical snap the
+      // brief asks for. delay is capped so a 14-card grid does not take 3s.
+      type: "spring",
+      stiffness: 420,
+      damping: 30,
+      mass: 0.7,
+      delay: Math.min(i * 0.035, 0.7),
+    },
+  }),
+};
+
+/** Hover jolt: short, overshooting, settles fast. */
+const jolt = {
+  rest: { scale: 1 },
+  hover: { scale: 1.028, transition: { type: "spring", stiffness: 700, damping: 17, mass: 0.5 } },
+  press: { scale: 0.985, transition: { type: "spring", stiffness: 900, damping: 30 } },
+};
 
 /**
  * A cover image that uses the mod's own extracted title screen when there is
@@ -67,12 +95,15 @@ export default function Tile({
   index,
 }) {
   const ref = useRef(null);
+  // One flag for every motion decision below. Framer's own hook, so it also
+  // respects the OS setting without me re-reading matchMedia.
+  const reduced = useReducedMotion();
   const cfg = group.cfgs[group.pick] || group.cfgs[0];
 
   // Keep the keyboard-selected tile in view without yanking the page around.
   useEffect(() => {
     if (selected && ref.current) {
-      ref.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      ref.current.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
     }
   }, [selected]);
 
@@ -88,7 +119,7 @@ export default function Tile({
    */
   function onMove(e) {
     const el = ref.current;
-    if (!el) return;
+    if (!el || reduced) return;
     const r = el.getBoundingClientRect();
     const px = (e.clientX - r.left) / r.width; // 0..1
     const py = (e.clientY - r.top) / r.height;
@@ -103,6 +134,8 @@ export default function Tile({
     if (!el) return;
     el.style.setProperty("--mx", 0);
     el.style.setProperty("--my", 0);
+    el.style.setProperty("--gx", "50%");
+    el.style.setProperty("--gy", "50%");
   }
 
   /**
@@ -148,15 +181,38 @@ export default function Tile({
     }
   }
 
+  // Long IWAD names get in the way of the title, so normalise them once here
+  // rather than inline in the JSX.
+  const iwadShort = (w) =>
+    (w || "")
+      .replace(/\.WAD$/i, "")
+      .replace(/^DOOM2$/i, "Doom 2")
+      .replace(/^DOOM$/i, "Doom 1")
+      .replace(/^Hexen$/i, "Hexen");
+
   return (
-    <div
+    <motion.div
       ref={ref}
       role="button"
       tabIndex={0}
-      className={`tile ${selected ? "is-sel" : ""} ${pinned ? "is-pin" : ""} ${
-        group.missing ? "is-missing" : ""
-      }`}
+      className={[
+        "tile",
+        "d-noise",
+        selected ? "is-sel" : "",
+        pinned ? "is-pin" : "",
+        group.missing ? "is-missing" : "",
+        // The notch profile changes with state: a deeper cut when selected.
+        selected ? "d-jagged-lg" : "d-jagged",
+        selected ? "d-jag-glow-blood" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{ "--i": index }}
+      variants={reduced ? undefined : rise}
+      initial={reduced ? false : "hidden"}
+      animate={reduced ? undefined : "show"}
+      whileHover={reduced ? undefined : "hover"}
+      whileTap={reduced ? undefined : "press"}
       onClick={activate}
       onKeyDown={onKeyDown}
       onContextMenu={openVariants}
@@ -169,11 +225,37 @@ export default function Tile({
       title={`${group.label}${multi ? ` — ${group.cfgs.length} builds` : ""}\nClick to pin · Right-click for builds`}
     >
       <Cover group={group} />
+      {/* Notch glow, revealed on hover so it snaps into place rather than
+          always being present. */}
+      <span className="tile-jag" aria-hidden="true" />
+
       <span className="tile-body">
-        <span className="tile-name">{group.label}</span>
+        {/* data-text is what .d-glitch's pseudo-elements copy. Without it the
+            chromatic aberration has nothing to render. */}
+        <span className="tile-name d-glitch" data-text={group.label}>
+          {group.label}
+        </span>
         <span className="tile-sub">
-          {cfg.iwad ? cfg.iwad.replace(/\.WAD$/i, "").replace(/^DOOM2$/i, "Doom 2").replace(/^DOOM$/i, "Doom 1").replace(/^Hexen$/i, "Hexen") : "Standalone"}
-          {multi ? ` · ${group.cfgs.length} configs` : ""}
+          {iwadShort(cfg.iwad) || "Standalone"}
+          {multi ? ` · ${group.cfgs.length} builds` : ""}
+        </span>
+        {/* Icons carry state the text does not, so state is not colour-only. */}
+        <span className="tile-tags">
+          {cfg.hd && (
+            <span className="tile-tag is-hd" title="High definition build">
+              <Radio size={10} aria-hidden="true" /> HD
+            </span>
+          )}
+          {pinned && (
+            <span className="tile-tag is-pin" title="Pinned">
+              <Swords size={10} aria-hidden="true" /> PINNED
+            </span>
+          )}
+          {group.missing && (
+            <span className="tile-tag is-bad" title="Files are missing">
+              <Skull size={10} aria-hidden="true" /> MISSING
+            </span>
+          )}
         </span>
       </span>
       {/* Hover play button. Always in the DOM and only revealed by CSS, so it
@@ -188,9 +270,7 @@ export default function Tile({
           aria-label={`Launch ${group.label} (default build)`}
           title="Launch (Space)"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 4l13 8-13 8z" />
-          </svg>
+          <Play size={18} strokeWidth={2.5} aria-hidden="true" />
           <span className="tile-playtext">PLAY</span>
         </button>
       </span>
@@ -202,7 +282,7 @@ export default function Tile({
         </svg>
       </span>
       <span className="tile-edge" aria-hidden="true" />
-    </div>
+    </motion.div>
   );
 }
 
