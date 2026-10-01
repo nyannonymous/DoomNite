@@ -1,10 +1,49 @@
 # DoomNite — where things stand
 
-Written just before a gateway reset. Everything below is **verified working**
-unless marked UNVERIFIED.
+**GATEWAY RESET PENDING.** Last action was a STOP from the user mid-redesign, so
+this file was updated by hand rather than by the normal flow. The UI redesign is
+**half done** — see §0, which is where you resume.
 
 Pack root: `Z:\DOOM_PACK` · serve on `http://127.0.0.1:8765` ·
 builder `python tools/build.py` · checker `python tools/build.py --check`
+
+HEAD: `68b9a56` (pushed). Working tree has **uncommitted UI work** — §0.
+
+---
+
+## ▶ §0 RESUME HERE — UI redesign is HALF DONE
+
+The user sent a full redesign brief, now saved verbatim as **`ui/BRIEF.md`**:
+retro-futuristic UAC terminal (1993 Doom UI + Doom Eternal), Tailwind +
+Framer Motion + Lucide, hero background of the selected game, terminal details
+pane with typing effect, jagged/glitch hover on cards, industrial play button,
+CRT overlay, custom crosshair cursor.
+
+I installed the deps and wrote the config, then was interrupted.
+**Nothing is broken: the app still builds and runs exactly as before.**
+
+**Done, uncommitted:**
+- `npm i` tailwindcss@3.4 postcss autoprefixer **framer-motion@13** **lucide-react@1**
+- `npm i` **@fontsource/{black-ops-one,oswald,jetbrains-mono}** — self-hosted on
+  purpose: this runs off a local server and often has no internet, so a Google
+  Fonts `<link>` would silently fall back and lose the whole look
+- `tailwind.config.js` — full Doom palette, fonts, bevel/glow shadows
+- `postcss.config.js`, and the six @fontsource imports in `src/main.jsx`
+
+**NOT done — all still the old pre-redesign files:**
+- `src/styles.css` — needs `@tailwind base/components/utilities` plus what
+  Tailwind can't express: noise, CRT scanlines, vignette, jagged `clip-path`,
+  chromatic aberration
+- `src/Tile.jsx` — `motion.div`, jagged hover border, glitch title, spring jolt
+- `src/Panel.jsx` — UAC terminal readout, typing effect, industrial play button
+- `src/App.jsx` — staggered entrance, hero art of selected game, CRT overlay,
+  custom crosshair cursor
+- **No CRT overlay component exists yet. No hero-art layer exists yet.**
+
+**Why nothing regressed:** the app still doesn't import the new config, and
+`styles.css` is untouched, so `npm run build` and `verify.mjs` (22/22) still pass.
+Config alone can't break anything. Work in this order — CSS layer, verify, then
+one component at a time — which is exactly what I was doing.
 
 ---
 
@@ -117,10 +156,14 @@ by the builder.
 
 ## 5. Suggested order after reset
 
-1. **Launch BDBE Enhanced E1 and HontE.** The only real verification left.
-2. If BE is wrong → `-stdout` + logfile capture, read the engine's own error.
-3. Look at the UI and tell me about the tilt and the ember density.
-4. Delete `mods/bdbe-3-38` once the lock clears.
+1. **Launch BDBE** (§1) — the only real verification left on the pack.
+2. Resume the redesign (§0): CSS layer → Tile → Panel → App → CRT overlay →
+   hero art. Verify with `npm run build` + `node verify.mjs
+   "../dist/assets/<bundle>.js"` after each step.
+3. Delete `mods/bdbe-3-38` (§4).
+4. Commit the redesign — the deps, `tailwind.config.js`, `postcss.config.js` and
+   the `main.jsx` font imports are currently **uncommitted**.
 
-Last commits: `310ab5e` (UI + pin) · BDBE fix is **uncommitted** — commit it
-first if you want it safe before the reset.
+**On the redesign, two things I still can't check myself:** whether the tilt/jolt
+feel is right, and whether the ember field is too busy behind the art. I have
+never seen a rendered pixel of the UI.
