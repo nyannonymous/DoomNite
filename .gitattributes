@@ -1,0 +1,40 @@
+# Normalise line endings in the repository.
+#
+# Without this, every text file differs between the repository (LF) and a
+# Windows checkout (CRLF), so git reports the whole file as modified on every
+# clone. That makes `git status` useless for spotting real work -- the diff for
+# one changed line is indistinguishable from a whole-file rewrite. It happened
+# here: 20 files showed as modified when the only real edits were two.
+#
+# * text=auto  -- let git detect text, and normalise on commit.
+# * eol=lf     -- check out with LF everywhere, including on Windows. The pack
+#                 ships .bat and .cmd launchers, which are marked eol=crlf
+#                 below because a Windows batch file with LF endings misbehaves.
+#
+# Fixes the existing mess in one commit; after this the tree settles.
+* text=auto eol=lf
+
+# Launchers run under cmd.exe, which wants CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary. Never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pk3 binary
+*.wad binary
+*.ipk3 binary
+*.sf2 binary
+*.dll binary
+*.exe binary
+*.pk7 binary
+*.deh binary
+*.map binary
+*.lmp binary

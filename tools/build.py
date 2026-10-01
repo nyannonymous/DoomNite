@@ -851,6 +851,15 @@ def _mapless_mods(manifest):
 
 def check():
     """Verify the built pack against GAMES, without writing anything."""
+    # runtime/, iwads/ and mods/ are gitignored. On a fresh clone they are not
+    # merely missing, they are absent, and every check below then fails at once
+    # with output that reads like a broken build rather than an unfinished one.
+    if not os.path.isdir(os.path.join(PACK, "runtime")):
+        print("runtime\\ is absent -- this looks like a fresh clone.")
+        print("The repo is code only; the assets are fetched separately:")
+        print("    python fetcher.py --check")
+        print("    python fetcher.py")
+        print()
     problems = []
     man_p = os.path.join(PACK, "pack-manifest.json")
     if not os.path.exists(man_p):
@@ -859,7 +868,12 @@ def check():
     for n in RUNTIME_REQUIRED + [RUNTIME_EXE]:
         p = os.path.join(PACK, "runtime", n)
         if not os.path.isfile(p):
-            problems.append(f"missing runtime\\{n}")
+            # A clone has no runtime/ at all, so "missing file" almost always
+            # means "never fetched", not "build ran wrong". Say so once, up
+            # front, instead of listing 30 identical problems.
+            problems.append(f"missing runtime\\{n}"
+                            + ("  <- nothing fetched? see below" if not
+                               os.path.isdir(os.path.join(PACK, "runtime")) else ""))
     # Hard requirement, not a nicety: UZDoom loads OpenAL Soft as
     # $PROGDIR/soft_oal.dll. If only openal32.dll is present it falls back to
     # the null sound module -- the game runs silently and prints no error, which
@@ -907,15 +921,43 @@ def check():
         problems.append(f"launcher count: script implies {expected}, manifest has {have}")
     for g in man["games"]:
         for a in g["actions"]:
-            if not os.path.isfile(os.path.join(PACK, a["mod"])):
-                problems.append(f"missing mod file {a['mod']} ({g['name']})")
+            # On-demand entries (the two games installer.py fetches) emit a
+            # different action shape: no "mod" key, because the file is not in
+            # the pack to be checked. They carry "needs_install" instead, and
+            # their launcher + IWAD are validated below like everyone else's.
+            # Reading a["mod"] unconditionally raised KeyError and took the
+            # whole --check down, so every other problem in the pack was
+            # invisible behind this one.
+            if "mod" in a:
+                if not os.path.isfile(os.path.join(PACK, a["mod"])):
+                    problems.append(f"missing mod file {a['mod']} ({g['name']})")
+                if a["mod"].endswith(".zip"):
+                    problems.append(
+                        f".zip in mod list (ZDoom cannot load these): {a['mod']}")
+            elif not a.get("needs_install"):
+                problems.append(
+                    f"action has neither 'mod' nor 'needs_install' "
+                    f"({g['name']}) - manifest shape is wrong")
             if not os.path.isfile(os.path.join(PACK, "launchers", a["bat"])):
                 problems.append(f"missing launcher launchers\\{a['bat']}")
-            if a["mod"].endswith(".zip"):
-                problems.append(f".zip in mod list (ZDoom cannot load these): {a['mod']}")
-            iw = os.path.join(PACK, "iwads", a["iwad"])
-            if not os.path.isfile(iw):
-                problems.append(f"missing iwad {a['iwad']} for {g['name']}")
+            # A standalone total conversion has no iwads\\ entry at all --
+            # the pk3 IS the IWAD and lives under mods\. iwad is "" for those,
+            # so joining it onto "iwads" produced the empty path and a
+            # "missing iwad " complaint that named nothing.
+            if a["iwad"]:
+                if not os.path.isfile(os.path.join(PACK, "iwads", a["iwad"])):
+                    problems.append(f"missing iwad {a['iwad']} for {g['name']}")
+            else:
+                siw = a.get("standalone_iwad")
+                if not siw:
+                    problems.append(
+                        f"no iwad and no standalone_iwad ({g['name']}) - "
+                        f"nowhere to load from")
+                elif not os.path.isfile(
+                        os.path.join(PACK, "mods", siw.replace("/", os.sep))):
+                    problems.append(
+                        f"missing standalone iwad {siw} for {g['name']} "
+                        f"(installed by installer.py, not by the build)")
     print(f"{len(man['games'])} games, {have} launchers")
     if problems:
         print(f"\n{len(problems)} PROBLEMS:")

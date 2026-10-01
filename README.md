@@ -18,6 +18,32 @@ Double-click `PLAY DOOMNITE.cmd`, type a number, type it again to confirm.
 - Vanilla Doom and Doom II IWADs only. Nothing here is a total conversion that
   needs its own game data.
 
+To clone this you need the assets first. The repo is code only — `runtime/`,
+`iwads/` and `mods/` are far too big for git and are gitignored on purpose:
+
+```
+git clone https://github.com/Chimthuwu/DoomNite.git
+cd DoomNite
+python fetcher.py --check      # what is missing
+python fetcher.py               # fetch it, checksum-verified
+python tools\build.py
+```
+
+`sources.json` is the committed list of what the pack contains (70 files,
+3.61 GB) with each file's size and sha256. Each file has a `urls` list,
+most-preferred first; a mirror that fails or is slow is skipped for the next.
+**`urls` is empty in the committed file — hosting is the operator's choice.**
+Until someone fills it in, `fetcher.py` reports every file as unavailable and
+exits 2 rather than pretending to succeed. Add a hosted URL to a file's `urls`
+and a clone fetches it, like the on-demand mods in the UI.
+
+Regenerate the manifest after changing what the pack contains:
+
+```
+python tools\make_sources.py            # re-hash, write sources.json
+python tools\make_sources.py --verify   # report drift only
+```
+
 ## Run it
 
 Two ways, both from the pack root.
