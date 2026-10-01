@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Doom Knight - build the portable Doom pack.
+DoomNite - build the portable Doom pack.
 
 Copies the runtime, IWADs and mods into a self-contained folder and writes one
 launcher .bat per entry, all using paths RELATIVE to the pack root, so the
@@ -128,10 +128,10 @@ def write_bat(bat, title, iwad, mods, note):
         f"rem {title}",
         'cd /d "%~dp0.."',
         "",
-        "rem DOOM_KNIGHT_DRYRUN=1 prints the command instead of running it, so",
-        "rem 'PLAY DOOM KNIGHT.cmd --dryrun N' can check every entry without",
+        "rem DOOMNITE_DRYRUN=1 prints the command instead of running it, so",
+        "rem 'PLAY DOOMNITE.cmd --dryrun N' can check every entry without",
         "rem launching anything. The menu sets it.",
-        'if /I "%DOOM_KNIGHT_DRYRUN%"=="1" (',
+        'if /I "%DOOMNITE_DRYRUN%"=="1" (',
         f'  echo {line}>>"%~dp0..\\dryrun.log"',
         "  exit /b 0",
         ")",

@@ -1,10 +1,10 @@
-# Doom Knight
+# DoomNite
 
 A portable Doom mod launcher. One folder holds the GZDoom runtime, the IWADs and
 the mods; every path is relative, so the whole thing works from a USB stick or
 any drive letter.
 
-Double-click `PLAY DOOM KNIGHT.cmd`, type a number, type it again to confirm.
+Double-click `PLAY DOOMNITE.cmd`, type a number, type it again to confirm.
 `0` exits.
 
 ## What it does
@@ -22,7 +22,7 @@ Double-click `PLAY DOOM KNIGHT.cmd`, type a number, type it again to confirm.
 
 ```
 python tools\build.py         # copy runtime, iwads, mods; write launchers
-python tools\make_menu.py     # write PLAY DOOM KNIGHT.cmd from the manifest
+python tools\make_menu.py     # write PLAY DOOMNITE.cmd from the manifest
 python tools\build.py --check # verify every referenced file exists
 ```
 
@@ -37,8 +37,8 @@ line it *would* run to `dryrun.log` instead of running it:
 
 ```
 python tools\make_menu.py --dryrun 15          # show what entry 15 does
-"PLAY DOOM KNIGHT.cmd" --dryrun 15             # log it, launch nothing
-for /L %%n in (1,1,30) do @"PLAY DOOM KNIGHT.cmd" --dryrun %%n
+"PLAY DOOMNITE.cmd" --dryrun 15             # log it, launch nothing
+for /L %%n in (1,1,30) do @"PLAY DOOMNITE.cmd" --dryrun %%n
 ```
 
 Then check every logged line resolves against the pack. All 30 currently pass:
@@ -65,7 +65,7 @@ though it is a Doom 1 style game.
 ## Layout
 
 ```
-PLAY DOOM KNIGHT.cmd   the menu
+PLAY DOOMNITE.cmd   the menu
 launchers\*.bat        one per entry, usable standalone
 runtime\               uzdoom.exe, game_support.pk3, zmusic.dll
 iwads\                 DOOM.WAD, DOOM2.WAD

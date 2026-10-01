@@ -6,7 +6,7 @@ launchers/
 
 # Build outputs
 pack-manifest.json
-PLAY DOOM KNIGHT.cmd
+PLAY DOOMNITE.cmd
 dryrun.log
 menu-dryrun.log
 
