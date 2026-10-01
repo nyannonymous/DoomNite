@@ -750,6 +750,37 @@
   }
 
 
+  /* The panel's action bar, hoisted out of .panel-scroll so the primary
+     control is always visible regardless of how far the details are scrolled. */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .panel-head {
+    flex: none;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(8, 14, 8, 0.9), rgba(4, 8, 4, 0.7));
+    position: relative;
+    z-index: 5;
+  }
+
+  .panel-head .panel-title { margin-bottom: 10px; }
+
+  .panel-head .panel-actions {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  /* Play takes all remaining width; the command toggle is a fixed-width
+     secondary so the primary never gets squeezed to nothing. */
+  .panel-head .play { flex: 1 1 auto; }
+  .panel-head .showcmd { flex: none; min-width: 4.2rem; }
+
+
   /* ---------- headers ---------- */
 
   .d-head {
@@ -1234,14 +1265,40 @@ kbd {
   background-clip: content-box;
 }
 
+/* Cards fill the space they are given.
+
+   Two things were wrong before. minmax(var(--tile-w), 1fr) with --tile-w at a
+   fixed 208px looked right in dev and wrong in the real window: the floor
+   decides how MANY columns fit, and at 1fr each column then stretched, so a
+   4-across grid on a 4K display produced enormous cards while a 6-across grid
+   produced cramped ones. The count was fixed by width, the size was never
+   considered.
+
+   clamp() ties the floor to the viewport instead, so the column count adapts
+   AND each card lands in a sensible pixel range. align-content: stretch (was
+   start) makes the last row fill the height instead of leaving a gap, and
+   auto-rows keeps every card the same height so the grid stays a grid. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--tile-w), 1fr));
-  gap: 16px;
-  align-content: start;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(clamp(190px, 21vw, 340px), 1fr)
+  );
+  gap: clamp(10px, 1.1vw, 18px);
+  align-content: stretch;
+  grid-auto-rows: 1fr;
   /* Tiles tilt in 3D, so the grid needs a shared perspective. */
   perspective: 1100px;
 }
+
+/* The scroll container has to be allowed to shrink for stretch to have any
+   height to distribute, otherwise the grid just overflows. */
+.grid-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid { flex: 1 1 auto; }
 
 .none {
   color: var(--fg-faint);

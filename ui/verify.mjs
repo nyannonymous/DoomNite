@@ -261,6 +261,51 @@ await sleep(400);
 const cmd = $(".cmd")?.textContent || "";
 check("show command returns a real command", /doom\.exe|\.bat/i.test(cmd), cmd.slice(0, 80));
 
+// --- card play button ------------------------------------------------------
+// Regression: Tile called onLaunch(group.key, 0) but App's launchBuild is
+// (group, n), so group.cfgs was undefined and every card PLAY reported
+// "files are missing" instead of launching. 23 tests passed straight through
+// it because none of them touched this button.
+//
+// The launch endpoint is stubbed so this asserts the button REACHES the launch
+// path with a real index, without spawning a game.
+{
+  const realFetch = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => {
+    if (/\/api\/launch/.test(String(url))) {
+      seen.push({ url: String(url), method: opts?.method, body: opts?.body });
+      return new Response(JSON.stringify({ ok: true, label: "stubbed" }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      });
+    }
+    return realFetch(url, opts);
+  };
+  try {
+    const tile = $$(".tile").find((t) => !t.className.includes("is-missing"));
+    check("a launchable card exists", !!tile, tile ? "found" : "none");
+    // Reveal the hover overlay the way a real pointer would, then click PLAY.
+    const play = tile?.querySelector(".tile-play");
+    check("card exposes a play button", !!play, play ? "found" : "missing");
+    play?.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+    await sleep(500);
+    check("card play button reaches the launch endpoint", seen.length === 1,
+      `${seen.length} launch call(s)${seen[0] ? " " + seen[0].url : ""}`);
+    // api.js sends the index as an integer in the JSON body; the server
+    // refuses a path. So the contract to prove is a well-formed integer body.
+    let idx = null;
+    try { idx = JSON.parse(seen[0]?.body || "{}").index; } catch { /* reported below */ }
+    check("card play posts an integer launch index",
+      Number.isInteger(idx) && idx >= 0, `index=${JSON.stringify(idx)}`);
+    const toastTxt = d.querySelector(".toast")?.textContent || "";
+    check("card play does not report files missing",
+      !/files are missing/i.test(toastTxt), toastTxt.slice(0, 60) || "no toast");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+await sleep(300);
+
 // --- filters ---------------------------------------------------------------
 const chips = $$(".chip");
 let comboOk = false;

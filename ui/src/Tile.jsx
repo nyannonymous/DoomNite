@@ -154,7 +154,12 @@ export default function Tile({
   function playDefault(e) {
     e.stopPropagation(); // don't let the click also pin/select
     e.preventDefault();
-    onLaunch?.(group.key, 0);
+    // Pass the group OBJECT. This used to pass group.key (a string), which
+    // App's launchBuild signature is (group, n) -- so group.cfgs was
+    // undefined, cfg came out undefined, and every card PLAY button reported
+    // "files are missing" instead of launching. The sidebar PLAY button was
+    // wired correctly, which is why only the cards looked broken.
+    onLaunch?.(group, 0);
   }
 
   function openVariants(e) {
@@ -172,7 +177,7 @@ export default function Tile({
       // Space is the conventional activate key; on this card it plays, which
       // is the action people expect from a game launcher tile.
       e.preventDefault();
-      onLaunch?.(group.key, 0);
+      onLaunch?.(group, 0);
     } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
       // The keyboard route to the same menu the right mouse button opens.
       e.preventDefault();

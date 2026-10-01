@@ -89,10 +89,38 @@ export default function Panel({ group, onPick, toast }) {
         </div>
       ) : null}
 
-      <div className="panel-scroll">
+      {/* Primary action lives ABOVE the scroll area, not at the bottom of it.
+          It used to be the last thing in .panel-scroll, below Configs,
+          Details, the term rows and the whole mod list -- so on a short window
+          the one control you actually want was the one you had to scroll to
+          find. Pinned here, under the title, it is always reachable. */}
+      <div className="panel-head">
         <h2 className="panel-title d-head d-glitch" data-text={group.label}>
           {group.label}
         </h2>
+        <div className="panel-actions">
+          <button
+            type="button"
+            className="play"
+            onClick={play}
+            disabled={disabled}
+          >
+            <span className="play-glow" aria-hidden="true" />
+            <Play size={18} strokeWidth={2.5} aria-hidden="true" />
+            <span className="play-label">{busy ? "Starting…" : "Play"}</span>
+            <span className="play-key">↵</span>
+          </button>
+          <button
+            type="button"
+            className="showcmd"
+            onClick={() => setCmdOpen((v) => !v)}
+          >
+            {cmdOpen ? "Hide" : "Cmd"}
+          </button>
+        </div>
+      </div>
+
+      <div className="panel-scroll">
         {/* The description types itself out, keyed on the game so switching
             games replays it. That replay is the mechanical feel. */}
         {group.note && (
@@ -173,27 +201,6 @@ export default function Panel({ group, onPick, toast }) {
           {group.cfgs.length > 1 && (
             <TermRow k="builds" v={`${group.cfgs.length} available`} />
           )}
-        </div>
-
-        <div className="panel-actions">
-          <button
-            type="button"
-            className="play"
-            onClick={play}
-            disabled={disabled}
-          >
-            <span className="play-glow" aria-hidden="true" />
-            <Play size={18} strokeWidth={2.5} aria-hidden="true" />
-            <span className="play-label">{busy ? "Starting…" : "Play"}</span>
-            <span className="play-key">↵</span>
-          </button>
-          <button
-            type="button"
-            className="showcmd"
-            onClick={() => setCmdOpen((v) => !v)}
-          >
-            {cmdOpen ? "Hide command" : "Show command"}
-          </button>
         </div>
 
         {cmdOpen && (

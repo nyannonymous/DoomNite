@@ -145,8 +145,19 @@ export default function App() {
   const launchBuild = useCallback(
     async (group, n) => {
       if (!group) return;
-      const cfg = group.cfgs[n] || group.cfgs[0];
-      if (!cfg || cfg.exists === false) {
+      // Defensive: a wrong-shaped argument here used to throw
+      // "Cannot read properties of undefined (reading '0')" and take the whole
+      // app down with it, because group.cfgs was undefined. A launch click
+      // should never be able to unmount the UI, so validate the shape and
+      // report it as a failed launch instead.
+      const cfg = Array.isArray(group.cfgs)
+        ? group.cfgs[n] || group.cfgs[0]
+        : null;
+      if (!cfg) {
+        toast(`Cannot launch: ${group.label || "game"} has no launchable build.`, true);
+        return;
+      }
+      if (cfg.exists === false) {
         toast(`Cannot launch ${group.label}: files are missing.`, true);
         return;
       }
