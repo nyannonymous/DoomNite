@@ -240,7 +240,11 @@ def handler_factory():
                 # from a fixed directory with a whitelisted extension -- the name
                 # is a basename, so no traversal, and non-image types never get
                 # a content type from us.
-                name = posixpath.basename(path[len("/art/"):])
+                # Percent-decode before touching the filesystem: art names carry
+                # spaces and commas ("The Bikini Bottom Massacre 1,3.png"), so a
+                # browser sends them as %20 and an undecoded lookup 404s.
+                rel = _up.unquote(path[len("/art/"):])
+                name = posixpath.basename(rel)
                 if not name or "/" in name or "\\" in name:
                     return self._send(404, _json.dumps({"error": "not found"}))
                 ext = os.path.splitext(name)[1].lower()

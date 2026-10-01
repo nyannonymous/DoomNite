@@ -157,10 +157,24 @@ def q(p):
 
 
 def launcher_line(slug, iwad, mods):
-    """The engine invocation. Relative to the pack root, so it stays portable."""
+    """The engine invocation. Relative to the pack root, so it stays portable.
+
+    A bare .pk3/.pk7 argument is loaded as a mod, which is what the combos want.
+    A bare .wad argument is NOT: UZDoom stacks it onto the IWAD and boots the
+    IWAD's own game, so both Brutal Doom Black Edition entries just started plain
+    Doom. Standalone wads must go through -file.
+    """
     parts = ['start "" "runtime\\doom.exe"']
+    pend = []
     for sub, fname in mods:
-        parts.append(f'"mods\\{sub}\\{fname}"')
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in (".pk3", ".pk7"):
+            parts.append(f'"mods\\{sub}\\{fname}"')
+        else:
+            pend.append(f'"mods\\{sub}\\{fname}"')
+    # -file and -iwad are flags, so they must follow the positional mods.
+    if pend:
+        parts.append("-file " + " ".join(pend))
     parts.append(f'-iwad "iwads\\{iwad}"')
     return " ".join(parts)
 
