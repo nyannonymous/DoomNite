@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Play, Swords, Skull, Radio, Download, Check, Trash2 } from "lucide-react";
 import { artUrl, startInstall, removeInstall } from "./api";
+import ConfirmDownload from "./ConfirmDownload";
 import { posterFor } from "./poster";
 
 /** Entrance: cards rise from below, staggered like loading into a level. */
@@ -140,8 +141,19 @@ export default function Tile({
     dl?.pct ??
     (inst?.size ? Math.round(((inst.received || 0) / inst.size) * 100) : 0);
 
+  // A download is the only thing this app does that touches the network, so it
+  // asks first. The spec comes from the server's own status, which already
+  // knows the file, the size and the host -- the dialog does not guess.
+  const [confirming, setConfirming] = useState(false);
+
   async function beginInstall() {
     if (!group.needsInstall || busy) return;
+    setConfirming(true);
+  }
+
+  // Actually start, once the prompt is confirmed.
+  async function doInstall() {
+    setConfirming(false);
     setDl({ pct: 0, error: null });
     try {
       await startInstall(group.needsInstall);
@@ -272,7 +284,11 @@ export default function Tile({
       .replace(/^DOOM$/i, "Doom 1")
       .replace(/^Hexen$/i, "Hexen");
 
+  // A fragment, not a bare div: the card is a motion.div, and the download
+  // confirmation is a sibling of it rather than a child. Putting the dialog
+  // inside would nest a role="dialog" inside a role="button".
   return (
+    <>
     <motion.div
       ref={ref}
       role="button"
@@ -460,6 +476,14 @@ export default function Tile({
       </span>
       <span className="tile-edge" aria-hidden="true" />
     </motion.div>
+    {confirming && inst && (
+      <ConfirmDownload
+        spec={inst}
+        onCancel={() => setConfirming(false)}
+        onConfirm={doInstall}
+      />
+    )}
+    </>
   );
 }
 

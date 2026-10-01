@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+from urllib.parse import urlsplit as _urlsplit
 import zipfile
 
 # installer.py lives IN the pack root, next to serve.py, so one dirname is the
@@ -161,6 +162,12 @@ def status():
             "kind": spec["kind"],
             "size": spec["size"],
             "size_h": _human(spec["size"]),
+            # Where it will actually come from, so the consent prompt can name
+            # the host instead of saying "the internet". First mirror only --
+            # the fallbacks are transparent retries of the same artifact, not
+            # a different thing the user is consenting to.
+            "host": _urlsplit(spec["mirrors"][0]).netloc if spec.get("mirrors") else "",
+            "files": sorted(spec.get("want", {})),
             "installed": installed(name),
             "state": (j or {}).get("state", "idle"),
             "received": (j or {}).get("received", 0),

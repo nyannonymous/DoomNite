@@ -2588,6 +2588,79 @@ kbd {
   white-space: nowrap;
 }
 
+/* ---------- download confirmation ---------- */
+
+/* A fetch from a third-party host is the one thing here that leaves the
+   machine, so it gets a dialog that names the file, the size, the host and the
+   destination. Reuses the setup modal's shell so it looks like the same
+   dialog family rather than a second visual language. */
+.cd-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 6px;
+}
+.cd-list li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+}
+.cd-k {
+  flex: 0 0 46px;
+  font: 700 0.6rem/1.4 var(--d-mono);
+  letter-spacing: 0.1em;
+  color: #6b5a52;
+}
+.cd-v {
+  min-width: 0;
+  font: 400 0.72rem/1.45 var(--d-mono);
+  color: #d8c9bf;
+  overflow-wrap: anywhere;
+}
+
+.cd-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 16px;
+  font: 400 0.66rem/1.5 var(--d-mono);
+  color: #8a7a70;
+}
+.cd-note svg {
+  flex: 0 0 auto;
+  color: #6f9a5c;
+}
+
+.btn-inst {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  font: 700 0.68rem/1 var(--d-mono);
+  letter-spacing: 0.08em;
+  color: #0b1a06;
+  background: linear-gradient(180deg, #7cc35f, #4e8a3a);
+  border: 1px solid #8fd472;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-inst:hover:not(:disabled) {
+  background: linear-gradient(180deg, #8ed36e, #5a9a43);
+}
+.btn-inst:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+.btn-inst:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ---------- on-demand install (total conversions) ---------- */
 
 /* The install button reuses .tile-play's shape but reads as a fetch rather

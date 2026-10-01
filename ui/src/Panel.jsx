@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { dryrun, launchIndex, startInstall, removeInstall } from "./api";
 import { Cover } from "./Tile";
+import ConfirmDownload from "./ConfirmDownload";
 import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
 
 function bytes(n) {
@@ -41,6 +42,10 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
     ? Math.round(((inst.received || 0) / inst.size) * 100)
     : 0;
   const [instError, setInstError] = useState(null);
+
+  // Prompts before downloading, like the card does. A download is the only
+  // action here that touches the network.
+  const [confirming, setConfirming] = useState(false);
 
   async function doInstall() {
     setInstError(null);
@@ -356,7 +361,7 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
                 <button
                   type="button"
                   className="btn-primary"
-                  onClick={doInstall}
+                  onClick={() => setConfirming(true)}
                   disabled={instBusy}
                 >
                   <Download size={13} aria-hidden="true" />
@@ -371,6 +376,13 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
           <p className="warn">This config&apos;s files are missing from the pack.</p>
         )}
       </div>
+      {confirming && inst && (
+        <ConfirmDownload
+          spec={inst}
+          onCancel={() => setConfirming(false)}
+          onConfirm={doInstall}
+        />
+      )}
     </motion.aside>
   );
 }
