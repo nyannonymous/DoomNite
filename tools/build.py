@@ -83,7 +83,10 @@ def runtime_files():
     return sorted(names)
 
 
-IWADS = ["DOOM.WAD", "DOOM2.WAD"]
+# Hexen Remade is a Hexen 1.5 remake: 31 MAP## maps that belong to the Hexen
+# IWAD, not either Doom one. It was being launched with DOOM2.WAD and so
+# could never work.
+IWADS = [("DOOM.WAD", GZ), ("DOOM2.WAD", GZ), ("Hexen.wad", HD)]
 
 # (name, note, [(subfolder, source path, iwad)])
 # subfolder is where it lands under mods\. "extra" is a raw -file fragment.
@@ -132,8 +135,9 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\myhouse.wad", BD + r"\myhouse.pk3")]),
     ("Hocus Pocus 3D", "Hocus Pocus, but 3D. Runs on the Doom II IWAD.",
      [("DOOM2.WAD", HO + r"\HOCUS.pk3")]),
-    ("Hexen Remade", "The cancelled Hexen 1.5, finished.",
-     [("DOOM2.WAD", GZ + r"\HEXENREMADE.wad")]),
+    ("Hexen Remade", "The cancelled Hexen 1.5, finished. Needs the Hexen IWAD: "
+     "its 31 maps are MAP##, which neither Doom IWAD has.",
+     [("Hexen.wad", HD + r"\HEXENREMADE.wad")]),
     ("DN3DooM", "Duke 3D in Doom II.",
      [("DOOM2.WAD", BD + r"\DN3DooM.pk3")]),
 ]
@@ -222,8 +226,8 @@ def build():
     manifest["runtime"] = sorted(
         RUNTIME_EXE if n == SOURCE_EXE else n for n in rt)
 
-    for n in IWADS:
-        src = os.path.join(GZ, n)
+    for n, src_dir in IWADS:
+        src = os.path.join(src_dir, n)
         if not os.path.isfile(src):
             manifest["missing"].append(f"iwad {n} not found at {src}")
             continue
