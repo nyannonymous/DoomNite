@@ -122,12 +122,46 @@ GAMES = [
       ("DOOM.WAD", BD + r"\brutal22test6.pk3"),
       ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad"),
       ("DOOM.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad")]),
+    # Brutal Doom Black Edition is NOT a standalone wad, and treating it as one
+    # is what made it launch as plain Brutal Doom. BDBE_v3.38.pk3 has 12,525 zip
+    # entries and zero map lumps -- no ExMy, no MAPxx -- just a MAPINFO with
+    # AddDefaultMap and its own actor classes (BEDoomer, EvilMarine). It is a
+    # game-support pk3 that upgrades a Brutal Doom base and inherits the base's
+    # maps. Loading the episode wad alone boots vanilla BD wearing nothing.
+    #
+    # Load order, as the pk3 expects:
+    #   1. brutal22test6.pk3  the Brutal Doom base that owns the maps
+    #   2. BDBE_v3.38.pk3     Black Edition, loaded last so it wins conflicts
+    #   3. the episode wad    via -file, adds maps on top
+    #
+    # IWAD per RaZZoR's "! READ !.txt": Enhanced E1 is played on DOOM, HontE
+    # Remastered on DOOM 2. Both were pinned to DOOM.WAD, which is why HontE
+    # quietly fell back to base-game content.
+    #
+    # The weapon-sounds pk3 is built against v3.35 but only adds sounds, so it is
+    # safe to append after v3.38. The HD-texture, neural-upscale, music, visor
+    # and terrain-splash addons are deliberately NOT loaded: that is the
+    # optional layer and belongs behind its own configs, not forced on everyone.
+    #
+    # Each mod becomes its own subfolder (slugified from its filename), so these
+    # land in mods/brutal22test6, mods/bdbe-v3-38 and mods/
+    # bd-black-editionv3-35-weapon-sounds.
     ("Brutal Doom Black Edition (Enhanced Episode 1)",
-     "RaZZoR's Black Edition, Episode 1. Standalone -file wad, runs on the Doom 1 IWAD.",
-     [("DOOM.WAD", BDBE + r"\enh_e1v1.8c.wad")]),
+     "RaZZoR's Black Edition v3.38 over Brutal Doom 22, with Enhanced Episode 1.",
+     [("DOOM.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\enh_e1v1.8c.wad"),
+      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\enh_e1v1.8c.wad")]),
     ("Brutal Doom Black Edition (HontE Remastered)",
-     "HontE Remastered, experimental REV1.103. Standalone -file wad on the Doom 1 IWAD.",
-     [("DOOM.WAD", BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
+     "RaZZoR's Black Edition v3.38 over Brutal Doom 22, with HontE Remastered REV1.103. Doom 2 IWAD.",
+     [("DOOM2.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad"),
+      ("DOOM.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
     ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign.",
      # Two files, per the author's Readme_2_0.txt: "run both files (pk3 and wad)
      # with the pk3 first and the wad second." The mapset carries MAP01-MAP08;
