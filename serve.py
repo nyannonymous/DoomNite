@@ -204,6 +204,8 @@ def load_entries():
             "mods": [],
             "exe": s["exe"],
             "wdir": s["wdir"],
+            # Extra args, if the build gave any (SRB2 needs -window and a size).
+            "args": s.get("args", []),
             "exists": os.path.isfile(s["exe"]),
             # Standalone games have no mods, so the mod-stem art match can
             # never resolve for them. The manifest names the art explicitly;
@@ -266,7 +268,9 @@ def command_for(entry):
     if entry["kind"] == "pack":
         bat = os.path.join(PACK, "launchers", entry["bat"])
         return f'cmd /c "{bat}"'
-    return f'start "" /D "{entry["wdir"]}" "{entry["exe"]}"'
+    args = " ".join(entry.get("args") or ())
+    return (f'start "" /D "{entry["wdir"]}" "{entry["exe"]}"'
+            + (f" {args}" if args else ""))
 
 
 def launch(idx):
@@ -281,8 +285,12 @@ def launch(idx):
         subprocess.Popen(["cmd", "/c", bat], cwd=PACK,
                          creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
     else:
-        subprocess.Popen(["cmd", "/c", "start", "", "/D", entry["wdir"], entry["exe"]],
-                         cwd=PACK)
+        # "start" treats the first quoted token as a window title, hence the
+        # empty "". Args come after the exe so they reach the game, and each is
+        # passed as a separate list element so nothing is re-split by the shell.
+        argv = ["cmd", "/c", "start", "", "/D", entry["wdir"], entry["exe"]]
+        argv += list(entry.get("args") or ())
+        subprocess.Popen(argv, cwd=PACK)
     return True, entry["label"]
 
 

@@ -136,11 +136,25 @@ def _load_iwad_config():
 # finder take precedence; these hardcoded locations are only the fallback for
 # a machine that has never been set up, and they are read once at build time
 # rather than baked into the launchers, which stay %~dp0-relative.
+# config.json stores the full path to each WAD FILE ("...\\iwads\\DOOM2.WAD"),
+# because that is what the finder validated and what launch has to be able to
+# check. IWADS here wants the containing DIRECTORY, so take dirname. Passing the
+# file path straight through built paths like "...\\DOOM2.WAD\\DOOM2.WAD" and
+# reported every IWAD missing.
 _IWAD_CFG = _load_iwad_config()
+
+
+def _iwad_src(name, fallback):
+    """Source directory for an IWAD: dirname of the configured file, or the
+    legacy hardcoded directory when the player has not set one up."""
+    p = _IWAD_CFG.get(name)
+    return os.path.dirname(p) if p else fallback
+
+
 IWADS = [
-    ("DOOM.WAD", _IWAD_CFG.get("DOOM.WAD", GZ)),
-    ("DOOM2.WAD", _IWAD_CFG.get("DOOM2.WAD", GZ)),
-    ("Hexen.wad", _IWAD_CFG.get("Hexen.wad", HD)),
+    ("DOOM.WAD", _iwad_src("DOOM.WAD", GZ)),
+    ("DOOM2.WAD", _iwad_src("DOOM2.WAD", GZ)),
+    ("Hexen.wad", _iwad_src("Hexen.wad", HD)),
 ]
 
 # (name, note, [(subfolder, source path, iwad)])
@@ -276,13 +290,12 @@ GAMES = [
     # offers an install button until that has happened. "install" names the
     # spec; "standalone" marks the pk3-as-iwad case.
     ("Adventures of Square", "Standalone total conversion. Square in Shapeland.",
-     # No art override: cover art for these two has not been chosen yet, and a
-     # name pointing at a missing file renders as a broken image instead of
-     # falling back to the mod's own TITLEPIC.
      [("SQUARE1.PK3",
-       {"install": os.path.join("adventures-of-square"), "standalone": True})]),
+       {"install": os.path.join("adventures-of-square"), "standalone": True,
+        "art": "AdventuresOfSquare.png"})]),
     ("Requiem", "1997 megawad, 32 levels.",
-     [("DOOM2.WAD", {"install": os.path.join("requiem")})]),
+     [("DOOM2.WAD", {"install": os.path.join("requiem"),
+                     "art": "Requiem.png"})]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
      # All three variants show the same cover art: the new Duke Boomem
      # image. Set explicitly on each because the mod-stem match in
@@ -337,10 +350,18 @@ GAMES = [
 # The art element is required in practice, not optional: serve.py resolves art
 # by matching filenames against mod stems, and these two have no mods, so
 # without an explicit name they can only ever draw a generated poster.
+# A 5th optional element is extra command-line arguments.
+#
+# SRB2 needs them. Its config.cfg says fullscreen "Yes", but on this machine it
+# comes up windowed at a small default size in the bottom-right corner, which is
+# SDL failing to get a real display mode and silently falling back. Passing
+# -window with an explicit size takes the decision away from it, and -center puts
+# it somewhere deliberate instead of wherever it defaulted.
 STANDALONE = [
     ("Sonic Robo Blast 2 v2.2", "ZDoom build. Sonic in Doom.",
      os.path.join(BD, "SRB2 v2.2"), os.path.join(BD, "SRB2 v2.2", "srb2win.exe"),
-     "SonicRoboBlast2.png"),
+     "SonicRoboBlast2.png",
+     ["-window", "-width", "1600", "-height", "900", "-center"]),
     ("Doom Half-Life", "Half-Life 1 in Doom.",
      HL, os.path.join(HL, "hl2doom.exe"),
      "DoomHalfLife.png"),
@@ -571,7 +592,12 @@ def build():
         if not os.path.isfile(src):
             manifest["missing"].append(f"iwad {n} not found at {src}")
             continue
-        shutil.copy2(src, os.path.join(PACK, "iwads", n))
+        dest = os.path.join(PACK, "iwads", n)
+        # The player may have pointed the finder at the pack's OWN iwads\
+        # directory, in which case src and dest are the same file and copy2
+        # fails with a sharing violation. Nothing to do in that case.
+        if os.path.abspath(src) != os.path.abspath(dest):
+            shutil.copy2(src, dest)
         manifest["iwads"].append(n)
 
     for name, note, actions in GAMES:
@@ -693,9 +719,11 @@ def build():
         # name here they fall back to a generated poster, which is how Sonic
         # Robo Blast 2 and Doom Half-Life were showing generic art.
         art_name = rest[0] if rest else ""
+        # Optional 6th element is extra command-line arguments.
+        args = rest[1] if len(rest) > 1 else []
         manifest["standalone_games"].append(
             {"name": name, "note": note, "wdir": wdir, "exe": exe,
-             "art": art_name})
+             "art": art_name, "args": args})
 
     with open(os.path.join(PACK, "pack-manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=1)

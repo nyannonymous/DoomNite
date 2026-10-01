@@ -1509,10 +1509,23 @@ kbd {
   transform: translateZ(18px);
 }
 
+.cover.has-art {
+  --cover-fit: cover;
+}
+.cover.is-poster {
+  --cover-fit: contain;
+}
+
 .cover img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  /* "contain" letterboxes a non-16:9 image against the cover background, which
+     is what put black bars down the sides of the Doom/Half-Life art (a 687x1024
+     portrait) and around the square Duke Boomem cover. An in-pack TITLEPIC is
+     rendered by the engine and carries its own framing, so it stays letterboxed
+     -- that is source art, not a poster. Art chosen as cover (a class on the
+     cover) is framed for this box, so it fills it. */
+  object-fit: var(--cover-fit, contain);
   object-position: center;
   display: block;
   opacity: 0;

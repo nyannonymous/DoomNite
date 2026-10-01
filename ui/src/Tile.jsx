@@ -48,7 +48,13 @@ function Cover({ group, className = "" }) {
   const generated = group.art && !failed ? artUrl(group.art) : posterFor(group.label, group.note);
 
   return (
-    <div className={`cover ${className} ${loaded ? "is-loaded" : ""}`}>
+    // Real art fills the frame; a generated poster is letterboxed because it is
+    // drawn at the cover's own aspect ratio and contain keeps its framing exact.
+    <div
+      className={`cover ${className} ${loaded ? "is-loaded" : ""} ${
+        group.art && !failed ? "has-art" : "is-poster"
+      }`}
+    >
       <img
         src={generated}
         alt=""
