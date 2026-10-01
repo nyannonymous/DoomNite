@@ -118,10 +118,16 @@ IWADS = [("DOOM.WAD", GZ), ("DOOM2.WAD", GZ), ("Hexen.wad", HD)]
 GAMES = [
     ("Brutal Doom v22 test 6",
      "Brutal Doom 22. Loads first, so combos list it first. Optionally with the Doom Metal vol 5 sound pack.",
-     [("DOOM2.WAD", BD + r"\brutal22test6.pk3"),
+     # METAL FIRST, ON PURPOSE. serve.py makes the first variant primary, and
+     # the user asked for metal to be the default. DoomMetalVol5_44100.wad is
+     # Doom 1 music (D_E1M1..D_E3M9, no D_MAPxx), so it only sounds on a
+     # DOOM.WAD run -- hence DOOM.WAD leads and DOOM2.WAD is the fallback.
+     # brutal22test6.pk3 ships no maps of its own, so it plays whichever IWAD
+     # it is given and the Doom 1 IWAD is the one the metal pack targets.
+     [("DOOM.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad"),
+      ("DOOM2.WAD", BD + r"\brutal22test6.pk3"),
       ("DOOM.WAD", BD + r"\brutal22test6.pk3"),
-      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad"),
-      ("DOOM.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad")]),
+      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad")]),
     # Brutal Doom Black Edition is a COMPLETE standalone total conversion, and
     # that is now proven rather than assumed. BDBE_v3.38.pk3 carries 10,496
     # sprites, 923 sounds, 80 actor-definition lumps and its own DECORATE for
@@ -177,11 +183,18 @@ GAMES = [
     # duplicate. See the note above the BDBE definition.
     ("Brutal Doom Black Edition (Enhanced Episode 1)",
      "RaZZoR's Black Edition v3.38 with Enhanced Episode 1. HD by default.",
+     # METAL MUSIC IS DEFAULT HERE. enh_e1v1.8c.wad supplies E1M1..E1M9, which
+     # is Doom 1 map naming, and DoomMetalVol5_44100.wad is a Doom 1 music
+     # pack (27 D_E#M# lumps, no D_MAPxx). So the metal pack only reaches the
+     # ear on a DOOM.WAD run -- which is why this is the primary variant.
+     # The pack is 205 MB and is the last -file before the mapset so its music
+     # is not shadowed by anything the episode wad declares.
      [("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
        BDBE + r"\addons\DoomHDTextures.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\enh_e1v1.8c.wad", {"hd": True, "label": "HD"}),
+       BD + r"\DoomMetalVol5_44100.wad",
+       BDBE + r"\enh_e1v1.8c.wad", {"hd": True, "label": "HD + METAL"}),
       ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
        BDBE + r"\addons\DoomHDTextures.pk3",
