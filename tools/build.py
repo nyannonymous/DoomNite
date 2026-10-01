@@ -144,9 +144,7 @@ GAMES = [
     ("Hexen Remade HD", "The cancelled Hexen 1.5, finished -- HD remaster. Needs "
      "the Hexen IWAD: its 31 maps are MAP##, which neither Doom IWAD has.",
      [("Hexen.wad", HD + r"\HEXENREMADE.wad", HD + r"\h_PBR_v461.pk3"),
-      ("Hexen.wad", HD + r"\HEXENREMADE.wad"),
-      ("Hexen.wad", HD + r"\HEXENREMADE.wad", HD + r"\HEXENREMADE-Effects-off.wad",
-       HD + r"\h_PBR_v461.pk3")]),
+      ("Hexen.wad", HD + r"\HEXENREMADE.wad")]),
     ("DN3DooM", "Duke 3D in Doom II.",
      [("DOOM2.WAD", BD + r"\DN3DooM.pk3")]),
 ]

@@ -314,7 +314,9 @@ function groupEntries(entries) {
       g.cfgs.push(c);
     }
   }
-  for (const g of out) g.cfgs.sort((a, b) => a.mods.length - b.mods.length);
+  // Keep the order build.py declared. Sorting by mod count put the plain
+  // build first and the HD remaster second, which is backwards from intent.
+  for (const g of out) g.cfgs.sort((a, b) => a.index - b.index);
   return out;
 }
 
