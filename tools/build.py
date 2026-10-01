@@ -135,9 +135,16 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\myhouse.wad", BD + r"\myhouse.pk3")]),
     ("Hocus Pocus 3D", "Hocus Pocus, but 3D. Runs on the Doom II IWAD.",
      [("DOOM2.WAD", HO + r"\HOCUS.pk3")]),
-    ("Hexen Remade", "The cancelled Hexen 1.5, finished. Needs the Hexen IWAD: "
-     "its 31 maps are MAP##, which neither Doom IWAD has.",
-     [("Hexen.wad", HD + r"\HEXENREMADE.wad")]),
+    # Two flavours, same 31 maps. The PBR pack is a 686 MB download that replaces
+    # every texture with a physically based one, so it ships as the HD default
+    # with the plain build kept as a second option -- the PBR one is a heavy
+    # load and some people just want the original 1995 look.
+    ("Hexen Remade HD", "The cancelled Hexen 1.5, finished -- HD remaster. Needs "
+     "the Hexen IWAD: its 31 maps are MAP##, which neither Doom IWAD has.",
+     [("Hexen.wad", HD + r"\HEXENREMADE.wad", HD + r"\h_PBR_v461.pk3"),
+      ("Hexen.wad", HD + r"\HEXENREMADE.wad"),
+      ("Hexen.wad", HD + r"\HEXENREMADE.wad", HD + r"\HEXENREMADE-Effects-off.wad",
+       HD + r"\h_PBR_v461.pk3")]),
     ("DN3DooM", "Duke 3D in Doom II.",
      [("DOOM2.WAD", BD + r"\DN3DooM.pk3")]),
 ]
