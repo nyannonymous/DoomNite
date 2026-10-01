@@ -28,6 +28,7 @@ exposure to anything else.
 import argparse
 import json
 import os
+import posixpath
 import subprocess
 import sys
 import threading
@@ -65,6 +66,19 @@ def _variant_label(mods, shared_base, other_iwad):
     return label
 
 
+def art_map():
+    """Map each mod file's stem to its extracted title-screen filename.
+
+    Matched against a launcher's mods so a tile can show the mod's own art
+    when it ships a title screen, and the generated poster otherwise.
+    """
+    d = os.path.join(PACK, "art")
+    if not os.path.isdir(d):
+        return {}
+    return {os.path.splitext(f)[0]: f for f in os.listdir(d)
+            if os.path.isfile(os.path.join(d, f))}
+
+
 def load_entries():
     """Build the flat entry list from the manifest.
 
@@ -75,6 +89,7 @@ def load_entries():
     configurations as options instead of three near-identical cards.
     """
     ENTRIES.clear()
+    art = art_map()
     man = json.load(open(MANIFEST, encoding="utf-8"))
     for g in man.get("games", []):
         acts = g.get("actions", [])
@@ -105,6 +120,11 @@ def load_entries():
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
                 "exists": os.path.isfile(os.path.join(PACK, "launchers", a["bat"])),
+                # First mod that ships title art wins; the game is usually
+                # named after that mod.
+                "art": next((art[m] for m in
+                             (os.path.splitext(os.path.basename(x))[0] for x in a.get("mods", []))
+                             if m in art), None),
                 "group": g["name"],
                 "variant": _variant_label(mods, shared_base, _own(a)),
                 "primary": False,
@@ -215,6 +235,24 @@ def handler_factory():
                     "missing": man.get("missing", []),
                     "pack": os.path.basename(PACK),
                 }))
+            if path.startswith("/art/"):
+                # Cover art extracted from the mods' own title screens. Served
+                # from a fixed directory with a whitelisted extension -- the name
+                # is a basename, so no traversal, and non-image types never get
+                # a content type from us.
+                name = posixpath.basename(path[len("/art/"):])
+                if not name or "/" in name or "\\" in name:
+                    return self._send(404, _json.dumps({"error": "not found"}))
+                ext = os.path.splitext(name)[1].lower()
+                ctype = {".png": "image/png", ".jpg": "image/jpeg",
+                         ".jpeg": "image/jpeg", ".gif": "image/gif"}.get(ext)
+                if not ctype:
+                    return self._send(404, _json.dumps({"error": "not found"}))
+                fp = os.path.join(PACK, "art", name)
+                if not os.path.isfile(fp):
+                    return self._send(404, _json.dumps({"error": "not found"}))
+                with open(fp, "rb") as f:
+                    return self._send(200, f.read(), ctype)
             if path == "/api/dryrun":
                 q = _up.parse_qs(_up.urlparse(self.path).query)
                 try:
