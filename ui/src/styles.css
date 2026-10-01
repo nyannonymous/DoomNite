@@ -811,6 +811,18 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Filenames are long and unbreakable, so each row must be allowed to
+     truncate rather than stretch the panel. */
+  min-width: 0;
+}
+
+.mods li {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Keep the full path reachable on hover for anything truncated. */
+  cursor: default;
 }
 
 .mods li {
@@ -919,6 +931,10 @@ kbd {
 .cfg-label {
   font-size: 12.5px;
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cfg-mods {
@@ -927,6 +943,14 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Required for the ellipsis above to actually engage. Without an explicit
+     min-width:0 a flex item defaults to min-content, and a long unbroken
+     filename (BD_Black_Editionv3.35_WeaponSounds.pk3) sets that floor --
+     so the row grows wider than the panel and the text spills over the UI
+     instead of truncating. The parent .cfg-text already has it; the child
+     needs it too. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .cfg-iwad {
