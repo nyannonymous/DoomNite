@@ -1203,3 +1203,277 @@ kbd {
     transform: none !important;
   }
 }
+
+
+/* ===================================================================
+   Hover play button, and the right-click build menu.
+
+   Both are additions to the existing tile. The play button is always in the
+   DOM and revealed by CSS rather than mounted on hover, so hovering costs no
+   React render and cannot pop in a frame late.
+   =================================================================== */
+
+/* The tile is now a div with role=button, so it needs the focus ring the
+   <button> element used to get for free. */
+.tile:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+.tile-playwrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* Hidden until hover, but still in the layout tree. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--fast) var(--ease);
+  /* Sit above the cover art, below the title text. */
+  z-index: 3;
+  background:
+    radial-gradient(
+      circle at 50% 55%,
+      color-mix(in srgb, var(--void) 55%, transparent),
+      color-mix(in srgb, var(--void) 88%, transparent) 70%
+    );
+}
+
+.tile:hover .tile-playwrap,
+.tile:focus-within .tile-playwrap {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tile-play {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.6em 1.1em;
+  font: 700 0.95rem/1 "Chakra Petch", system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--void);
+  background: linear-gradient(180deg, var(--ember) 0%, color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
+  border: 1px solid color-mix(in srgb, var(--ember) 70%, #fff);
+  border-radius: var(--radius);
+  cursor: pointer;
+  /* Heavy industrial switch: a hard drop shadow that collapses on press. */
+  box-shadow:
+    0 4px 0 color-mix(in srgb, var(--blood) 70%, #000),
+    0 10px 24px -6px color-mix(in srgb, var(--ember) 60%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  transform: translateY(0);
+  transition:
+    transform var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease),
+    filter var(--fast) var(--ease);
+  animation: play-pulse 2.4s ease-in-out infinite;
+}
+
+.tile-play svg {
+  width: 1.1em;
+  height: 1.1em;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
+}
+
+.tile-play:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+  box-shadow:
+    0 5px 0 color-mix(in srgb, var(--blood) 70%, #000),
+    0 14px 30px -6px color-mix(in srgb, var(--ember) 75%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.tile-play:active {
+  /* Press down: the shadow is the button's thickness, so it collapses to 0. */
+  transform: translateY(4px);
+  box-shadow:
+    0 0 0 color-mix(in srgb, var(--blood) 70%, #000),
+    0 4px 12px -4px color-mix(in srgb, var(--ember) 60%, transparent),
+    inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tile-play:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.tile-play:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8) brightness(0.6);
+  animation: none;
+}
+
+@keyframes play-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.16); }
+}
+
+/* Respect a stated preference for less motion: the pulse is decorative and
+   the tilt is large, so both are dropped rather than merely shortened. */
+@media (prefers-reduced-motion: reduce) {
+  .tile { transform: none !important; }
+  .tile-play { animation: none; transition: none; }
+  .tile-play:active { transform: none; }
+}
+
+/* ---------- right-click build menu ---------- */
+
+.vmenu {
+  position: fixed;
+  z-index: 90;
+  min-width: 17rem;
+  max-width: 24rem;
+  padding: 0.4rem;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  box-shadow:
+    var(--shadow-3),
+    inset 0 1px 0 var(--bevel-lt);
+  /* Hidden until measured, so it never paints at the un-flipped position. */
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+  backdrop-filter: blur(8px);
+}
+
+.vmenu.is-placed { opacity: 1; }
+
+.vmenu-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 0.3rem;
+}
+
+.vmenu-title {
+  font: 700 0.9rem/1.2 "Chakra Petch", system-ui, sans-serif;
+  letter-spacing: 0.06em;
+}
+
+.vmenu-count {
+  font-size: 0.72rem;
+  color: var(--fg-faint);
+  white-space: nowrap;
+}
+
+.vmenu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.vrow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.3rem;
+  border-radius: calc(var(--radius) - 2px);
+  transition: background var(--fast) var(--ease);
+}
+
+.vrow:hover { background: color-mix(in srgb, var(--ember) 14%, transparent); }
+.vrow.is-disabled { opacity: 0.45; }
+
+.vrow-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.5rem;
+  background: none;
+  border: 0;
+  border-radius: inherit;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.vrow-info:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: -2px;
+}
+
+.vrow-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+
+.vrow-def, .vrow-hd {
+  font: 700 0.6rem/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.25em 0.4em;
+  border-radius: 3px;
+}
+
+.vrow-def {
+  color: var(--void);
+  background: var(--ember);
+}
+
+.vrow-hd {
+  color: var(--void);
+  background: var(--ok);
+}
+
+.vrow-meta {
+  font-size: 0.7rem;
+  color: var(--fg-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vrow-play {
+  flex: none;
+  width: 2.1rem;
+  display: grid;
+  place-items: center;
+  margin: 0.3rem 0.3rem 0.3rem 0;
+  color: var(--ember);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ember) 40%, transparent);
+  border-radius: calc(var(--radius) - 3px);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.vrow-play svg { width: 0.85rem; height: 0.85rem; fill: currentColor; }
+
+.vrow-play:hover:not(:disabled) {
+  color: var(--void);
+  background: var(--ember);
+}
+
+.vrow-play:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+
+.vrow-play:disabled { cursor: not-allowed; }
+
+.vrow-spin {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid color-mix(in srgb, var(--ember) 30%, transparent);
+  border-top-color: var(--ember);
+  border-radius: 50%;
+  animation: vrow-spin 0.7s linear infinite;
+}
+
+@keyframes vrow-spin { to { transform: rotate(360deg); } }

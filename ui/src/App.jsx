@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchEntries, groupEntries, FILTERS } from "./api";
+import { fetchEntries, groupEntries, FILTERS, launchIndex } from "./api";
 import Tile from "./Tile";
 import Panel from "./Panel";
 import EmberField from "./EmberField";
+import VariantMenu from "./VariantMenu";
 
 function Toast({ msg, bad }) {
   if (!msg) return null;
@@ -42,6 +43,8 @@ export default function App() {
       /* non-fatal */
     }
   }, [pinned]);
+  // Which game's build menu is open, and where. Null key means closed.
+  const [menu, setMenu] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
   const [toastBad, setToastBad] = useState(false);
   const [count, setCount] = useState(0); // entrance animation trigger
@@ -125,6 +128,49 @@ export default function App() {
     }, [filtered, sel, pinned]);
 
   const current = filtered.find((g) => g.key === sel) || null;
+
+  /**
+   * Launch one build of a group.
+   *
+   * `n` indexes that group's cfgs. 0 is the primary build, which is what a
+   * left-click on the hover play button and what Space on a focused card both
+   * do. The primary is first because tools/build.py lists the HD build first for
+   * BDBE, so "the default" is the best-looking one.
+   */
+  const launchBuild = useCallback(
+    async (group, n) => {
+      if (!group) return;
+      const cfg = group.cfgs[n] || group.cfgs[0];
+      if (!cfg || cfg.exists === false) {
+        toast(`Cannot launch ${group.label}: files are missing.`, true);
+        return;
+      }
+      try {
+        const r = await launchIndex(cfg.index);
+        toast(`Launched: ${r.label}`);
+      } catch (e) {
+        toast(`Failed: ${e.message}`, true);
+      }
+    },
+    [toast]
+  );
+
+  const openVariants = useCallback((group, x, y) => {
+    setMenu({ group, x, y });
+  }, []);
+
+  const closeVariants = useCallback(() => setMenu(null), []);
+
+  // The grid owns a contextmenu handler per tile, but a right-click on the
+  // surrounding empty space should still dismiss an open menu.
+  useEffect(() => {
+    if (!menu) return;
+    function onKey(e) {
+      if (e.key === "Escape") setMenu(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
 
   const move = useCallback(
     (dir) => {
@@ -264,6 +310,8 @@ export default function App() {
                   onPin={setPinned}
                   pinned={g.key === pinned}
                   onHover={setSel}
+                  onLaunch={launchBuild}
+                  onOpenVariants={openVariants}
                 />
               ))}
             </div>
@@ -278,6 +326,16 @@ export default function App() {
           toast={toast}
         />
       </main>
+
+      {menu && (
+        <VariantMenu
+          group={menu.group}
+          at={{ x: menu.x, y: menu.y }}
+          onClose={closeVariants}
+          onLaunched={(g, c) => toast(`Launched: ${c.label || g.label}`)}
+          onError={(m) => toast(`Failed: ${m}`, true)}
+        />
+      )}
 
       <footer className="statusbar">
         <span>{filtered.length} of {merged.length} games</span>

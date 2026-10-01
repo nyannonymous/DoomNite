@@ -45,7 +45,7 @@ ENTRIES = []
 # in-place mutation raced with concurrent /api/entries requests.
 
 
-def _variant_label(mods, shared_base, other_iwad):
+def _variant_label(mods, shared_base, other_iwad, explicit=""):
     """A short human label for one variant of a game.
 
     When every variant of a game shares the same leading mod, that mod is the
@@ -57,6 +57,14 @@ def _variant_label(mods, shared_base, other_iwad):
     other_iwad is the OTHER iwad this game offers, or None when every variant
     uses the same one -- so only the differing half gets an IWAD tag.
     """
+    # An explicit label from the manifest wins. The inferred form reads like
+    # "with BD_Black_NeuralUpscale.pk3, DoomHDTextures.pk3" once a variant
+    # carries four mods, which is no use to anyone on a card.
+    if explicit:
+        label = explicit
+        if other_iwad:
+            label += "  [Doom 1]" if other_iwad == "DOOM.WAD" else "  [Doom 2]"
+        return label
     base = mods[0] if mods else ""
     if shared_base and base:
         extras = mods[1:]
@@ -142,7 +150,8 @@ def load_entries():
                              (os.path.splitext(os.path.basename(x))[0] for x in a.get("mods", []))
                              if m in art), None),
                 "group": g["name"],
-                "variant": _variant_label(mods, shared_base, _own(a)),
+                "variant": _variant_label(mods, shared_base, _own(a), a.get("label", "")),
+                 "hd": bool(a.get("hd")),
                 "primary": False,
             })
         # Point every member of the group at all of its configurations, so the

@@ -40,7 +40,32 @@ function Cover({ group, className = "" }) {
   );
 }
 
-export default function Tile({ group, selected, pinned, onSelect, onPin, onHover, index }) {
+/**
+ * One game card.
+ *
+ * The element is a <div role="button"> rather than a real <button> because it
+ * now contains its own buttons (the hover play button and the per-variant play
+ * buttons in the context menu). Nesting interactive elements inside a <button>
+ * is invalid HTML and browsers flatten it unpredictably, so the card is a div
+ * with the keyboard and ARIA wiring done by hand instead.
+ *
+ * Interaction model, per the user's spec:
+ *   - hover           reveals a play button
+ *   - click the play  launches the DEFAULT build (the primary variant)
+ *   - click the card  selects it for the details pane
+ *   - right-click     opens the variant menu, each variant with its own play
+ */
+export default function Tile({
+  group,
+  selected,
+  pinned,
+  onSelect,
+  onPin,
+  onHover,
+  onLaunch,
+  onOpenVariants,
+  index,
+}) {
   const ref = useRef(null);
   const cfg = group.cfgs[group.pick] || group.cfgs[0];
 
@@ -92,23 +117,56 @@ export default function Tile({ group, selected, pinned, onSelect, onPin, onHover
     onSelect(group.key);
   }
 
+  /** Launch the default build: the primary variant, never the hovered pick. */
+  function playDefault(e) {
+    e.stopPropagation(); // don't let the click also pin/select
+    e.preventDefault();
+    onLaunch?.(group.key, 0);
+  }
+
+  function openVariants(e) {
+    // Right-click must not also fire the context menu, and must not select.
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenVariants?.(group, e.clientX, e.clientY);
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      activate();
+    } else if (e.key === " ") {
+      // Space is the conventional activate key; on this card it plays, which
+      // is the action people expect from a game launcher tile.
+      e.preventDefault();
+      onLaunch?.(group.key, 0);
+    } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      // The keyboard route to the same menu the right mouse button opens.
+      e.preventDefault();
+      const r = ref.current?.getBoundingClientRect();
+      onOpenVariants?.(group, r ? r.left + r.width / 2 : 0, r ? r.top : 0);
+    }
+  }
+
   return (
-    <button
+    <div
       ref={ref}
-      type="button"
+      role="button"
+      tabIndex={0}
       className={`tile ${selected ? "is-sel" : ""} ${pinned ? "is-pin" : ""} ${
         group.missing ? "is-missing" : ""
       }`}
       style={{ "--i": index }}
       onClick={activate}
+      onKeyDown={onKeyDown}
+      onContextMenu={openVariants}
       onMouseEnter={() => onHover?.(group.key)}
       onFocus={() => onSelect(group.key)}
       onPointerMove={onMove}
       onPointerLeave={reset}
       aria-pressed={pinned}
-      title={`${group.label}${multi ? ` — ${group.cfgs.length} configs` : ""}${
-        pinned ? " (pinned — click to unpin)" : " (click to pin)"
-      }`}
+      aria-haspopup={multi ? "menu" : undefined}
+      title={`${group.label}${multi ? ` — ${group.cfgs.length} builds` : ""}\nClick to pin · Right-click for builds`}
     >
       <Cover group={group} />
       <span className="tile-body">
@@ -118,6 +176,24 @@ export default function Tile({ group, selected, pinned, onSelect, onPin, onHover
           {multi ? ` · ${group.cfgs.length} configs` : ""}
         </span>
       </span>
+      {/* Hover play button. Always in the DOM and only revealed by CSS, so it
+          costs no layout thrash and cannot pop in late. A real <button> inside
+          a <button> is invalid, which is why the card is a div. */}
+      <span className="tile-playwrap">
+        <button
+          type="button"
+          className="tile-play"
+          onClick={playDefault}
+          disabled={group.missing || cfg.exists === false}
+          aria-label={`Launch ${group.label} (default build)`}
+          title="Launch (Space)"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 4l13 8-13 8z" />
+          </svg>
+          <span className="tile-playtext">PLAY</span>
+        </button>
+      </span>
       {/* Pin marker: pinned state must not be conveyed by glow alone. */}
       <span className="tile-pin" aria-hidden="true">
         <svg viewBox="0 0 24 24">
@@ -126,7 +202,7 @@ export default function Tile({ group, selected, pinned, onSelect, onPin, onHover
         </svg>
       </span>
       <span className="tile-edge" aria-hidden="true" />
-    </button>
+    </div>
   );
 }
 

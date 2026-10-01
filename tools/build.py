@@ -150,22 +150,67 @@ GAMES = [
     # terrain splashes stay out: that is the optional addon layer.
     #
     # Each mod lands in its own subfolder, slugified from its filename.
+    # HD VARIANTS ARE FIRST ON PURPOSE. serve.py marks the first action of a
+    # group as primary, and a left-click on a card launches the primary. So the
+    # best-looking build is the default and the bare one is still a variant.
+    #
+    # Why the HD addons are needed at all -- the user noticed the helmet and
+    # weapons looked low-res, and the base pk3 confirms it:
+    #
+    #   BDBE_v3.38.pk3            10,496 sprites, but only 23 HIRES/ lumps, and
+    #                             22 of those are items/health. Exactly one is
+    #                             a weapon (SGN2A0). The BD marine visor
+    #                             (PLAYA*, 62 sprites) has 0 hires versions.
+    #   BD_Black_NeuralUpscale    1,274 HIRES/ lumps: shotgun, plasma, BFG,
+    #                             rifle, chainsaw, ripper.
+    #   DoomHDTextures            51 hires PLAY* under filter/doom/hires/player/
+    #                             -- the helmet -- plus the HD texture set.
+    #
+    # So the base pk3 alone is not designed to look good; it ships the art
+    # layer and expects the addons for the hires pass.
+    #
+    # Load order: base first, then the upscaler and HD textures, then the
+    # episode wad last so the mapset still wins.
+    #
+    # BDBE itself is standalone and must not be stacked on brutal22test6 -- both
+    # forks declare 'server int zdoombrutalblood' and UZDoom aborts on the
+    # duplicate. See the note above the BDBE definition.
     ("Brutal Doom Black Edition (Enhanced Episode 1)",
-     "RaZZoR's Black Edition v3.38, standalone, with Enhanced Episode 1.",
+     "RaZZoR's Black Edition v3.38 with Enhanced Episode 1. HD by default.",
      [("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
+       BDBE + r"\addons\DoomHDTextures.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\enh_e1v1.8c.wad"),
+       BDBE + r"\enh_e1v1.8c.wad", {"hd": True, "label": "HD"}),
       ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
+       BDBE + r"\addons\DoomHDTextures.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\enh_e1v1.8c.wad")]),
-    ("Brutal Doom Black Edition (HontE Remastered)",
-     "RaZZoR's Black Edition v3.38, standalone, with HontE Remastered REV1.103. Doom 2 IWAD.",
-     [("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
-       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad"),
+       BDBE + r"\enh_e1v1.8c.wad", {"hd": True, "label": "HD"}),
       ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
+       BDBE + r"\enh_e1v1.8c.wad", {"label": "no addons"}),
+      ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\enh_e1v1.8c.wad", {"label": "no addons"})]),
+    ("Brutal Doom Black Edition (HontE Remastered)",
+     "RaZZoR's Black Edition v3.38 with HontE Remastered REV1.103. HD by default.",
+     [("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
+       BDBE + r"\addons\DoomHDTextures.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"hd": True, "label": "HD"}),
+      ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
+       BDBE + r"\addons\DoomHDTextures.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"hd": True, "label": "HD"}),
+      ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"label": "no addons"}),
+      ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
+       BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"label": "no addons"})]),
     ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign.",
      # Two files, per the author's Readme_2_0.txt: "run both files (pk3 and wad)
      # with the pk3 first and the wad second." The mapset carries MAP01-MAP08;
@@ -315,7 +360,25 @@ def build():
 
     for name, note, actions in GAMES:
         entry = {"name": name, "note": note, "actions": []}
-        for i, (iwad, *modsrcs) in enumerate(actions):
+        # An action may carry an optional trailing dict of options. Kept as a
+        # 4th tuple slot so the common (iwad, *mods) form stays unchanged.
+        #
+        # hd=True marks the high-fidelity build. The UI treats the first action
+        # of a group as primary, so ordering the HD build first makes the best
+        # looking version what a left-click launches, with the bare build still
+        # reachable as a variant.
+        for i, action in enumerate(actions):
+            # The options dict is always the LAST element when present, and it
+            # may sit at any index because the number of mods varies per action.
+            # Checking only a fixed slot (len == 4) silently passed a dict
+            # through as a mod path, which then reached os.path.isfile.
+            opts = {}
+            if action and isinstance(action[-1], dict):
+                iwad, *modsrcs = action[:-1]
+                opts = action[-1]
+            else:
+                iwad, *modsrcs = action
+            is_hd = bool(opts.get("hd"))
             mods, ok = [], True
             for src in modsrcs:
                 if not os.path.isfile(src):
@@ -341,7 +404,11 @@ def build():
             bat = f"{slugify(name)}{suffix}.bat"
             write_bat(bat, name, iwad, mods, note)
             entry["actions"].append({
-                "bat": bat, "iwad": iwad, "hd": False,
+                "bat": bat, "iwad": iwad, "hd": is_hd,
+                # Optional explicit label for this variant. Without it serve.py
+                # infers one from the mod list, which goes unreadable once a
+                # variant carries four mods.
+                "label": opts.get("label", ""),
                 "mod": mods[0][1] and f"mods\\{mods[0][0]}\\{mods[0][1]}",
                 "mods": [f"mods\\{s}\\{f}" for s, f in mods],
             })

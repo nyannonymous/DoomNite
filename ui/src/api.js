@@ -64,6 +64,7 @@ export function groupEntries(entries) {
             mods: v.mods || [],
             iwad: v.iwad,
             exists: v.exists,
+            hd: !!v.hd,
           }));
       }
       g.kind = e.kind;
@@ -77,6 +78,7 @@ export function groupEntries(entries) {
         exists: e.exists,
         exe: e.exe,
         wdir: e.wdir,
+        hd: !!e.hd,
       });
     }
     if (e.art && !g.art) g.art = e.art;
