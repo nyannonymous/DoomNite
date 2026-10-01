@@ -1,5 +1,13 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Play, Terminal as TerminalIcon, Wrench, Download, Trash2, Check } from "lucide-react";
+import {
+  Play,
+  Terminal as TerminalIcon,
+  Wrench,
+  Download,
+  Trash2,
+  Check,
+  HardDrive,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { dryrun, launchIndex, startInstall, removeInstall } from "./api";
 import { Cover } from "./Tile";
@@ -288,7 +296,21 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
         )}
 
         {/* On-demand total conversion: install/uninstall at the bottom of the
-            sidebar, where the rest of this game's controls live. */}
+            sidebar, where the rest of this game's controls live.
+
+            Everything else in the pack ships inside it, so it has nothing to
+            install or remove. That used to mean this whole block simply
+            vanished, while the card showed an IN PACK label -- so the same
+            game said two different things in two places. It now says the same
+            thing here too. */}
+        {!group.needsInstall && (
+          <div className="panel-install">
+            <p className="panel-inpack">
+              <HardDrive size={13} aria-hidden="true" />
+              Ships inside the pack
+            </p>
+          </div>
+        )}
         {group.needsInstall && (
           <div className="panel-install">
             {instError && (

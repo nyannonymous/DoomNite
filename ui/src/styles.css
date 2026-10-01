@@ -2995,3 +2995,21 @@ kbd {
   color: #ff7a7a;
   border-color: color-mix(in srgb, var(--blood) 60%, transparent);
 }
+
+/* Sidebar counterpart to the card's IN PACK label. Dim on purpose: it is a
+   statement of fact, not an action, and it sits at the bottom of the sidebar
+   where the on-demand INSTALL/UNINSTALL controls live for the two games that
+   do have them. Same wording in both places so the game never contradicts
+   itself between the card and the panel. */
+.panel-inpack {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--fg-dim);
+  opacity: 0.7;
+  font: 400 0.72rem/1.4 var(--d-mono);
+  letter-spacing: 0.04em;
+}
+.panel-inpack svg {
+  flex: 0 0 auto;
+}
