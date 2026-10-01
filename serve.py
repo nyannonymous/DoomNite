@@ -188,6 +188,12 @@ def load_entries():
             "exe": s["exe"],
             "wdir": s["wdir"],
             "exists": os.path.isfile(s["exe"]),
+            # Standalone games have no mods, so the mod-stem art match can
+            # never resolve for them. The manifest names the art explicitly;
+            # without passing it through here the field was written by
+            # build.py, ignored here, and the tiles fell back to a generated
+            # poster.
+            "art": s.get("art") or "",
         })
     # Single atomic rebind: concurrent readers see either the whole old list or
     # the whole new one, never a partially built one. Safe under the GIL.

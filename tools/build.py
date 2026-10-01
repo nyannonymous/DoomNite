@@ -246,13 +246,17 @@ GAMES = [
     ("The Bikini Bottom Massacre", "SpongeBob, but in Doom.",
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
-     [("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad"),
-      # Aliens-Only ships no TITLEPIC, so the default art rule finds
-      # nothing and this tile fell back to a generated poster while its
-      # two siblings showed the real title screen. Same game, same art.
+     # All three variants show the same cover art: the new Duke Boomem
+     # image. Set explicitly on each because the mod-stem match in
+     # serve.py would otherwise give the 2.5D tiles the mod's own
+     # TITLEPIC and the Aliens-Only tile a generated poster, so one game
+     # showed two different pictures.
+     [("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad",
+       {"art": "DukeBoomem.png"}),
       ("DOOM2.WAD", BD + r"\Duke-Boomem-Aliens-Only.wad",
-       {"art": "Duke-Boomem-2.5D.png"}),
-      ("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad", BD + r"\Duke-Textures.pk3")]),
+       {"art": "DukeBoomem.png"}),
+      ("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad", BD + r"\Duke-Textures.pk3",
+       {"art": "DukeBoomem.png"})]),
     ("QuakinDoom: Total 3-D Edition", "Quake's guns and monsters, Doom's maps.",
      [("DOOM2.WAD", BD + r"\QuakinDoomT3DE.pk3"),
       ("DOOM2.WAD", BD + r"\QuakinDoomT3DE.pk3", BD + r"\QuakinMobs.pk3")]),
@@ -290,11 +294,18 @@ GAMES = [
 ]
 
 # Non-ZDoom games: launched in place, not copied into the pack.
+# (name, note, working dir, exe, art filename)
+#
+# The art element is required in practice, not optional: serve.py resolves art
+# by matching filenames against mod stems, and these two have no mods, so
+# without an explicit name they can only ever draw a generated poster.
 STANDALONE = [
     ("Sonic Robo Blast 2 v2.2", "ZDoom build. Sonic in Doom.",
-     os.path.join(BD, "SRB2 v2.2"), os.path.join(BD, "SRB2 v2.2", "srb2win.exe")),
+     os.path.join(BD, "SRB2 v2.2"), os.path.join(BD, "SRB2 v2.2", "srb2win.exe"),
+     "SonicRoboBlast2.png"),
     ("Doom Half-Life", "Half-Life 1 in Doom.",
-     HL, os.path.join(HL, "hl2doom.exe")),
+     HL, os.path.join(HL, "hl2doom.exe"),
+     "DoomHalfLife.png"),
 ]
 
 
@@ -571,12 +582,21 @@ def build():
         if entry["actions"]:
             manifest["games"].append(entry)
 
-    for name, note, wdir, exe in STANDALONE:
+    for name, note, wdir, exe, *rest in STANDALONE:
         if not os.path.isfile(exe):
             manifest["missing"].append(f"standalone {name}: {exe}")
             continue
+        # Optional 5th element sets the card art.
+        #
+        # Standalone games point at an exe outside the pack and have no mods,
+        # so serve.py's art_map() -- which matches art filenames against mod
+        # stems -- can never resolve anything for them. Without an explicit
+        # name here they fall back to a generated poster, which is how Sonic
+        # Robo Blast 2 and Doom Half-Life were showing generic art.
+        art_name = rest[0] if rest else ""
         manifest["standalone_games"].append(
-            {"name": name, "note": note, "wdir": wdir, "exe": exe})
+            {"name": name, "note": note, "wdir": wdir, "exe": exe,
+             "art": art_name})
 
     with open(os.path.join(PACK, "pack-manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=1)
