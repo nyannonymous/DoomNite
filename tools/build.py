@@ -647,6 +647,11 @@ def build():
                         # Repeated on the action so serve.py can tell whether
                         # the pk3 is actually on disk without reading the group.
                         "standalone_iwad": os.path.join(inst, "square1.pk3"),
+                        # This branch used to `continue` before the shared
+                        # tail below, so it never got an "art" key and the tile
+                        # fell back to a generated poster even though the game
+                        # had chosen art in GAMES.
+                        "art": opts.get("art", ""),
                     })
                     continue
 
@@ -658,6 +663,8 @@ def build():
                     "bat": bat, "iwad": "DOOM2.WAD", "hd": is_hd,
                     "mods": [os.path.join(inst, "REQUIEM.WAD")],
                     "exists": False, "needs_install": inst,
+                    # Same omission as the standalone branch above.
+                    "art": opts.get("art", ""),
                 })
                 continue
 

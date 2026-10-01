@@ -1,35 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ===================================================================
-   DoomNite -- UAC terminal skin.
-
-   Tailwind handles layout and spacing; this layer handles the things
-   utilities cannot express: generated noise, scanlines, the vignette,
-   jagged clip-path borders and chromatic aberration. All of it is drawn
-   from CSS gradients and blend modes -- no image files, so the app stays
-   a self-contained bundle that works offline.
-
-   The pre-redesign stylesheet follows below unchanged. It is the working
-   UI, so it stays until the new components prove themselves.
-   =================================================================== */
-
 @layer base {
   :root {
-    /* Doom palette. Duplicated from tailwind.config.js because the layer
-       below reads them at runtime; keep the two in step. */
-    --d-void:      #08090b;
-    --d-gun-900:   #0e1013;
-    --d-gun-800:   #16191d;
-    --d-gun-700:   #1e2227;
-    --d-gun-600:   #2a2f36;
-    --d-gun-400:   #3a4149;
-    --d-gun-200:   #7c848e;
-    --d-rust-600:  #7a3b18;
-    --d-rust-500:  #a5521f;
-    --d-rust-400:  #c76a2c;
-    --d-rust-300:  #e08a45;
+    --d-void: #08090b;
+    --d-gun-900: #0e1013;
+    --d-gun-800: #16191d;
+    --d-gun-700: #1e2227;
+    --d-gun-600: #2a2f36;
+    --d-gun-400: #3a4149;
+    --d-gun-200: #7c848e;
+    --d-rust-600: #7a3b18;
+    --d-rust-500: #a5521f;
+    --d-rust-400: #c76a2c;
+    --d-rust-300: #e08a45;
     --d-toxic-500: #5b942e;
     --d-toxic-400: #7fc23c;
     --d-toxic-300: #a3e05c;
@@ -37,31 +21,32 @@
     --d-blood-500: #b71c1c;
     --d-blood-400: #e02f2f;
     --d-blood-300: #ff5c5c;
-
-    --d-display: "Black Ops One", "Oswald", Impact, sans-serif;
-    --d-head:    "Oswald", "Arial Narrow", sans-serif;
-    --d-mono:    "JetBrains Mono", "Fira Code", Consolas, monospace;
+    --d-display:
+      "Black Ops One",
+      "Oswald",
+      Impact,
+      sans-serif;
+    --d-head:
+      "Oswald",
+      "Arial Narrow",
+      sans-serif;
+    --d-mono:
+      "JetBrains Mono",
+      "Fira Code",
+      Consolas,
+      monospace;
   }
-
-  html, body, #root { height: 100%; }
-
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
   body {
     background: var(--d-void);
     color: #d8dce1;
     font-family: var(--d-mono);
-    /* Kill the iOS/Android tap highlight so the custom cursor is the only
-       pointer feedback on touch devices too. */
     -webkit-tap-highlight-color: transparent;
   }
-
-  /* Doom crosshair cursor. Two crossed bars plus a centre gap, drawn with
-     gradients so there is no image to load. `cursor` is set on the app
-     shell; native cursors are kept for form fields and text so typing and
-     text selection still work normally. */
-  /* Gated on .d-has-crosshair, which CRTOverlay sets only when it has actually
-     mounted a crosshair. Unconditional `cursor: none` was a trap: the
-     component returns null under prefers-reduced-motion and on coarse
-     pointers, so those users got no cursor at all. The DOM now decides. */
   .d-has-crosshair .uac-root,
   .d-has-crosshair .uac-root .tile,
   .d-has-crosshair .uac-root button:not(.keep-cursor) {
@@ -73,41 +58,28 @@
     cursor: auto;
   }
 }
-
 @layer components {
-  /* ---------- metal, not flat ---------- */
-
-  /* A bevel is a light top edge and a dark bottom edge. Paired with the
-     noise overlay below it stops any panel reading as a flat fill. */
   .d-bevel {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.09),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.6);
   }
-
   .d-panel {
     background:
-      linear-gradient(180deg, rgba(42, 47, 54, 0.82) 0%, rgba(14, 16, 19, 0.9) 100%);
+      linear-gradient(
+        180deg,
+        rgba(42, 47, 54, 0.82) 0%,
+        rgba(14, 16, 19, 0.9) 100%);
     border: 1px solid var(--d-gun-600);
     backdrop-filter: blur(2px);
   }
-
-  /* Brushed-metal striping, used behind headers and the terminal readout. */
   .d-brushed {
-    background-image: repeating-linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.022) 0px,
-      rgba(255, 255, 255, 0.022) 1px,
-      transparent 1px,
-      transparent 3px
-    );
+    background-image:
+      repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.022) 0px,
+        rgba(255, 255, 255, 0.022) 1px,
+        transparent 1px,
+        transparent 3px);
   }
-
-  /* ---------- generated noise ---------- */
-
-  /* Two offset fractal-noise SVG data URIs composited together. A single
-     layer looks like a repeating pattern; the two different scales are
-     what make it read as film grain. */
   .d-noise::before {
     content: "";
     position: absolute;
@@ -119,30 +91,29 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
     background-size: 140px 140px;
   }
-
-  /* ---------- CRT ---------- */
-
-  /* Scanlines: a 3px repeating linear gradient at low alpha. The mask
-     gradient fades the effect toward the edges so the centre stays
-     readable -- uniform scanlines across a wide screen are genuinely
-     hard to read text through. */
   .d-scanlines {
     position: fixed;
     inset: 0;
     z-index: 60;
     pointer-events: none;
-    background-image: repeating-linear-gradient(
-      180deg,
-      rgba(0, 0, 0, 0.28) 0px,
-      rgba(0, 0, 0, 0.28) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
-    -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
+    background-image:
+      repeating-linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.28) 0px,
+        rgba(0, 0, 0, 0.28) 1px,
+        transparent 1px,
+        transparent 3px);
+    mask-image:
+      radial-gradient(
+        ellipse 120% 100% at 50% 50%,
+        #000 45%,
+        transparent 100%);
+    -webkit-mask-image:
+      radial-gradient(
+        ellipse 120% 100% at 50% 50%,
+        #000 45%,
+        transparent 100%);
   }
-
-  /* A brighter band rolling slowly down the screen, like a CRT refresh. */
   .d-scan-sweep {
     position: fixed;
     inset: 0;
@@ -156,33 +127,29 @@
     left: 0;
     right: 0;
     height: 22vh;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      rgba(127, 194, 60, 0.045),
-      transparent
-    );
+    background:
+      linear-gradient(
+        180deg,
+        transparent,
+        rgba(127, 194, 60, 0.045),
+        transparent);
     animation: d-sweep 7s linear infinite;
   }
   @keyframes d-sweep {
-    0%   { transform: translateY(-22vh); }
-    100% { transform: translateY(100vh); }
+    0% {
+      transform: translateY(-22vh);
+    }
+    100% {
+      transform: translateY(100vh);
+    }
   }
-
-  /* Vignette. Inset box-shadow rather than a gradient so it can sit above
-     the hero art without a second element. */
   .d-vignette {
     position: fixed;
     inset: 0;
     z-index: 59;
     pointer-events: none;
-    box-shadow:
-      inset 0 0 180px 40px rgba(0, 0, 0, 0.82),
-      inset 0 0 60px 0 rgba(0, 0, 0, 0.5);
+    box-shadow: inset 0 0 180px 40px rgba(0, 0, 0, 0.82), inset 0 0 60px 0 rgba(0, 0, 0, 0.5);
   }
-
-  /* Very low-alpha colour fringing on the whole screen. Kept subtle on
-     purpose; at higher values it makes text look broken rather than CRT. */
   .d-aberration {
     position: fixed;
     inset: 0;
@@ -191,54 +158,31 @@
     mix-blend-mode: screen;
     opacity: 0.05;
     background:
-      linear-gradient(90deg, rgba(224, 47, 47, 0.5), transparent 12%),
-      linear-gradient(270deg, rgba(127, 194, 60, 0.5), transparent 12%);
+      linear-gradient(
+        90deg,
+        rgba(224, 47, 47, 0.5),
+        transparent 12%),
+      linear-gradient(
+        270deg,
+        rgba(127, 194, 60, 0.5),
+        transparent 12%);
   }
-
-  /* ---------- jagged clip-path borders ---------- */
-
-  /* A notched rectangle. Eight points, alternating long and short edges,
-     which reads as a torn metal plate. clip-path clips the border itself,
-     so the element's own border would be cut through -- the visible edge
-     comes from a drop-shadow filter instead. */
   .d-jagged {
-    clip-path: polygon(
-      0 6px, 6px 0,
-      calc(100% - 10px) 0, 100% 8px,
-      100% calc(100% - 6px), calc(100% - 6px) 100%,
-      10px 100%, 0 calc(100% - 8px)
-    );
+    clip-path: polygon(0 6px, 6px 0, calc(100% - 10px) 0, 100% 8px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 10px 100%, 0 calc(100% - 8px));
   }
-
-  /* Heavier notch for the selected card. */
   .d-jagged-lg {
-    clip-path: polygon(
-      0 12px, 12px 0,
-      calc(100% - 18px) 0, 100% 14px,
-      100% calc(100% - 12px), calc(100% - 12px) 100%,
-      18px 100%, 0 calc(100% - 14px)
-    );
+    clip-path: polygon(0 12px, 12px 0, calc(100% - 18px) 0, 100% 14px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 18px 100%, 0 calc(100% - 14px));
   }
-
-  /* Glow that traces a clip-path edge. Two offset drop-shadows in the
-     toxic green, blurred, read as the notches lighting up. */
   .d-jag-glow {
-    filter:
-      drop-shadow(0 0 1px var(--d-toxic-400))
-      drop-shadow(0 0 6px color-mix(in srgb, var(--d-toxic-500) 70%, transparent));
+    filter: drop-shadow(0 0 1px var(--d-toxic-400)) drop-shadow(0 0 6px color-mix(in srgb, var(--d-toxic-500) 70%, transparent));
   }
   .d-jag-glow-blood {
-    filter:
-      drop-shadow(0 0 1px var(--d-blood-400))
-      drop-shadow(0 0 8px color-mix(in srgb, var(--d-blood-500) 75%, transparent));
+    filter: drop-shadow(0 0 1px var(--d-blood-400)) drop-shadow(0 0 8px color-mix(in srgb, var(--d-blood-500) 75%, transparent));
   }
-
-  /* ---------- glitch text ---------- */
-
-  /* Chromatic aberration by offsetting two copies of the same text in red
-     and cyan behind the real one. The element needs position:relative and
-     its own text colour for the copies to be hidden behind it. */
-  .d-glitch { position: relative; display: inline-block; }
+  .d-glitch {
+    position: relative;
+    display: inline-block;
+  }
   .d-glitch::before,
   .d-glitch::after {
     content: attr(data-text);
@@ -247,9 +191,12 @@
     pointer-events: none;
     opacity: 0;
   }
-  .d-glitch::before { color: var(--d-blood-400); }
-  .d-glitch::after  { color: var(--d-toxic-300); }
-
+  .d-glitch::before {
+    color: var(--d-blood-400);
+  }
+  .d-glitch::after {
+    color: var(--d-toxic-300);
+  }
   .d-glitch:hover::before,
   .d-glitch.is-glitching::before {
     opacity: 0.85;
@@ -260,22 +207,34 @@
     opacity: 0.7;
     animation: d-glitch-b 0.42s steps(2) infinite;
   }
-
   @keyframes d-glitch-a {
-    0%, 100% { transform: translate(0, 0); }
-    25% { transform: translate(-2px, 1px); }
-    50% { transform: translate(2px, -1px); }
-    75% { transform: translate(-1px, -1px); }
+    0%, 100% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(-2px, 1px);
+    }
+    50% {
+      transform: translate(2px, -1px);
+    }
+    75% {
+      transform: translate(-1px, -1px);
+    }
   }
   @keyframes d-glitch-b {
-    0%, 100% { transform: translate(0, 0); }
-    25% { transform: translate(2px, -1px); }
-    50% { transform: translate(-2px, 1px); }
-    75% { transform: translate(1px, 1px); }
+    0%, 100% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(2px, -1px);
+    }
+    50% {
+      transform: translate(-2px, 1px);
+    }
+    75% {
+      transform: translate(1px, 1px);
+    }
   }
-
-  /* A hard horizontal slice, the other half of a glitch: one band of the
-     text jumps sideways. */
   .d-glitch-slice::after {
     content: "";
     position: absolute;
@@ -292,36 +251,39 @@
     animation: d-slice 0.5s steps(3) infinite;
   }
   @keyframes d-slice {
-    0%, 100% { transform: translateX(0); }
-    33% { transform: translateX(-4px); }
-    66% { transform: translateX(5px); }
+    0%, 100% {
+      transform: translateX(0);
+    }
+    33% {
+      transform: translateX(-4px);
+    }
+    66% {
+      transform: translateX(5px);
+    }
   }
-
-  /* ---------- terminal readout ---------- */
-
   .d-term {
     font-family: var(--d-mono);
     background:
-      linear-gradient(180deg, rgba(10, 26, 8, 0.72) 0%, rgba(6, 12, 6, 0.86) 100%);
+      linear-gradient(
+        180deg,
+        rgba(10, 26, 8, 0.72) 0%,
+        rgba(6, 12, 6, 0.86) 100%);
     border: 1px solid color-mix(in srgb, var(--d-toxic-500) 40%, transparent);
-    box-shadow:
-      inset 0 0 40px rgba(0, 0, 0, 0.9),
-      0 0 18px -6px color-mix(in srgb, var(--d-toxic-500) 45%, transparent);
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9), 0 0 18px -6px color-mix(in srgb, var(--d-toxic-500) 45%, transparent);
     color: var(--d-toxic-300);
     text-shadow: 0 0 6px color-mix(in srgb, var(--d-toxic-400) 55%, transparent);
   }
-
-  /* Blinking block cursor at the end of typed text. */
   .d-caret::after {
     content: "\2588";
     margin-left: 1px;
     color: var(--d-toxic-300);
     animation: d-blink 1s steps(2) infinite;
   }
-  @keyframes d-blink { 50% { opacity: 0; } }
-
-  /* UAC boot-sequence bar: segmented, so it reads as filling in discrete
-     steps rather than sliding smoothly. */
+  @keyframes d-blink {
+    50% {
+      opacity: 0;
+    }
+  }
   .d-bootbar {
     height: 10px;
     background: rgba(0, 0, 0, 0.55);
@@ -330,16 +292,13 @@
   }
   .d-bootbar-fill {
     height: 100%;
-    background-image: repeating-linear-gradient(
-      90deg,
-      var(--d-toxic-400) 0 6px,
-      transparent 6px 8px
-    );
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        var(--d-toxic-400) 0 6px,
+        transparent 6px 8px);
     box-shadow: 0 0 12px color-mix(in srgb, var(--d-toxic-400) 70%, transparent);
   }
-
-  /* "Data streams": falling characters. The streaks are gradients, not
-     glyphs, so they cost nothing to animate. */
   .d-streams {
     position: absolute;
     inset: 0;
@@ -354,25 +313,36 @@
     top: -100%;
     width: 2px;
     height: 200%;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      var(--d-toxic-400),
-      transparent
-    );
+    background:
+      linear-gradient(
+        180deg,
+        transparent,
+        var(--d-toxic-400),
+        transparent);
     animation: d-fall 1.6s linear infinite;
   }
-  .d-streams::before { left: 12%; animation-duration: 1.9s; }
-  .d-streams::after  { left: 78%; animation-duration: 1.4s; animation-delay: 0.5s; }
-  @keyframes d-fall {
-    0%   { transform: translateY(-50%); opacity: 0; }
-    20%  { opacity: 0.8; }
-    100% { transform: translateY(50%); opacity: 0; }
+  .d-streams::before {
+    left: 12%;
+    animation-duration: 1.9s;
   }
-
-  /* ---------- hero ---------- */
-
-  /* The selected game's art, filling the screen behind everything. */
+  .d-streams::after {
+    left: 78%;
+    animation-duration: 1.4s;
+    animation-delay: 0.5s;
+  }
+  @keyframes d-fall {
+    0% {
+      transform: translateY(-50%);
+      opacity: 0;
+    }
+    20% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translateY(50%);
+      opacity: 0;
+    }
+  }
   .d-hero {
     position: fixed;
     inset: 0;
@@ -380,20 +350,20 @@
     background-size: cover;
     background-position: center;
     filter: blur(14px) saturate(0.55) brightness(0.42);
-    transform: scale(1.08); /* hides the blur's soft edge */
+    transform: scale(1.08);
   }
-  /* Dark overlay so text over the art keeps contrast. */
   .d-hero-veil {
     position: fixed;
     inset: 0;
     z-index: 1;
     pointer-events: none;
     background:
-      linear-gradient(180deg, rgba(8, 9, 11, 0.82) 0%, rgba(8, 9, 11, 0.6) 45%, rgba(8, 9, 11, 0.92) 100%);
+      linear-gradient(
+        180deg,
+        rgba(8, 9, 11, 0.82) 0%,
+        rgba(8, 9, 11, 0.6) 45%,
+        rgba(8, 9, 11, 0.92) 100%);
   }
-
-  /* ---------- launch flash ---------- */
-
   .d-flash {
     position: fixed;
     inset: 0;
@@ -401,8 +371,6 @@
     pointer-events: none;
     background: var(--d-blood-300);
   }
-
-  /* Glitch bars during launch: horizontal slices that displace. */
   .d-glitchbars {
     position: fixed;
     inset: 0;
@@ -419,19 +387,27 @@
     right: -10%;
     background: var(--d-toxic-300);
   }
-  .d-glitchbars::before { height: 12%; top: 30%; animation: d-bar 0.28s steps(3) 3; }
-  .d-glitchbars::after  { height: 8%;  top: 66%; animation: d-bar 0.28s steps(3) 3 reverse; }
-  @keyframes d-bar {
-    0%, 100% { transform: translateX(0); }
-    33% { transform: translateX(-6%); }
-    66% { transform: translateX(7%); }
+  .d-glitchbars::before {
+    height: 12%;
+    top: 30%;
+    animation: d-bar 0.28s steps(3) 3;
   }
-
-  /* ---------- crosshair cursor ---------- */
-
-  /* Positioned by transform from CRTOverlay's pointermove handler. The
-     negative margins centre the crosshair on the pointer rather than putting
-     its top-left there. */
+  .d-glitchbars::after {
+    height: 8%;
+    top: 66%;
+    animation: d-bar 0.28s steps(3) 3 reverse;
+  }
+  @keyframes d-bar {
+    0%, 100% {
+      transform: translateX(0);
+    }
+    33% {
+      transform: translateX(-6%);
+    }
+    66% {
+      transform: translateX(7%);
+    }
+  }
   .d-crosshair {
     position: fixed;
     top: 0;
@@ -443,24 +419,42 @@
     pointer-events: none;
     will-change: transform;
     transition: opacity var(--fast) var(--ease);
-    /* The crosshair is the only pointer feedback, so it needs to stay legible
-       over both the pale hero art and the dark UI. */
     filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9));
   }
-  .d-crosshair.is-out { opacity: 0; }
-
+  .d-crosshair.is-out {
+    opacity: 0;
+  }
   .d-xh {
     position: absolute;
     background: var(--d-toxic-300);
     box-shadow: 0 0 6px var(--d-toxic-400);
   }
-  .d-xh-t, .d-xh-b { left: 50%; width: 2px; height: 8px; margin-left: -1px; }
-  .d-xh-l, .d-xh-r { top: 50%; height: 2px; width: 8px; margin-top: -1px; }
-  .d-xh-t { top: 0; }
-  .d-xh-b { bottom: 0; }
-  .d-xh-l { left: 0; }
-  .d-xh-r { right: 0; }
-
+  .d-xh-t,
+  .d-xh-b {
+    left: 50%;
+    width: 2px;
+    height: 8px;
+    margin-left: -1px;
+  }
+  .d-xh-l,
+  .d-xh-r {
+    top: 50%;
+    height: 2px;
+    width: 8px;
+    margin-top: -1px;
+  }
+  .d-xh-t {
+    top: 0;
+  }
+  .d-xh-b {
+    bottom: 0;
+  }
+  .d-xh-l {
+    left: 0;
+  }
+  .d-xh-r {
+    right: 0;
+  }
   .d-xh-dot {
     position: absolute;
     top: 50%;
@@ -471,12 +465,6 @@
     background: var(--d-blood-400);
     box-shadow: 0 0 6px var(--d-blood-400);
   }
-
-  /* ---------- card: notch glow, tags, glitch ---------- */
-
-  /* The notch glow. Sits behind the card body and fades in on hover, so the
-     jagged edge reads as lighting up rather than being permanently drawn.
-     Pointer-events off so it never intercepts the card click. */
   .tile-jag {
     position: absolute;
     inset: 0;
@@ -485,42 +473,44 @@
     opacity: 0;
     transition: opacity var(--fast) var(--ease);
     background:
-      linear-gradient(180deg,
+      linear-gradient(
+        180deg,
         color-mix(in srgb, var(--d-toxic-500) 22%, transparent),
         transparent 40%);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--d-toxic-400) 55%, transparent),
-      inset 0 0 22px -6px color-mix(in srgb, var(--d-toxic-400) 60%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--d-toxic-400) 55%, transparent), inset 0 0 22px -6px color-mix(in srgb, var(--d-toxic-400) 60%, transparent);
   }
   .tile:hover .tile-jag,
-  .tile:focus-within .tile-jag { opacity: 1; }
+  .tile:focus-within .tile-jag {
+    opacity: 1;
+  }
   .tile.is-sel .tile-jag {
     opacity: 1;
     background:
-      linear-gradient(180deg,
+      linear-gradient(
+        180deg,
         color-mix(in srgb, var(--d-blood-600, #8c1418) 26%, transparent),
         transparent 45%);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--d-blood-400) 65%, transparent),
-      inset 0 0 26px -6px color-mix(in srgb, var(--d-blood-500) 65%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--d-blood-400) 65%, transparent), inset 0 0 26px -6px color-mix(in srgb, var(--d-blood-500) 65%, transparent);
   }
-
-  /* The noise overlay is a ::before, so the content needs to sit above it. */
-  .tile > * { position: relative; z-index: 1; }
-  .tile .tile-jag { z-index: 2; }
-  .tile .tile-playwrap { z-index: 3; }
-
-  /* Chrome Petch is already the display face; the glitch offsets assume a
-     tight line box, so give the title one. */
-  .tile-name { position: relative; }
-
+  .tile > * {
+    position: relative;
+    z-index: 1;
+  }
+  .tile .tile-jag {
+    z-index: 2;
+  }
+  .tile .tile-playwrap {
+    z-index: 3;
+  }
+  .tile-name {
+    position: relative;
+  }
   .tile-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 3px;
     margin-top: 3px;
   }
-
   .tile-tag {
     display: inline-flex;
     align-items: center;
@@ -531,46 +521,52 @@
     border-radius: 2px;
     color: var(--d-void);
   }
-  .tile-tag.is-hd  { background: var(--d-toxic-400); }
-  .tile-tag.is-pin { background: var(--d-rust-400); }
-  .tile-tag.is-bad { background: var(--d-blood-400); }
-
-  /* Framer Motion writes transform on the tile for the spring. The tilt also
-     wants a transform, so the tilt moves to an inner wrapper-free property:
-     rotate is applied via the custom props on a child, keeping the two from
-     fighting over the same declaration. */
-  .tile { --tilt-x: 0deg; --tilt-y: 0deg; }
+  .tile-tag.is-hd {
+    background: var(--d-toxic-400);
+  }
+  .tile-tag.is-pin {
+    background: var(--d-rust-400);
+  }
+  .tile-tag.is-bad {
+    background: var(--d-blood-400);
+  }
+  .tile {
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+  }
   .tile .cover,
   .tile .tile-body {
     transform: rotateX(calc(var(--my) * -5deg)) rotateY(calc(var(--mx) * 7deg));
     transform-style: preserve-3d;
   }
-
-  /* ---------- terminal pane internals ---------- */
-
   .d-termpane {
     position: relative;
     padding: 14px 16px 16px;
     overflow: hidden;
   }
-
-  /* The streams sit behind the text, so the pane needs its own stacking
-     context for them not to escape. */
-  .d-streamwrap { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-  .d-termpane > *:not(.d-streamwrap) { position: relative; z-index: 1; }
-
-  /* Offset the second stream pair so they do not fall in lockstep. */
-  .d-streams-2 { transform: scaleX(-1); opacity: 0.3; }
-
-  .d-termpane-head { margin-bottom: 12px; }
-
+  .d-streamwrap {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .d-termpane > *:not(.d-streamwrap) {
+    position: relative;
+    z-index: 1;
+  }
+  .d-streams-2 {
+    transform: scaleX(-1);
+    opacity: 0.3;
+  }
+  .d-termpane-head {
+    margin-bottom: 12px;
+  }
   .d-termpane-title {
     margin: 0 0 3px;
     font-size: clamp(1.05rem, 2.2vw, 1.4rem);
     line-height: 1.1;
     color: #e8ecef;
   }
-
   .d-termpane-sub {
     margin: 0 0 9px;
     font-size: 0.72rem;
@@ -578,12 +574,11 @@
     color: color-mix(in srgb, var(--d-toxic-300) 70%, #fff 0%);
     opacity: 0.85;
   }
-
-  .d-termpane-body { display: flex; flex-direction: column; gap: 3px; }
-
-  /* A readout row: key, dotted leader, value. The leader is a repeating
-     gradient rather than a literal "......" so it aligns to the value edge at
-     any panel width. */
+  .d-termpane-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
   .d-termrow {
     display: flex;
     align-items: baseline;
@@ -591,28 +586,25 @@
     font-size: 0.72rem;
     line-height: 1.7;
   }
-
   .d-termkey {
     flex: none;
     color: color-mix(in srgb, var(--d-toxic-400) 60%, transparent);
     text-transform: uppercase;
     letter-spacing: 0.12em;
   }
-
   .d-termdots {
     flex: 1;
     min-width: 8px;
     height: 1px;
     align-self: center;
-    background-image: linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--d-toxic-500) 45%, transparent) 0 2px,
-      transparent 2px 4px
-    );
+    background-image:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--d-toxic-500) 45%, transparent) 0 2px,
+        transparent 2px 4px);
     background-size: 4px 1px;
     opacity: 0.7;
   }
-
   .d-termval {
     flex: none;
     max-width: 62%;
@@ -626,9 +618,11 @@
     color: var(--d-rust-300);
     text-shadow: 0 0 8px color-mix(in srgb, var(--d-rust-500) 60%, transparent);
   }
-
-  .d-bootwrap { display: flex; flex-direction: column; gap: 6px; }
-
+  .d-bootwrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
   .d-bootlabel {
     display: flex;
     justify-content: space-between;
@@ -636,13 +630,6 @@
     letter-spacing: 0.18em;
     color: color-mix(in srgb, var(--d-toxic-400) 75%, transparent);
   }
-
-  /* ---------- panel: industrial switch + terminal rows ---------- */
-
-  /* The panel's own play button is the heavy industrial switch the brief
-     asks for: a thick bottom edge that collapses on press, and a pulsing
-     blood/rust glow on hover. The edge is real geometry (a 5px inset shadow
-     plus a matching offset), not a blur, so it reads as metal thickness. */
   .panel .play {
     position: relative;
     display: inline-flex;
@@ -650,11 +637,18 @@
     justify-content: center;
     gap: 0.6em;
     padding: 0.85em 1.6em;
-    font: 700 1rem/1 "Chakra Petch", system-ui, sans-serif;
+    font:
+      700 1rem/1 "Chakra Petch",
+      system-ui,
+      sans-serif;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: #fff;
-    background: linear-gradient(180deg, #8c1418 0%, #4a0b0e 100%);
+    background:
+      linear-gradient(
+        180deg,
+        #8c1418 0%,
+        #4a0b0e 100%);
     border: 1px solid #b71c1c;
     border-radius: 3px;
     cursor: pointer;
@@ -669,41 +663,45 @@
       box-shadow var(--fast) var(--ease),
       filter var(--fast) var(--ease);
   }
-
   .panel .play:hover:not(:disabled) {
     filter: brightness(1.18);
-    /* Pulse: the glow breathes rather than sitting static. */
     animation: d-switch-pulse 1.5s ease-in-out infinite;
   }
-
   .panel .play:active:not(:disabled) {
-    /* Press down: the 5px bottom edge collapses to 0. */
     transform: translateY(5px);
     box-shadow:
       0 0 0 #2b0608,
       0 4px 10px -4px rgba(224, 47, 47, 0.6),
       inset 0 3px 6px rgba(0, 0, 0, 0.55);
   }
-
-  .panel .play:disabled { cursor: not-allowed; filter: grayscale(0.85) brightness(0.55); }
-
+  .panel .play:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.85) brightness(0.55);
+  }
   .panel .play:focus-visible {
     outline: 2px solid var(--d-toxic-300);
     outline-offset: 3px;
   }
-
-  .panel .play svg { fill: currentColor; flex: none; }
-
-  @keyframes d-switch-pulse {
-    0%, 100% { box-shadow: 0 5px 0 #2b0608, 0 12px 26px -8px rgba(224, 47, 47, 0.6), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 0 rgba(0,0,0,0.4); }
-    50%      { box-shadow: 0 5px 0 #2b0608, 0 16px 34px -6px rgba(255, 92, 92, 0.85), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -2px 0 rgba(0,0,0,0.4); }
+  .panel .play svg {
+    fill: currentColor;
+    flex: none;
   }
-
-  /* Boot overlay: covers the panel body for ~half a second on game switch. */
-
-  /* The panel body is the terminal: green-on-black with a glow, matching the
-     .d-term recipe but softer, since the whole pane already sits on a
-     terminal-tinted background. */
+  @keyframes d-switch-pulse {
+    0%, 100% {
+      box-shadow:
+        0 5px 0 #2b0608,
+        0 12px 26px -8px rgba(224, 47, 47, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.4);
+    }
+    50% {
+      box-shadow:
+        0 5px 0 #2b0608,
+        0 16px 34px -6px rgba(255, 92, 92, 0.85),
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.4);
+    }
+  }
   .panel-note.d-term {
     margin: 0 0 10px;
     padding: 7px 9px;
@@ -711,34 +709,40 @@
     line-height: 1.5;
     border-radius: 2px;
   }
-
-  /* The panel must sit above the hero art and its veil. */
-  .panel, .stage, .statusbar, .topbar { position: relative; z-index: 2; }
-
-  /* The panel's own `animation: panel-in` and Framer's slide-in both animate
-     transform. The boot overlay used to sit on a panel that was mid-animation,
-     and `inset: 0` resolved against the animating box -- so the overlay
-     tracked a moving, skewed target and the CRT layers above it sheared
-     against it. It is now a static block in flow, not an absolutely
-     positioned overlay, and Framer owns the transform outright. */
-  .panel { animation: none; }
-
+  .panel,
+  .stage,
+  .statusbar,
+  .topbar {
+    position: relative;
+    z-index: 2;
+  }
+  .panel {
+    animation: none;
+  }
   .panel-boot {
     position: relative;
     z-index: 4;
     margin: 12px 0;
     padding: 11px 12px;
-    background: linear-gradient(180deg, rgba(6, 12, 6, 0.92), rgba(4, 8, 4, 0.96));
+    background:
+      linear-gradient(
+        180deg,
+        rgba(6, 12, 6, 0.92),
+        rgba(4, 8, 4, 0.96));
     border: 1px solid color-mix(in srgb, var(--d-toxic-500) 40%, transparent);
   }
-
-  /* DataStreams was absolutely positioned against .panel-scroll, a scrolling
-     flex child, so the falling streaks were pinned to the scroll CONTENT box
-     and slid with it. Scoped to the panel itself instead. */
-  .panel > .d-streamwrap { position: absolute; inset: 0; z-index: 0; }
-  .panel > .d-streamwrap .d-streams { opacity: 0.22; }
-  .panel > *:not(.d-streamwrap) { position: relative; z-index: 1; }
-
+  .panel > .d-streamwrap {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .panel > .d-streamwrap .d-streams {
+    opacity: 0.22;
+  }
+  .panel > *:not(.d-streamwrap) {
+    position: relative;
+    z-index: 1;
+  }
   .panel-termrows {
     display: flex;
     flex-direction: column;
@@ -748,51 +752,43 @@
     background: rgba(4, 10, 5, 0.5);
     border-left: 2px solid color-mix(in srgb, var(--d-toxic-500) 55%, transparent);
   }
-
-
-  /* The panel's action bar, hoisted out of .panel-scroll so the primary
-     control is always visible regardless of how far the details are scrolled. */
   .panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
   }
-
   .panel-head {
     flex: none;
     padding: 12px 14px 10px;
     border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, rgba(8, 14, 8, 0.9), rgba(4, 8, 4, 0.7));
+    background:
+      linear-gradient(
+        180deg,
+        rgba(8, 14, 8, 0.9),
+        rgba(4, 8, 4, 0.7));
     position: relative;
     z-index: 5;
   }
-
-  .panel-head .panel-title { margin-bottom: 10px; }
-
+  .panel-head .panel-title {
+    margin-bottom: 10px;
+  }
   .panel-head .panel-actions {
     display: flex;
     gap: 8px;
     align-items: stretch;
   }
-
-  /* Play takes all remaining width; the command toggle is a fixed-width
-     secondary so the primary never gets squeezed to nothing. */
-  .panel-head .play { flex: 1 1 auto; }
-  .panel-head .showcmd { flex: none; min-width: 4.2rem; }
-
-
-  /* ---------- headers ---------- */
-
+  .panel-head .play {
+    flex: 1 1 auto;
+  }
+  .panel-head .showcmd {
+    flex: none;
+    min-width: 4.2rem;
+  }
   .d-head {
     font-family: var(--d-display);
     letter-spacing: 0.04em;
-    /* Chunky display type needs a hard shadow to feel stamped rather than
-       printed. Two offsets, no blur. */
-    text-shadow:
-      2px 2px 0 rgba(0, 0, 0, 0.85),
-      0 0 18px color-mix(in srgb, var(--d-rust-500) 35%, transparent);
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.85), 0 0 18px color-mix(in srgb, var(--d-rust-500) 35%, transparent);
   }
-
   .d-label {
     font-family: var(--d-head);
     letter-spacing: 0.22em;
@@ -800,49 +796,34 @@
     font-size: 0.68rem;
     color: var(--d-rust-300);
   }
-
-  /* Faint horizontal rule with a bright segment, like a UAC divider. */
   .d-rule {
     height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      var(--d-gun-600) 15%,
-      var(--d-rust-600) 50%,
-      var(--d-gun-600) 85%,
-      transparent
-    );
+    background:
+      linear-gradient(
+        90deg,
+        transparent,
+        var(--d-gun-600) 15%,
+        var(--d-rust-600) 50%,
+        var(--d-gun-600) 85%,
+        transparent);
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .d-scan-sweep::after,
   .d-streams::before,
   .d-streams::after,
-  .d-caret::after { animation: none; }
-  .d-glitch::before, .d-glitch::after { opacity: 0 !important; }
-  .panel .play:hover { animation: none; }
+  .d-caret::after {
+    animation: none;
+  }
+  .d-glitch::before,
+  .d-glitch::after {
+    opacity: 0 !important;
+  }
+  .panel .play:hover {
+    animation: none;
+  }
 }
-
-/* DoomNite UI
- *
- * Inspiration: the Nexus Oracle card archive -- a dark void, a live canvas that
- * reacts to the pointer, glass panels floating in it. Borrowed, not copied.
- *
- * The Doom half: ember palette instead of gold, bevelled panel edges and chunky
- * bevel highlights like the DOS menu widgets, CRT scanlines and a vignette, and
- * a blood-red accent that only appears on the thing you can act on.
- *
- * Motion rules followed throughout:
- *   - transform/opacity only, so transitions stay on the compositor
- *   - a shared --ease so curves feel consistent
- *   - hover adds (lift, glow, sheen, glare), never shifts layout
- *   - pointer effects write CSS vars directly, bypassing React re-renders
- *   - prefers-reduced-motion disables the lot
- */
-
 :root {
-  /* Near-black with a red undertone, so the whole UI sits in Doom's world. */
   --void: #05030a;
   --bg: #07040d;
   --panel: #0d0714;
@@ -852,15 +833,12 @@
   --fg: #ece4f0;
   --fg-dim: #a996b4;
   --fg-faint: #6b5a78;
-
-  /* The one saturated colour, reserved for action. */
   --blood: #e02a1c;
   --blood-hot: #ff5a3c;
   --blood-dim: #8f1a12;
   --ember: #ff9a3c;
   --brass: #d9a441;
   --ok: #5cffa8;
-
   --radius: 8px;
   --radius-lg: 10px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -868,50 +846,47 @@
   --fast: 130ms;
   --med: 260ms;
   --slow: 520ms;
-
   --tile-w: 208px;
-
-  /* The DOS bevel: light top-left, dark bottom-right. */
   --bevel-lt: rgba(255, 200, 150, 0.16);
   --bevel-dk: rgba(0, 0, 0, 0.7);
-
   --glass: rgba(14, 9, 22, 0.72);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-2: 0 12px 34px -10px rgba(0, 0, 0, 0.85);
   --shadow-3: 0 28px 70px -20px rgba(0, 0, 0, 0.95);
 }
-
 * {
   box-sizing: border-box;
 }
-
 html,
 body,
 #root {
   height: 100%;
 }
-
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
-
 h1,
 h2,
 h3 {
-  /* Chakra Petch reads as industrial/technical, which fits better than a
-     literal serif nod. Letter-spaced caps do the rest of the work. */
-  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-family:
+    "Chakra Petch",
+    system-ui,
+    sans-serif;
   letter-spacing: 0.02em;
   margin: 0;
 }
-
 kbd {
   font-family: inherit;
   font-size: 10px;
@@ -922,9 +897,6 @@ kbd {
   background: #100a1a;
   color: var(--fg-dim);
 }
-
-/* ---------------------------------------------------------------- backdrop */
-
 .app {
   height: 100%;
   display: grid;
@@ -932,8 +904,6 @@ kbd {
   position: relative;
   z-index: 1;
 }
-
-/* The ember canvas sits behind everything and reacts to the pointer. */
 .embers {
   position: fixed;
   inset: 0;
@@ -943,25 +913,21 @@ kbd {
   display: block;
   pointer-events: none;
 }
-
-/* Static darkening at the edges, so the eye lands on the grid. Combined with
-   the scanlines below this is most of the CRT read. */
 .vignette {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(2, 0, 4, 0.72) 100%),
+    radial-gradient(
+      120% 90% at 50% 40%,
+      transparent 35%,
+      rgba(2, 0, 4, 0.72) 100%),
     repeating-linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.014) 0 1px,
-      transparent 1px 3px
-    );
+      transparent 1px 3px);
 }
-
-/* ------------------------------------------------------------------ boot */
-
 .boot {
   height: 100%;
   display: grid;
@@ -971,7 +937,6 @@ kbd {
   position: relative;
   z-index: 1;
 }
-
 .boot-mark {
   font-family: "Chakra Petch", sans-serif;
   font-weight: 700;
@@ -981,7 +946,6 @@ kbd {
   text-shadow: 0 0 30px rgba(224, 42, 28, 0.75);
   animation: pulse 1.9s var(--ease-in-out) infinite;
 }
-
 .boot-bar {
   width: 200px;
   height: 3px;
@@ -989,15 +953,18 @@ kbd {
   border-radius: 3px;
   overflow: hidden;
 }
-
 .boot-bar span {
   display: block;
   width: 40%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, var(--blood-hot), transparent);
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      var(--blood-hot),
+      transparent);
   animation: sweep 1.15s var(--ease-in-out) infinite;
 }
-
 @keyframes sweep {
   from {
     transform: translateX(-110%);
@@ -1006,19 +973,20 @@ kbd {
     transform: translateX(360%);
   }
 }
-
 @keyframes pulse {
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0.5;
   }
   50% {
     opacity: 1;
   }
 }
-
 .boot-error code {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-family:
+    ui-monospace,
+    "Cascadia Code",
+    Consolas,
+    monospace;
   font-size: 12px;
   color: var(--blood-hot);
   background: #100a16;
@@ -1026,61 +994,54 @@ kbd {
   border-radius: var(--radius);
   padding: 8px 12px;
 }
-
 .boot-error .hint {
   color: var(--fg-faint);
   font-size: 12px;
 }
-
-/* ---------------------------------------------------------------- topbar */
-
 .topbar {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 11px 18px;
   border-bottom: 1px solid var(--line);
-  /* Glass, lifted off the ember field the way the Oracle's panels float. */
-  background: linear-gradient(180deg, rgba(16, 10, 24, 0.86), rgba(10, 6, 16, 0.7));
+  background:
+    linear-gradient(
+      180deg,
+      rgba(16, 10, 24, 0.86),
+      rgba(10, 6, 16, 0.7));
   backdrop-filter: blur(16px) saturate(120%);
-  box-shadow:
-    inset 0 1px 0 var(--bevel-lt),
-    0 8px 24px -14px rgba(0, 0, 0, 0.9);
+  box-shadow: inset 0 1px 0 var(--bevel-lt), 0 8px 24px -14px rgba(0, 0, 0, 0.9);
   animation: drop-in var(--slow) var(--ease) both;
   position: relative;
   z-index: 2;
 }
-
 @keyframes drop-in {
   from {
     opacity: 0;
     transform: translateY(-12px);
   }
 }
-
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   user-select: none;
 }
-
 .brand-mark {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  /* An imp-red core rather than the Oracle's gold conic sweep. */
   background:
-    radial-gradient(circle at 50% 50%, var(--ember), var(--blood) 45%, #3a0a06 100%);
-  box-shadow:
-    0 0 20px rgba(224, 42, 28, 0.65),
-    inset 0 1px 0 rgba(255, 190, 150, 0.35);
+    radial-gradient(
+      circle at 50% 50%,
+      var(--ember),
+      var(--blood) 45%,
+      #3a0a06 100%);
+  box-shadow: 0 0 20px rgba(224, 42, 28, 0.65), inset 0 1px 0 rgba(255, 190, 150, 0.35);
   animation: breathe 3.4s var(--ease-in-out) infinite;
 }
-
 @keyframes breathe {
-  0%,
-  100% {
+  0%, 100% {
     transform: scale(1);
     filter: brightness(1);
   }
@@ -1089,21 +1050,16 @@ kbd {
     filter: brightness(1.3);
   }
 }
-
 .brand-text {
   font-family: "Chakra Petch", sans-serif;
   font-weight: 700;
   font-size: 16px;
   letter-spacing: 0.2em;
 }
-
 .brand-text span {
   color: var(--blood-hot);
   text-shadow: 0 0 14px rgba(255, 90, 60, 0.6);
 }
-
-/* ---------------------------------------------------------------- search */
-
 .search {
   position: relative;
   flex: 1;
@@ -1111,7 +1067,6 @@ kbd {
   display: flex;
   align-items: center;
 }
-
 .search-icon {
   position: absolute;
   left: 11px;
@@ -1124,7 +1079,6 @@ kbd {
   pointer-events: none;
   transition: stroke var(--fast) var(--ease);
 }
-
 .search input {
   width: 100%;
   padding: 9px 32px 9px 34px;
@@ -1135,21 +1089,15 @@ kbd {
   font: inherit;
   font-size: 13px;
   outline: none;
-  /* The inset bevel is what makes these read as DOS widgets. */
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
-  transition:
-    border-color var(--med) var(--ease),
-    box-shadow var(--med) var(--ease);
+  transition: border-color var(--med) var(--ease), box-shadow var(--med) var(--ease);
 }
-
 .search input::placeholder {
   color: var(--fg-faint);
 }
-
 .search input:hover {
   border-color: var(--line-2);
 }
-
 .search input:focus {
   border-color: var(--blood-dim);
   box-shadow:
@@ -1157,11 +1105,9 @@ kbd {
     0 0 0 3px rgba(224, 42, 28, 0.16),
     0 0 26px -8px rgba(224, 42, 28, 0.7);
 }
-
 .search:focus-within .search-icon {
   stroke: var(--blood-hot);
 }
-
 .search-clear {
   position: absolute;
   right: 7px;
@@ -1174,24 +1120,17 @@ kbd {
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  transition:
-    transform var(--fast) var(--ease),
-    background var(--fast) var(--ease);
+  transition: transform var(--fast) var(--ease), background var(--fast) var(--ease);
 }
-
 .search-clear:hover {
   background: var(--blood);
   transform: rotate(90deg) scale(1.12);
 }
-
-/* ----------------------------------------------------------------- chips */
-
 .chips {
   display: flex;
   gap: 6px;
   margin-left: auto;
 }
-
 .chip {
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.02);
@@ -1209,35 +1148,30 @@ kbd {
     background var(--fast) var(--ease),
     transform var(--fast) var(--ease);
 }
-
 .chip:hover {
   color: var(--fg);
   border-color: var(--line-2);
   background: rgba(255, 255, 255, 0.05);
   transform: translateY(-1px);
 }
-
 .chip:active {
   transform: translateY(0) scale(0.97);
 }
-
 .chip.is-on {
   color: #fff;
-  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim));
+  background:
+    linear-gradient(
+      180deg,
+      var(--blood-hot),
+      var(--blood-dim));
   border-color: var(--blood-hot);
-  box-shadow:
-    0 0 24px -4px rgba(224, 42, 28, 0.85),
-    inset 0 1px 0 rgba(255, 200, 180, 0.35);
+  box-shadow: 0 0 24px -4px rgba(224, 42, 28, 0.85), inset 0 1px 0 rgba(255, 200, 180, 0.35);
 }
-
-/* ----------------------------------------------------------------- stage */
-
 .stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
   min-height: 0;
 }
-
 .grid-wrap {
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1245,12 +1179,10 @@ kbd {
   position: relative;
   z-index: 1;
 }
-
 .grid-wrap::-webkit-scrollbar,
 .panel-scroll::-webkit-scrollbar {
   width: 10px;
 }
-
 .grid-wrap::-webkit-scrollbar-thumb,
 .panel-scroll::-webkit-scrollbar-thumb {
   background: var(--line);
@@ -1258,68 +1190,33 @@ kbd {
   border: 3px solid transparent;
   background-clip: content-box;
 }
-
 .grid-wrap::-webkit-scrollbar-thumb:hover,
 .panel-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--line-2);
   background-clip: content-box;
 }
-
-/* Cards fill the space they are given.
-
-   Two things were wrong before. minmax(var(--tile-w), 1fr) with --tile-w at a
-   fixed 208px looked right in dev and wrong in the real window: the floor
-   decides how MANY columns fit, and at 1fr each column then stretched, so a
-   4-across grid on a 4K display produced enormous cards while a 6-across grid
-   produced cramped ones. The count was fixed by width, the size was never
-   considered.
-
-   clamp() ties the floor to the viewport instead, so the column count adapts
-   AND each card lands in a sensible pixel range.
-
-   Cards size to their own content. Rows used to be 1fr with
-   align-content: stretch, which forced every row to the height of its TALLEST
-   card and then stretched each card to fill it: a card with one tag next to a
-   card with three ended up with a large dead area under its cover art. The
-   row height is now the max of its contents and align-items/align-content
-   start mean a shorter card is only as tall as it needs to be, top-aligned
-   with its row-mates. Cards whose covers and text are all the same height
-   still line up exactly, because the cover is a fixed 16/9 box and the title
-   is clamped to 2 lines -- so the raggedness is bounded by a line or a tag
-   row, not by the tallest card in the row. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(clamp(190px, 21vw, 340px), 1fr)
-  );
+  grid-template-columns: repeat(auto-fill, minmax(clamp(190px, 21vw, 340px), 1fr));
   gap: clamp(10px, 1.1vw, 18px);
-  /* Rows hug their tallest item; items hug their own height. */
   grid-auto-rows: auto;
   align-content: start;
   align-items: start;
-  /* Tiles tilt in 3D, so the grid needs a shared perspective. */
   perspective: 1100px;
 }
-
-/* The grid still fills the pane so the scrollbar belongs to the wrap rather
-   than to the grid box, but with align-content: start the slack height stays
-   at the bottom instead of being handed out as dead space inside the cards. */
 .grid-wrap {
   display: flex;
   flex-direction: column;
 }
-
-.grid { flex: 1 1 auto; min-height: 0; }
-
+.grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 .none {
   color: var(--fg-faint);
   padding: 40px;
   text-align: center;
 }
-
-/* ------------------------------------------------------------------ tile */
-
 .tile {
   position: relative;
   display: flex;
@@ -1333,20 +1230,10 @@ kbd {
   text-align: left;
   color: inherit;
   font: inherit;
-  /* Pointer-tracked values, written by Tile.onMove. Defaults are flat. */
   --mx: 0;
   --my: 0;
   --gx: 50%;
   --gy: 50%;
-  /* transform, transform-style and the entrance animation all used to live
-     here. They belong to Framer Motion now:
-       - transform is written by the spring (whileHover/whileTap/entrance),
-         so a CSS transform here is overwritten every frame and the two
-         systems fight over the same property.
-       - the pointer tilt moved to .cover/.tile-body, which rotate on their
-         own axes and leave the card's transform free for the spring.
-       - tile-in was a CSS keyframe entrance; Framer's `rise` variant does it
-         now, so the stagger is spring-driven rather than eased. */
   transform-style: flat;
   box-shadow:
     var(--shadow-1),
@@ -1356,38 +1243,27 @@ kbd {
     border-color var(--med) var(--ease),
     box-shadow var(--med) var(--ease),
     background var(--med) var(--ease);
-  /* The notch profile comes from a clip-path in the UAC layer, so the rounded
-     corners have to go or the two shapes fight. */
   border-radius: 0;
-  /* Hover lift, expressed as a shadow change rather than a transform, because
-     transform now belongs to the spring. */
   will-change: transform;
 }
-
 @keyframes tile-in {
   from {
     opacity: 0;
     transform: translateY(16px) rotateX(14deg) scale(0.96);
   }
 }
-
 .tile:hover {
-  /* Lift toward the viewer and stop tracking, so the tilt reads as depth
-     rather than as the whole card sliding. */
-  transform: rotateX(calc(var(--my) * -6deg)) rotateY(calc(var(--mx) * 8deg))
-    translateZ(14px) scale(1.015);
+  transform: rotateX(calc(var(--my) * -6deg)) rotateY(calc(var(--mx) * 8deg)) translateZ(14px) scale(1.015);
   border-color: var(--line-2);
   box-shadow:
     var(--shadow-2),
     0 0 34px -10px rgba(224, 42, 28, 0.55),
     inset 0 1px 0 rgba(255, 200, 150, 0.22);
 }
-
 .tile:focus-visible {
   outline: 2px solid var(--blood-hot);
   outline-offset: 3px;
 }
-
 .tile.is-sel {
   border-color: var(--blood);
   box-shadow:
@@ -1396,29 +1272,27 @@ kbd {
     0 0 40px -10px rgba(224, 42, 28, 0.9),
     inset 0 1px 0 rgba(255, 200, 150, 0.25);
 }
-
-/* Bottom bar that wipes in on the selected tile. */
 .tile-edge {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--blood-hot), transparent);
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      var(--blood-hot),
+      transparent);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform var(--med) var(--ease);
 }
-
 .tile.is-sel .tile-edge {
   transform: scaleX(1);
 }
-
-/* A locked tile: stays lifted and lit regardless of the pointer. This is the
-   state that survives the cursor leaving, so it must be unmistakable. */
 .tile.is-pin {
-  transform: rotateX(calc(var(--my) * -4deg)) rotateY(calc(var(--mx) * 6deg))
-    translateZ(18px);
+  transform: rotateX(calc(var(--my) * -4deg)) rotateY(calc(var(--mx) * 6deg)) translateZ(18px);
   border-color: var(--ember);
   box-shadow:
     var(--shadow-2),
@@ -1426,13 +1300,15 @@ kbd {
     0 0 46px -8px rgba(255, 154, 60, 0.95),
     inset 0 1px 0 rgba(255, 220, 180, 0.3);
 }
-
-/* Brass, not blood: the pin is a distinct commitment from the hover selection. */
 .tile.is-pin .tile-edge {
-  background: linear-gradient(90deg, transparent, var(--ember), transparent);
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      var(--ember),
+      transparent);
   transform: scaleX(1);
 }
-
 .tile-pin {
   position: absolute;
   top: 8px;
@@ -1454,7 +1330,6 @@ kbd {
     border-color var(--fast) var(--ease);
   pointer-events: none;
 }
-
 .tile-pin svg {
   width: 12px;
   height: 12px;
@@ -1464,12 +1339,10 @@ kbd {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-
 .tile:hover .tile-pin {
   opacity: 0.55;
   transform: scale(1) rotate(0deg);
 }
-
 .tile.is-pin .tile-pin {
   opacity: 1;
   transform: scale(1) rotate(0deg);
@@ -1478,93 +1351,44 @@ kbd {
   background: rgba(40, 18, 4, 0.9);
   box-shadow: 0 0 18px -4px rgba(255, 154, 60, 0.9);
 }
-
-/* Missing builds stay in the grid -- the user asked for them to be visible,
-   just visibly not ready. Dimming is on the card's own opacity rather than a
-   filter, so the cover art desaturates with everything else and the badge and
-   MISSING tag stay legible. */
 .tile.is-missing {
   border-color: #4a2020;
   opacity: 0.44;
-  /* A dimmed card must still take a hover, or it reads as disabled rather than
-     unavailable -- and the play button has to be reachable to see why. */
   transition: opacity var(--med) var(--ease);
 }
 .tile:hover.is-missing,
 .tile.is-sel.is-missing {
   opacity: 0.82;
 }
-
 .tile.is-missing .tile-sub {
   color: var(--blood-hot);
 }
-
-/* The MISSING tag is the one thing that must stay fully opaque -- it is the
-   explanation, and dimming it along with the card defeats the purpose. */
 .tile.is-missing .tile-tag.is-bad {
   opacity: 1;
 }
-
-/* ----------------------------------------------------------------- cover */
-
 .cover {
   position: relative;
   aspect-ratio: 16/9;
   background: #050208;
   overflow: hidden;
-  /* Lift the art slightly off the panel body on hover. */
   transform: translateZ(0);
   transition: transform var(--med) var(--ease);
 }
-
 .tile:hover .cover {
   transform: translateZ(18px);
 }
-
 .cover.has-art {
   --cover-fit: cover;
-  /* Vertical focal point for `cover`, as a percentage of the image's own
-     height. NOT a nudge: it is the whole fix.
-
-     With object-fit:cover, a source narrower than the 16:9 frame is scaled to
-     fill the width and the overflow is split by object-position -- 50% splits
-     it evenly. Measured on the real files, that centred window cuts the title
-     lettering out of every sub-16:9 cover:
-       DukeBoomem.png 1024x1024 (1.00) -> shows 23.0%..77.0%, title starts at
-         12.1% and ends at 23.5% -- i.e. all but the final sliver is cropped.
-       DoomHalfLife.png 687x1024 (0.67) -> shows 31.9%..68.1%, title band
-         5%..22% is entirely outside the window.
-     Anchoring near the top keeps the whole band: at 6% the window becomes
-     3.8%..57.8% (rest) and 4.6%..56.2% (hover zoom), so the lettering lands
-     with real headroom rather than flush against the frame edge.
-
-     6% rather than 0% so a little of the artwork above the title survives as
-     a margin instead of butting the glyphs against the bezel. It is the top of
-     the range that still protects the text; past ~12% the title starts to go
-     again. Sources already at or wider than 16:9 have no vertical overflow at
-     all and ignore this entirely. */
   --cover-focus-y: 6%;
 }
 .cover.is-poster {
   --cover-fit: contain;
-  /* A poster is generated at the cover's own aspect ratio, so contain fits it
-     exactly and the focal point stays at its default. Left explicit so the
-     poster path is provably untouched by the has-art rule above. */
   --cover-focus-y: center;
 }
-
 .cover img {
   width: 100%;
   height: 100%;
-  /* "contain" letterboxes a non-16:9 image against the cover background, which
-     is what put black bars down the sides of the Doom/Half-Life art (a 687x1024
-     portrait) and around the square Duke Boomem cover. An in-pack TITLEPIC is
-     rendered by the engine and carries its own framing, so it stays letterboxed
-     -- that is source art, not a poster. Art chosen as cover (a class on the
-     cover) is framed for this box, so it fills it. */
   object-fit: var(--cover-fit, contain);
-  /* Falls back to `center` for the poster path; has-art raises it to 6% so the
-     title lettering at the top of a square/portrait source stays in frame. */
   object-position: center var(--cover-focus-y, center);
   display: block;
   opacity: 0;
@@ -1575,59 +1399,45 @@ kbd {
     filter var(--slow) var(--ease);
   filter: saturate(0.85) brightness(0.88) contrast(1.05);
 }
-
 .cover.is-loaded img {
   opacity: 1;
   transform: scale(1);
 }
-
 .tile:hover .cover img {
   transform: scale(1.07);
-  /* Doom title screens are dark; lift them on hover instead of leaving a
-     grey rectangle. */
   filter: saturate(1.15) brightness(1.12) contrast(1.08);
 }
-
-/* A light sweep, fired on hover. */
 .cover-sheen {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    104deg,
-    transparent 32%,
-    rgba(255, 160, 120, 0.16) 46%,
-    transparent 60%
-  );
+  background:
+    linear-gradient(
+      104deg,
+      transparent 32%,
+      rgba(255, 160, 120, 0.16) 46%,
+      transparent 60%);
   transform: translateX(-120%);
   transition: transform 760ms var(--ease);
   pointer-events: none;
 }
-
 .tile:hover .cover-sheen {
   transform: translateX(120%);
 }
-
-/* Specular glare following the cursor: a soft highlight at the pointer
-   position, which is what sells "physical surface". */
 .cover-glare {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(
-    60% 60% at var(--gx) var(--gy),
-    rgba(255, 190, 150, 0.2),
-    transparent 70%
-  );
+  background:
+    radial-gradient(
+      60% 60% at var(--gx) var(--gy),
+      rgba(255, 190, 150, 0.2),
+      transparent 70%);
   transition: opacity var(--med) var(--ease);
 }
-
 .tile:hover .cover-glare {
   opacity: 1;
 }
-
-/* -------------------------------------------------------------- tile body */
-
 .tile-body {
   padding: 9px 11px 11px;
   display: flex;
@@ -1636,11 +1446,9 @@ kbd {
   transform: translateZ(0);
   transition: transform var(--med) var(--ease);
 }
-
 .tile:hover .tile-body {
   transform: translateZ(26px);
 }
-
 .tile-name {
   font-weight: 600;
   font-size: 13px;
@@ -1651,18 +1459,18 @@ kbd {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
 .tile-sub {
   font-size: 11px;
   color: var(--fg-faint);
   font-variant-numeric: tabular-nums;
 }
-
-/* ----------------------------------------------------------------- panel */
-
 .panel {
   border-left: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(15, 9, 24, 0.9), rgba(9, 5, 15, 0.94));
+  background:
+    linear-gradient(
+      180deg,
+      rgba(15, 9, 24, 0.9),
+      rgba(9, 5, 15, 0.94));
   backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
@@ -1672,26 +1480,21 @@ kbd {
   box-shadow: inset 1px 0 0 rgba(255, 200, 150, 0.06);
   animation: panel-in var(--slow) var(--ease) both;
 }
-
-/* Remounts per game (key=group.key), so this replays on selection change. */
 @keyframes panel-in {
   from {
     opacity: 0;
     transform: translateX(18px);
   }
 }
-
 .panel-empty {
   display: grid;
   place-items: center;
   color: var(--fg-faint);
 }
-
 .panel-cover {
   flex: none;
   border-bottom: 1px solid var(--line);
 }
-
 .panel-scroll {
   overflow-y: auto;
   padding: 16px;
@@ -1699,18 +1502,15 @@ kbd {
   flex-direction: column;
   gap: 18px;
 }
-
 .panel-title {
   font-size: 19px;
   line-height: 1.2;
 }
-
 .panel-note {
   margin: 6px 0 0;
   font-size: 12.5px;
   color: var(--fg-dim);
 }
-
 .panel-section h3 {
   font-size: 10.5px;
   text-transform: uppercase;
@@ -1718,7 +1518,6 @@ kbd {
   color: var(--fg-faint);
   margin-bottom: 9px;
 }
-
 .facts {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1726,17 +1525,14 @@ kbd {
   margin: 0;
   font-size: 12.5px;
 }
-
 .facts dt {
   color: var(--fg-faint);
 }
-
 .facts dd {
   margin: 0;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
-
 .mods {
   list-style: none;
   margin: 10px 0 0;
@@ -1744,27 +1540,25 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Filenames are long and unbreakable, so each row must be allowed to
-     truncate rather than stretch the panel. */
   min-width: 0;
 }
-
 .mods li {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* Keep the full path reachable on hover for anything truncated. */
   cursor: default;
 }
-
 .mods li {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-family:
+    ui-monospace,
+    "Cascadia Code",
+    Consolas,
+    monospace;
   font-size: 11.5px;
   color: var(--fg-dim);
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--line);
-  /* Blood-red spine on the left, like a highlighted list row. */
   border-left: 2px solid var(--blood-dim);
   border-radius: 5px;
   padding: 5px 9px;
@@ -1774,22 +1568,17 @@ kbd {
   animation: mod-in var(--med) var(--ease) both;
   animation-delay: calc(var(--i, 0) * 30ms);
 }
-
 @keyframes mod-in {
   from {
     opacity: 0;
     transform: translateX(-8px);
   }
 }
-
-/* ------------------------------------------------------------------ cfgs */
-
 .cfgs {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-
 .cfg {
   display: flex;
   align-items: center;
@@ -1808,13 +1597,11 @@ kbd {
     transform var(--fast) var(--ease),
     box-shadow var(--fast) var(--ease);
 }
-
 .cfg:hover {
   border-color: var(--line-2);
   background: rgba(255, 255, 255, 0.045);
   transform: translateX(3px);
 }
-
 .cfg-radio {
   flex: none;
   width: 13px;
@@ -1824,18 +1611,15 @@ kbd {
   position: relative;
   transition: border-color var(--fast) var(--ease);
 }
-
 .cfg.is-on {
   border-color: var(--blood);
   background: rgba(224, 42, 28, 0.09);
   color: var(--fg);
   box-shadow: inset 0 1px 0 rgba(255, 180, 150, 0.12);
 }
-
 .cfg.is-on .cfg-radio {
   border-color: var(--blood-hot);
 }
-
 .cfg.is-on .cfg-radio::after {
   content: "";
   position: absolute;
@@ -1845,14 +1629,12 @@ kbd {
   animation: dot-pop var(--med) var(--ease);
   box-shadow: 0 0 10px rgba(255, 90, 60, 0.9);
 }
-
 @keyframes dot-pop {
   from {
     transform: scale(0.2);
     opacity: 0;
   }
 }
-
 .cfg-text {
   flex: 1;
   min-width: 0;
@@ -1860,7 +1642,6 @@ kbd {
   flex-direction: column;
   gap: 1px;
 }
-
 .cfg-label {
   font-size: 12.5px;
   font-weight: 500;
@@ -1869,23 +1650,15 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .cfg-mods {
   font-size: 10.5px;
   color: var(--fg-faint);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* Required for the ellipsis above to actually engage. Without an explicit
-     min-width:0 a flex item defaults to min-content, and a long unbroken
-     filename (BD_Black_Editionv3.35_WeaponSounds.pk3) sets that floor --
-     so the row grows wider than the panel and the text spills over the UI
-     instead of truncating. The parent .cfg-text already has it; the child
-     needs it too. */
   min-width: 0;
   max-width: 100%;
 }
-
 .cfg-iwad {
   flex: none;
   font-size: 10px;
@@ -1896,15 +1669,11 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-
-/* --------------------------------------------------------------- actions */
-
 .panel-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .play {
   position: relative;
   overflow: hidden;
@@ -1915,8 +1684,12 @@ kbd {
   padding: 14px 16px;
   border: 1px solid var(--blood-hot);
   border-radius: var(--radius);
-  /* Chunky vertical gradient: the DOOM "press to continue" energy bar. */
-  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim) 55%, #5c0f08);
+  background:
+    linear-gradient(
+      180deg,
+      var(--blood-hot),
+      var(--blood-dim) 55%,
+      #5c0f08);
   color: #fff;
   font-family: "Chakra Petch", sans-serif;
   font-weight: 700;
@@ -1925,7 +1698,6 @@ kbd {
   text-transform: uppercase;
   cursor: pointer;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  /* Bevel highlight: this is the single most DOS-looking element. */
   box-shadow:
     inset 0 1px 0 rgba(255, 200, 180, 0.5),
     inset 0 -2px 0 rgba(0, 0, 0, 0.45),
@@ -1935,7 +1707,6 @@ kbd {
     box-shadow var(--med) var(--ease),
     filter var(--fast) var(--ease);
 }
-
 .play:hover:not(:disabled) {
   transform: translateY(-2px);
   filter: brightness(1.12);
@@ -1945,54 +1716,42 @@ kbd {
     0 16px 36px -12px rgba(224, 42, 28, 1),
     0 0 46px -14px rgba(255, 90, 60, 0.95);
 }
-
 .play:active:not(:disabled) {
   transform: translateY(0) scale(0.985);
-  /* Pressing pushes the bevel in: the highlight flips to the bottom edge. */
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.65),
-    0 4px 12px -8px rgba(224, 42, 28, 0.8);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.65), 0 4px 12px -8px rgba(224, 42, 28, 0.8);
 }
-
 .play:disabled {
   opacity: 0.42;
   cursor: not-allowed;
   box-shadow: none;
 }
-
 .play-label {
   position: relative;
   z-index: 1;
 }
-
-/* Heat sweep across the button on hover. */
 .play-glow {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 35%,
-    rgba(255, 220, 190, 0.5) 50%,
-    transparent 65%
-  );
+  background:
+    linear-gradient(
+      100deg,
+      transparent 35%,
+      rgba(255, 220, 190, 0.5) 50%,
+      transparent 65%);
   transform: translateX(-130%);
   transition: transform 640ms var(--ease);
 }
-
 .play:hover:not(:disabled) .play-glow {
   transform: translateX(130%);
 }
-
 .play.busy {
   animation: throb 900ms var(--ease-in-out) infinite;
 }
-
 @keyframes throb {
   50% {
     filter: brightness(1.25);
   }
 }
-
 .play-key {
   position: relative;
   z-index: 1;
@@ -2002,7 +1761,6 @@ kbd {
   border-radius: 4px;
   padding: 0 4px;
 }
-
 .showcmd {
   padding: 7px;
   background: rgba(255, 255, 255, 0.02);
@@ -2017,13 +1775,11 @@ kbd {
     border-color var(--fast) var(--ease),
     background var(--fast) var(--ease);
 }
-
 .showcmd:hover {
   color: var(--fg);
   border-color: var(--line-2);
   background: rgba(255, 255, 255, 0.05);
 }
-
 .cmd {
   margin: 0;
   padding: 10px 12px;
@@ -2031,7 +1787,11 @@ kbd {
   border: 1px solid var(--line);
   border-left: 2px solid var(--ember);
   border-radius: var(--radius);
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-family:
+    ui-monospace,
+    "Cascadia Code",
+    Consolas,
+    monospace;
   font-size: 11px;
   line-height: 1.65;
   color: var(--fg-dim);
@@ -2039,14 +1799,12 @@ kbd {
   word-break: break-all;
   animation: cmd-in var(--med) var(--ease) both;
 }
-
 @keyframes cmd-in {
   from {
     opacity: 0;
     transform: translateY(-6px);
   }
 }
-
 .warn {
   margin: 0;
   padding: 9px 11px;
@@ -2056,9 +1814,6 @@ kbd {
   color: var(--blood-hot);
   font-size: 12px;
 }
-
-/* ------------------------------------------------------------ status bar */
-
 .statusbar {
   display: flex;
   align-items: center;
@@ -2074,31 +1829,24 @@ kbd {
   position: relative;
   z-index: 2;
 }
-
 .statusbar .grow {
   flex: 1;
 }
-
 .statusbar .dot {
   width: 3px;
   height: 3px;
   border-radius: 50%;
   background: var(--line-2);
 }
-
 .statusbar .status-pin {
   color: var(--ember);
   text-shadow: 0 0 12px rgba(255, 154, 60, 0.5);
 }
-
 .statusbar .keys {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-
-/* ------------------------------------------------------------------ toast */
-
 .toast {
   position: fixed;
   left: 50%;
@@ -2114,22 +1862,17 @@ kbd {
   box-shadow: var(--shadow-3), 0 0 40px -14px rgba(92, 255, 168, 0.7);
   animation: toast-in 340ms var(--ease);
 }
-
 .toast.is-bad {
   border-color: var(--blood-hot);
   color: var(--blood-hot);
   box-shadow: var(--shadow-3), 0 0 40px -14px rgba(255, 90, 60, 0.9);
 }
-
 @keyframes toast-in {
   from {
     opacity: 0;
     transform: translate(-50%, 14px) scale(0.96);
   }
 }
-
-/* ---------------------------------------------------------------- narrow */
-
 @media (max-width: 900px) {
   .stage {
     grid-template-columns: minmax(0, 1fr);
@@ -2140,14 +1883,10 @@ kbd {
   .search {
     max-width: none;
   }
-  /* Tilt reads as a glitch on touch, where there is no pointer position. */
   .tile {
     transform: none !important;
   }
 }
-
-/* ------------------------------------------------------- reduced motion */
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2160,61 +1899,49 @@ kbd {
     transform: none !important;
   }
 }
-
-
-/* ===================================================================
-   Hover play button, and the right-click build menu.
-
-   Both are additions to the existing tile. The play button is always in the
-   DOM and revealed by CSS rather than mounted on hover, so hovering costs no
-   React render and cannot pop in a frame late.
-   =================================================================== */
-
-/* The tile is now a div with role=button, so it needs the focus ring the
-   <button> element used to get for free. */
 .tile:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 2px;
 }
-
 .tile-playwrap {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  /* Hidden until hover, but still in the layout tree. */
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--fast) var(--ease);
-  /* Sit above the cover art, below the title text. */
   z-index: 3;
   background:
     radial-gradient(
       circle at 50% 55%,
       color-mix(in srgb, var(--void) 55%, transparent),
-      color-mix(in srgb, var(--void) 88%, transparent) 70%
-    );
+      color-mix(in srgb, var(--void) 88%, transparent) 70%);
 }
-
 .tile:hover .tile-playwrap,
 .tile:focus-within .tile-playwrap {
   opacity: 1;
   pointer-events: auto;
 }
-
 .tile-play {
   display: flex;
   align-items: center;
   gap: 0.5em;
   padding: 0.6em 1.1em;
-  font: 700 0.95rem/1 "Chakra Petch", system-ui, sans-serif;
+  font:
+    700 0.95rem/1 "Chakra Petch",
+    system-ui,
+    sans-serif;
   letter-spacing: 0.14em;
   color: var(--void);
-  background: linear-gradient(180deg, var(--ember) 0%, color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
+  background:
+    linear-gradient(
+      180deg,
+      var(--ember) 0%,
+      color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
   border: 1px solid color-mix(in srgb, var(--ember) 70%, #fff);
   border-radius: var(--radius);
   cursor: pointer;
-  /* Heavy industrial switch: a hard drop shadow that collapses on press. */
   box-shadow:
     0 4px 0 color-mix(in srgb, var(--blood) 70%, #000),
     0 10px 24px -6px color-mix(in srgb, var(--ember) 60%, transparent),
@@ -2227,14 +1954,12 @@ kbd {
     filter var(--fast) var(--ease);
   animation: play-pulse 2.4s ease-in-out infinite;
 }
-
 .tile-play svg {
   width: 1.1em;
   height: 1.1em;
   fill: currentColor;
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
 }
-
 .tile-play:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
@@ -2243,51 +1968,48 @@ kbd {
     0 14px 30px -6px color-mix(in srgb, var(--ember) 75%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
-
 .tile-play:active {
-  /* Press down: the shadow is the button's thickness, so it collapses to 0. */
   transform: translateY(4px);
   box-shadow:
     0 0 0 color-mix(in srgb, var(--blood) 70%, #000),
     0 4px 12px -4px color-mix(in srgb, var(--ember) 60%, transparent),
     inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
-
 .tile-play:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
-
 .tile-play:disabled {
   cursor: not-allowed;
   filter: grayscale(0.8) brightness(0.6);
   animation: none;
 }
-
 @keyframes play-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.16); }
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.16);
+  }
 }
-
-/* Respect a stated preference for less motion: the pulse is decorative and
-   the tilt is large, so both are dropped rather than merely shortened. */
 @media (prefers-reduced-motion: reduce) {
-  .tile { transform: none !important; }
-  .tile-play { animation: none; transition: none; }
-  .tile-play:active { transform: none; }
+  .tile {
+    transform: none !important;
+  }
+  .tile-play {
+    animation: none;
+    transition: none;
+  }
+  .tile-play:active {
+    transform: none;
+  }
 }
-
-/* ---------- on-demand install: card + sidebar ---------- */
-
-/* Card-level uninstall. Sits top-left of the cover so it cannot collide with
-   the play button (bottom-centre) or the ON DEMAND badge (top-right). */
 .tile-uninstall {
   position: absolute;
   top: 6px;
   left: 6px;
   z-index: 5;
 }
-
 .tile-uninst {
   display: grid;
   place-items: center;
@@ -2298,7 +2020,10 @@ kbd {
   border: 1px solid var(--line-2);
   border-radius: 3px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
 }
 .tile-uninst:hover {
   color: #ff5c5c;
@@ -2309,8 +2034,6 @@ kbd {
   opacity: 0.4;
   cursor: default;
 }
-
-/* Sidebar install block, below Details. */
 .panel-install {
   display: flex;
   flex-direction: column;
@@ -2319,7 +2042,6 @@ kbd {
   padding-top: 11px;
   border-top: 1px solid var(--line-2);
 }
-
 .panel-installed,
 .panel-dlhint {
   display: flex;
@@ -2340,9 +2062,6 @@ kbd {
   flex: 0 0 auto;
   margin-top: 1px;
 }
-
-/* Progress in the sidebar, matching the card's bar but with the size shown
-   alongside the percentage so the player knows what they are waiting for. */
 .panel-dlbar {
   position: relative;
   display: block;
@@ -2352,14 +2071,16 @@ kbd {
   border-radius: 3px;
   overflow: hidden;
 }
-
 .panel-dlfill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #5b942e, #a3e05c);
+  background:
+    linear-gradient(
+      90deg,
+      #5b942e,
+      #a3e05c);
   transition: width 0.35s linear;
 }
-
 .panel-dltext {
   position: absolute;
   inset: 0;
@@ -2370,7 +2091,6 @@ kbd {
   color: var(--fg);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
-
 .btn-ghost.is-danger {
   color: #ff8a8a;
   border-color: #5a2020;
@@ -2380,12 +2100,6 @@ kbd {
   background: var(--blood);
   border-color: var(--blood-hot);
 }
-
-/* ---------- first-run IWAD setup ---------- */
-
-/* A modal, not a page: the app is unusable without the IWADs, but the player
-   must still be able to dismiss it -- someone who has a working config on disk
-   should never be trapped here. */
 .setup {
   position: fixed;
   inset: 0;
@@ -2396,16 +2110,18 @@ kbd {
   background: rgba(4, 2, 6, 0.86);
   backdrop-filter: blur(3px);
 }
-
 .setup-card {
   width: min(560px, 100%);
   padding: 20px;
-  background: linear-gradient(180deg, #17120f, #100b0d);
+  background:
+    linear-gradient(
+      180deg,
+      #17120f,
+      #100b0d);
   border: 1px solid #4a2020;
   border-radius: 4px;
   box-shadow: 0 24px 70px -12px rgba(0, 0, 0, 0.9);
 }
-
 .setup-hd {
   display: flex;
   align-items: center;
@@ -2413,14 +2129,12 @@ kbd {
   gap: 10px;
   margin-bottom: 10px;
 }
-
 .setup-hd h2 {
   margin: 0;
   font: 700 1.05rem/1 var(--d-head);
   letter-spacing: 0.14em;
   color: var(--ember);
 }
-
 .setup-x {
   display: grid;
   place-items: center;
@@ -2436,7 +2150,6 @@ kbd {
   color: var(--fg);
   border-color: var(--blood);
 }
-
 .setup-lede {
   margin: 0 0 14px;
   font: 400 0.82rem/1.5 var(--d-mono);
@@ -2445,7 +2158,6 @@ kbd {
 .setup-lede b {
   color: var(--fg);
 }
-
 .setup-ok {
   display: flex;
   align-items: center;
@@ -2455,7 +2167,6 @@ kbd {
   letter-spacing: 0.08em;
   color: #a3e05c;
 }
-
 .setup-list {
   display: flex;
   flex-direction: column;
@@ -2464,7 +2175,6 @@ kbd {
   padding: 0;
   list-style: none;
 }
-
 .setup-row {
   display: flex;
   flex-direction: column;
@@ -2478,13 +2188,11 @@ kbd {
   border-color: #2f5a17;
   background: rgba(60, 100, 30, 0.1);
 }
-
 .setup-name {
   font: 700 0.72rem/1 var(--d-mono);
   letter-spacing: 0.1em;
   color: var(--fg);
 }
-
 .setup-found {
   display: flex;
   align-items: center;
@@ -2493,13 +2201,11 @@ kbd {
   color: #a3e05c;
   word-break: break-all;
 }
-
 .setup-pick {
   display: flex;
   gap: 6px;
   align-items: center;
 }
-
 .setup-path {
   flex: 1;
   min-width: 0;
@@ -2517,7 +2223,6 @@ kbd {
 .setup-path::placeholder {
   color: #5a4a4a;
 }
-
 .setup-err {
   display: flex;
   align-items: center;
@@ -2526,30 +2231,25 @@ kbd {
   font: 700 0.7rem/1.4 var(--d-mono);
   color: #ff5c5c;
 }
-
 .setup-ft {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
   align-items: center;
 }
-
 .btn-ghost.is-sm {
   padding: 6px 9px;
   font: 700 0.65rem/1 var(--d-mono);
   letter-spacing: 0.08em;
   white-space: nowrap;
 }
-
-/* ---------- on-demand install (total conversions) ---------- */
-
-/* The install button reuses .tile-play's shape but reads as a fetch rather
-   than a launch: cool green against the ember PLAY button, so the two are
-   never confused at a glance. Green is the palette's "safe/go" colour
-   (--toxic), already used for the HD tag. */
 .tile-play.is-install {
   color: var(--void);
-  background: linear-gradient(180deg, #a3e05c 0%, #5b942e 100%);
+  background:
+    linear-gradient(
+      180deg,
+      #a3e05c 0%,
+      #5b942e 100%);
   border-color: color-mix(in srgb, #c9f58c 70%, #fff);
   animation: none;
 }
@@ -2559,10 +2259,6 @@ kbd {
     0 14px 30px -6px rgba(127, 194, 60, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
-
-/* Progress sits on the cover's bottom edge. A bar alone is easy to miss on a
-   dark card, so it is paired with a text line: one for glanceability, one for
-   precision. */
 .tile-install {
   position: absolute;
   left: 0;
@@ -2573,10 +2269,13 @@ kbd {
   flex-direction: column;
   gap: 3px;
   padding: 6px 8px;
-  background: linear-gradient(180deg, transparent, rgba(5, 2, 8, 0.92) 55%);
+  background:
+    linear-gradient(
+      180deg,
+      transparent,
+      rgba(5, 2, 8, 0.92) 55%);
   pointer-events: none;
 }
-
 .tile-installbar {
   display: block;
   height: 3px;
@@ -2584,37 +2283,36 @@ kbd {
   border-radius: 2px;
   overflow: hidden;
 }
-
 .tile-installfill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #5b942e, #c9f58c);
+  background:
+    linear-gradient(
+      90deg,
+      #5b942e,
+      #c9f58c);
   border-radius: 2px;
-  /* Width is set inline from the server's byte count; the transition keeps it
-     from stepping once per poll. */
   transition: width 0.35s linear;
 }
-
 .tile-installtext {
   font: 700 0.55rem/1 var(--d-mono);
   letter-spacing: 0.1em;
   color: #c9f58c;
 }
-
 .tile-install.is-err {
-  background: linear-gradient(180deg, transparent, rgba(43, 6, 8, 0.95) 55%);
+  background:
+    linear-gradient(
+      180deg,
+      transparent,
+      rgba(43, 6, 8, 0.95) 55%);
 }
 .tile-install.is-err .tile-installtext {
   color: #ff5c5c;
-  /* Errors can be long mirror lists; keep them to two lines. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-/* Badge on a not-yet-installed card, so it is obvious before any click that
-   the game downloads rather than being present. */
 .tile-installbadge {
   position: absolute;
   top: 6px;
@@ -2631,9 +2329,6 @@ kbd {
   border-radius: 2px;
   pointer-events: none;
 }
-
-/* ---------- right-click build menu ---------- */
-
 .vmenu {
   position: fixed;
   z-index: 90;
@@ -2644,17 +2339,14 @@ kbd {
   background: color-mix(in srgb, var(--panel) 96%, transparent);
   border: 1px solid var(--line-2);
   border-radius: var(--radius);
-  box-shadow:
-    var(--shadow-3),
-    inset 0 1px 0 var(--bevel-lt);
-  /* Hidden until measured, so it never paints at the un-flipped position. */
+  box-shadow: var(--shadow-3), inset 0 1px 0 var(--bevel-lt);
   opacity: 0;
   transition: opacity var(--fast) var(--ease);
   backdrop-filter: blur(8px);
 }
-
-.vmenu.is-placed { opacity: 1; }
-
+.vmenu.is-placed {
+  opacity: 1;
+}
 .vmenu-head {
   display: flex;
   align-items: baseline;
@@ -2664,18 +2356,18 @@ kbd {
   border-bottom: 1px solid var(--line);
   margin-bottom: 0.3rem;
 }
-
 .vmenu-title {
-  font: 700 0.9rem/1.2 "Chakra Petch", system-ui, sans-serif;
+  font:
+    700 0.9rem/1.2 "Chakra Petch",
+    system-ui,
+    sans-serif;
   letter-spacing: 0.06em;
 }
-
 .vmenu-count {
   font-size: 0.72rem;
   color: var(--fg-faint);
   white-space: nowrap;
 }
-
 .vmenu-list {
   list-style: none;
   margin: 0;
@@ -2683,7 +2375,6 @@ kbd {
   max-height: 60vh;
   overflow-y: auto;
 }
-
 .vrow {
   display: flex;
   align-items: stretch;
@@ -2691,10 +2382,12 @@ kbd {
   border-radius: calc(var(--radius) - 2px);
   transition: background var(--fast) var(--ease);
 }
-
-.vrow:hover { background: color-mix(in srgb, var(--ember) 14%, transparent); }
-.vrow.is-disabled { opacity: 0.45; }
-
+.vrow:hover {
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+}
+.vrow.is-disabled {
+  opacity: 0.45;
+}
 .vrow-info {
   flex: 1;
   display: flex;
@@ -2710,12 +2403,10 @@ kbd {
   cursor: pointer;
   min-width: 0;
 }
-
 .vrow-info:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: -2px;
 }
-
 .vrow-name {
   display: flex;
   align-items: center;
@@ -2723,26 +2414,27 @@ kbd {
   font-size: 0.88rem;
   line-height: 1.25;
 }
-
-.vrow-def, .vrow-hd {
-  font: 700 0.6rem/1 ui-monospace, "Cascadia Code", Consolas, monospace;
+.vrow-def,
+.vrow-hd {
+  font:
+    700 0.6rem/1 ui-monospace,
+    "Cascadia Code",
+    Consolas,
+    monospace;
   font-style: normal;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 0.25em 0.4em;
   border-radius: 3px;
 }
-
 .vrow-def {
   color: var(--void);
   background: var(--ember);
 }
-
 .vrow-hd {
   color: var(--void);
   background: var(--ok);
 }
-
 .vrow-meta {
   font-size: 0.7rem;
   color: var(--fg-faint);
@@ -2750,7 +2442,6 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .vrow-play {
   flex: none;
   width: 2.1rem;
@@ -2764,21 +2455,22 @@ kbd {
   cursor: pointer;
   transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-
-.vrow-play svg { width: 0.85rem; height: 0.85rem; fill: currentColor; }
-
+.vrow-play svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  fill: currentColor;
+}
 .vrow-play:hover:not(:disabled) {
   color: var(--void);
   background: var(--ember);
 }
-
 .vrow-play:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 1px;
 }
-
-.vrow-play:disabled { cursor: not-allowed; }
-
+.vrow-play:disabled {
+  cursor: not-allowed;
+}
 .vrow-spin {
   width: 0.8rem;
   height: 0.8rem;
@@ -2787,15 +2479,11 @@ kbd {
   border-radius: 50%;
   animation: vrow-spin 0.7s linear infinite;
 }
-
-@keyframes vrow-spin { to { transform: rotate(360deg); } }
-
-
-/* ------------------------------------------------------- launch target */
-
-/* The big PLAY button launches the primary build, not whichever config row is
-   highlighted. That is invisible with one config and badly misleading with
-   three, so the build it will actually run is named directly under it. */
+@keyframes vrow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .play-target {
   margin: 8px 0 0;
   font-size: 10px;
@@ -2814,18 +2502,11 @@ kbd {
 .play-target-v {
   color: var(--fg);
   font-weight: 600;
-  /* Long mod-derived labels must not push the row wide. */
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* ---------------------------------------------------------- config rows */
-
-/* A row is [choose build] + [play this build]. The play glyph is its own
-   button because the row itself only picks which build the Details readout
-   describes -- clicking a row must not silently decide what PLAY launches. */
 .cfg-row {
   display: flex;
   align-items: stretch;
@@ -2861,8 +2542,6 @@ kbd {
   opacity: 0.32;
   cursor: not-allowed;
 }
-/* The primary build is the one the big PLAY runs, so mark it as such rather
-   than leaving the player to infer it from ordering. */
 .cfg-go.is-primary {
   color: var(--ember);
   border-color: color-mix(in srgb, var(--ember) 45%, var(--line-2));

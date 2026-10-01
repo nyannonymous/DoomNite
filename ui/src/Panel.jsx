@@ -59,7 +59,8 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
     let alive = true;
     setCmd(null);
     if (!group) return;
-    const cfg = group.cfgs[group.pick];
+    // Preview the command the PLAY button will actually run.
+    const cfg = group.cfgs[0];
     dryrun(cfg.index)
       .then((d) => {
         if (alive) setCmd(d);
@@ -80,13 +81,24 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
     );
   }
 
-  const cfg = group.cfgs[group.pick];
-  const disabled = busy || cfg.exists === false;
+  // The selected config (for the Details readout) is NOT the one the big PLAY
+  // button launches. This used to be one variable, so the top button silently
+  // launched whatever row happened to be highlighted -- and the card buttons,
+  // which always passed index 0, launched something different from the sidebar
+  // for the same game. Now the primary build is its own named thing:
+  //
+  //   PRIMARY  = the build the big PLAY button and every card PLAY button run.
+  //   pick     = which build's details are shown in the readout below.
+  //
+  // Anything other than the primary is launched deliberately, from its own row.
+  const primary = group.cfgs[0];
+  const cfg = group.cfgs[group.pick] || primary;
+  const disabled = busy || primary.exists === false;
 
-  async function play() {
+  async function play(which) {
     setBusy(true);
     try {
-      const r = await launchIndex(cfg.index);
+      const r = await launchIndex(which.index);
       toast(`Launched: ${r.label}`);
     } catch (e) {
       toast(`Failed: ${e.message}`, true);
@@ -131,8 +143,12 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
           <button
             type="button"
             className="play"
-            onClick={play}
+            onClick={() => play(primary)}
             disabled={disabled}
+            // Naming the build on the button itself: with several configs on a
+            // game it was otherwise impossible to tell what PLAY would run, and
+            // it was not the highlighted row.
+            title={`Launch ${primary.label || "config 1"}`}
           >
             <span className="play-glow" aria-hidden="true" />
             <Play size={18} strokeWidth={2.5} aria-hidden="true" />
@@ -147,6 +163,13 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
             {cmdOpen ? "Hide" : "Cmd"}
           </button>
         </div>
+        {/* Which build PLAY runs, stated rather than implied. */}
+        <p className="play-target" aria-live="polite">
+          <span className="play-target-k">launches</span>
+          <span className="play-target-v" title={primary.label || ""}>
+            {primary.label || "config 1"}
+          </span>
+        </p>
       </div>
 
       <div className="panel-scroll">
@@ -163,8 +186,11 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
             <h3>Configs</h3>
             <div className="cfgs">
               {group.cfgs.map((c, n) => (
+                // Row = [choose-this-build] + [play-this-build]. Wrapped because
+                // the play glyph is a separate button, and the old .cfg button
+                // used to be a direct flex child of .cfgs.
+                <div className="cfg-row" key={c.index}>
                 <button
-                  key={c.index}
                   type="button"
                   className={`cfg ${n === group.pick ? "is-on" : ""}`}
                   onClick={() => onPick(n)}
@@ -185,6 +211,25 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
                   </span>
                   <span className="cfg-iwad">{(c.iwad || "").replace(/\.WAD$/i, "")}</span>
                 </button>
+                {/* Non-primary builds are launched deliberately, from their own
+                    row. Before this the only way to run one was the right-click
+                    context menu, which is undiscoverable. Clicking the row itself
+                    just chooses which build the Details readout describes. */}
+                <button
+                  type="button"
+                  className={`cfg-go ${n === 0 ? "is-primary" : ""}`}
+                  onClick={() => play(c)}
+                  disabled={busy || c.exists === false}
+                  title={
+                    c.exists === false
+                      ? `${c.label || `config ${n + 1}`} — not installed`
+                      : `Play ${c.label || `config ${n + 1}`}`
+                  }
+                  aria-label={`Play ${c.label || `config ${n + 1}`}`}
+                >
+                  <Play size={12} strokeWidth={3} aria-hidden="true" />
+                </button>
+                </div>
               ))}
             </div>
           </section>

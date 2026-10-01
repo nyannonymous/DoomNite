@@ -288,7 +288,24 @@ export default function App() {
         e.preventDefault();
         move(-1);
       } else if (k === "Enter") {
-        if (document.activeElement?.tagName === "BUTTON") return;
+        const active = document.activeElement;
+        // Enter is "play the primary build", the same as the big button -- the
+        // highlighted config row must not change what it launches.
+        //
+        // It used to bail out whenever anything held focus, which meant that
+        // after clicking a config row (or its play glyph) Enter did nothing at
+        // all: the focused button swallowed it and the guard returned early.
+        // Let Enter through except on an interactive control that handles it
+        // itself, and let a focused per-config play button run its own build.
+        if (active instanceof HTMLElement) {
+          if (active.tagName === "TEXTAREA" || active.isContentEditable) return;
+          if (active.classList.contains("cfg-go")) return;
+          if (
+            (active.tagName === "BUTTON" || active.tagName === "A") &&
+            !active.classList.contains("cfg")
+          )
+            return;
+        }
         const btn = document.querySelector(".play");
         if (btn && !btn.disabled) btn.click();
       }
