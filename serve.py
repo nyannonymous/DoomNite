@@ -41,6 +41,8 @@ INDEX = os.path.join(PACK, "dist", "index.html")
 # Resolved once at startup: a flat, ordered list of runnable entries. The UI and
 # the launch endpoint both work off this, so a number always means the same game.
 ENTRIES = []
+# Rebound, never mutated in place, by load_entries(). See the comment there:
+# in-place mutation raced with concurrent /api/entries requests.
 
 
 def _variant_label(mods, shared_base, other_iwad):
@@ -88,7 +90,21 @@ def load_entries():
     shared group id so the UI can show a single card and offer the
     configurations as options instead of three near-identical cards.
     """
-    ENTRIES.clear()
+    global ENTRIES
+    # Build into a local list and publish it in one assignment at the end.
+    #
+    # This used to mutate the module-global ENTRIES in place: ENTRIES.clear()
+    # followed by refills. load_entries() is called on every /api/entries
+    # request, so with the UI polling and a Vite dev server proxying on top,
+    # one thread's clear() landed in the middle of another thread's iteration
+    # over ENTRIES. Symptom: KeyError 'variant' at the variants comprehension,
+    # printed as a traceback from load_entries, and the client saw
+    # "RemoteDisconnected" because the handler thread died mid-response.
+    # Measured 143 failures out of 200 concurrent requests before this.
+    #
+    # Assigning once is atomic under the GIL, so a reader either sees the whole
+    # previous list or the whole new one -- never a partial one.
+    built = []
     art = art_map()
     man = json.load(open(MANIFEST, encoding="utf-8"))
     for g in man.get("games", []):
@@ -97,7 +113,7 @@ def load_entries():
         # Shared base = every variant starts with the same mod.
         firsts = {tuple(a.get("mods", []))[:1] for a in acts}
         shared_base = len(firsts) == 1
-        start = len(ENTRIES)
+        start = len(built)
         # Per-variant IWAD tag: None where every variant shares one IWAD, so the
         # label stops saying "[Doom 1]" on two identical rows. The tag names the
         # entry's OWN iwad, matching the card label in the manifest.
@@ -108,7 +124,7 @@ def load_entries():
             label = g["name"]
             if len(acts) > 1 and len(iwads) > 1:
                 label += " [Doom 1]" if a["iwad"] == "DOOM.WAD" else " [Doom 2]"
-            ENTRIES.append({
+            built.append({
                 "kind": "pack",
                 "label": label,
                 "note": g.get("note", ""),
@@ -132,19 +148,19 @@ def load_entries():
         # Point every member of the group at all of its configurations, so the
         # UI can offer them without a second request. Ordered fewest-mods-first
         # so "base" is the default the user sees at the top.
-        members = sorted(range(start, len(ENTRIES)), key=lambda i: len(ENTRIES[i]["mods"]))
+        members = sorted(range(start, len(built)), key=lambda i: len(built[i]["mods"]))
         variants = [{"index": i,
-                     "label": ENTRIES[i]["variant"],
-                     "mods": ENTRIES[i]["mods"],
-                     "iwad": ENTRIES[i]["iwad"],
-                     "exists": ENTRIES[i]["exists"]}
+                     "label": built[i]["variant"],
+                     "mods": built[i]["mods"],
+                     "iwad": built[i]["iwad"],
+                     "exists": built[i]["exists"]}
                     for i in members]
         for i in members:
-            ENTRIES[i]["group_size"] = len(members)
-            ENTRIES[i]["variants"] = variants
-            ENTRIES[i]["primary"] = (i == start)
+            built[i]["group_size"] = len(members)
+            built[i]["variants"] = variants
+            built[i]["primary"] = (i == start)
     for s in man.get("standalone_games", []):
-        ENTRIES.append({
+        built.append({
             "kind": "standalone",
             "label": s["name"],
             "note": s.get("note", ""),
@@ -154,6 +170,9 @@ def load_entries():
             "wdir": s["wdir"],
             "exists": os.path.isfile(s["exe"]),
         })
+    # Single atomic rebind: concurrent readers see either the whole old list or
+    # the whole new one, never a partially built one. Safe under the GIL.
+    ENTRIES = built
     return man
 
 
@@ -198,7 +217,7 @@ def page():
     more often than the server does, and a cached copy means every rebuild
     silently does nothing until you restart. One small file, one disk read.
 
-    The UI is a Vite/React bundle built to dist/ by `npm run build` in ui/. The
+    The UI is a Vite/React bundle ENTRIES to dist/ by `npm run build` in ui/. The
     old hand-written index.html is kept as index.html.vanilla so it can be
     compared against or restored without a git checkout.
     """
