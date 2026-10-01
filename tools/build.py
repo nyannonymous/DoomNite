@@ -306,22 +306,27 @@ def q(p):
 def launcher_line(slug, iwad, mods):
     """The engine invocation. Relative to the pack root, so it stays portable.
 
-    A bare .pk3/.pk7 argument is loaded as a mod, which is what the combos want.
-    A bare .wad argument is NOT: UZDoom stacks it onto the IWAD and boots the
-    IWAD's own game, so both Brutal Doom Black Edition entries just started plain
-    Doom. Standalone wads must go through -file.
+    EVERY mod goes through -file, whatever its extension.
+
+    The old version put .pk3/.pk7 on the command line as bare positional
+    arguments on the belief that "a bare pk3 is loaded as a mod". That is true
+    of GZDoom and false of UZDoom, which is the engine this pack ships. UZDoom
+    silently ignores positional mod arguments -- no warning, no error, it just
+    does not appear in the W_Init load list. Confirmed against the pack's own
+    runtime: a bare BDBE_v3.38.pk3 added nothing, while the same file passed
+    with -file added all 12,525 lumps.
+
+    The symptom was brutal: every game in the pack booted as plain Doom with
+    the vanilla status bar, because the mod supplying the real one was never
+    loaded. BDBE looked like "a different mod's HUD is showing".
+
+    -file also fixes standalone wads, which never worked here either -- UZDoom
+    stacks a bare .wad onto the IWAD and boots the IWAD's own game.
     """
     parts = ['start "" "runtime\\doom.exe"']
-    pend = []
-    for sub, fname in mods:
-        ext = os.path.splitext(fname)[1].lower()
-        if ext in (".pk3", ".pk7"):
-            parts.append(f'"mods\\{sub}\\{fname}"')
-        else:
-            pend.append(f'"mods\\{sub}\\{fname}"')
-    # -file and -iwad are flags, so they must follow the positional mods.
-    if pend:
-        parts.append("-file " + " ".join(pend))
+    files = [f'"mods\\{sub}\\{fname}"' for sub, fname in mods]
+    if files:
+        parts.append("-file " + " ".join(files))
     parts.append(f'-iwad "iwads\\{iwad}"')
     return " ".join(parts)
 
