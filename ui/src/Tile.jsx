@@ -346,7 +346,13 @@ export default function Tile({
       <span className="tile-playwrap">
         <button
           type="button"
-          className={`tile-play ${group.needsInstall ? "is-install" : ""}`}
+          // Green meant "this button fetches something". Once the download is
+          // done the button is only a launcher, so it keeps the ember PLAY look
+          // -- an installed on-demand game was staying green forever purely
+          // because the game still had an installer spec attached to it.
+          className={`tile-play ${
+            group.needsInstall && !installed ? "is-install" : ""
+          }`}
           onClick={playDefault}
           // An installable game is not "missing" -- it has a button that
           // fetches it. Disabling on exists===false would have greyed out the
