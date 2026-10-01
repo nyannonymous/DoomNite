@@ -1,0 +1,17 @@
+# Doom/mods binaries, runtime and launchers: generated, and far too big for git.
+runtime/
+iwads/
+mods/
+launchers/
+
+# Build outputs
+pack-manifest.json
+PLAY DOOM KNIGHT.cmd
+dryrun.log
+menu-dryrun.log
+
+# Playnite export, contains local paths
+playnite-data/
+
+__pycache__/
+*.pyc
