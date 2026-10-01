@@ -65,6 +65,8 @@ export function groupEntries(entries) {
             iwad: v.iwad,
             exists: v.exists,
             hd: !!v.hd,
+            needsInstall: v.needs_install || null,
+            standalone: !!v.standalone,
           }));
       }
       g.kind = e.kind;
@@ -79,13 +81,42 @@ export function groupEntries(entries) {
         exe: e.exe,
         wdir: e.wdir,
         hd: !!e.hd,
+        needsInstall: e.needs_install || null,
+        standalone: !!e.standalone,
       });
     }
     if (e.art && !g.art) g.art = e.art;
+    // Installable games are NOT "missing" -- they have an install button.
+    if (e.needs_install) g.needsInstall = e.needs_install;
     if (e.exists === false) g.missing = true;
   }
-  for (const g of out) if (g.cfgs.every((c) => c.exists === false)) g.missing = true;
+  // An installable entry always reports exists:false until installed, so it
+  // must be excluded from the "missing" verdict or the filter and the card
+  // would both claim the files are lost.
+  for (const g of out)
+    if (!g.needsInstall && g.cfgs.every((c) => c.exists === false)) g.missing = true;
   return out;
+}
+
+/* ---------------------------------------------------------------- installer */
+
+// Status for every installable entry. Polled while a download runs, so it must
+// stay cheap -- the server only reads the filesystem, it does no work here.
+export async function fetchInstallStatus() {
+  const d = await j(await fetch("/api/install", { cache: "no-store" }));
+  return d.entries || [];
+}
+
+// Kick off a download. Returns immediately; the server does the work in a
+// worker thread and progress shows up via fetchInstallStatus().
+export async function startInstall(name, force = false) {
+  return j(
+    await fetch(`/api/install/${encodeURIComponent(name)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force }),
+    })
+  );
 }
 
 export const FILTERS = [

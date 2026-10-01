@@ -1467,12 +1467,30 @@ kbd {
   box-shadow: 0 0 18px -4px rgba(255, 154, 60, 0.9);
 }
 
+/* Missing builds stay in the grid -- the user asked for them to be visible,
+   just visibly not ready. Dimming is on the card's own opacity rather than a
+   filter, so the cover art desaturates with everything else and the badge and
+   MISSING tag stay legible. */
 .tile.is-missing {
   border-color: #4a2020;
+  opacity: 0.44;
+  /* A dimmed card must still take a hover, or it reads as disabled rather than
+     unavailable -- and the play button has to be reachable to see why. */
+  transition: opacity var(--med) var(--ease);
+}
+.tile:hover.is-missing,
+.tile.is-sel.is-missing {
+  opacity: 0.82;
 }
 
 .tile.is-missing .tile-sub {
   color: var(--blood-hot);
+}
+
+/* The MISSING tag is the one thing that must stay fully opaque -- it is the
+   explanation, and dimming it along with the card defeats the purpose. */
+.tile.is-missing .tile-tag.is-bad {
+  opacity: 1;
 }
 
 /* ----------------------------------------------------------------- cover */
@@ -2205,6 +2223,97 @@ kbd {
   .tile { transform: none !important; }
   .tile-play { animation: none; transition: none; }
   .tile-play:active { transform: none; }
+}
+
+/* ---------- on-demand install (total conversions) ---------- */
+
+/* The install button reuses .tile-play's shape but reads as a fetch rather
+   than a launch: cool green against the ember PLAY button, so the two are
+   never confused at a glance. Green is the palette's "safe/go" colour
+   (--toxic), already used for the HD tag. */
+.tile-play.is-install {
+  color: var(--void);
+  background: linear-gradient(180deg, #a3e05c 0%, #5b942e 100%);
+  border-color: color-mix(in srgb, #c9f58c 70%, #fff);
+  animation: none;
+}
+.tile-play.is-install:hover {
+  box-shadow:
+    0 5px 0 #2f5a17,
+    0 14px 30px -6px rgba(127, 194, 60, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* Progress sits on the cover's bottom edge. A bar alone is easy to miss on a
+   dark card, so it is paired with a text line: one for glanceability, one for
+   precision. */
+.tile-install {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, transparent, rgba(5, 2, 8, 0.92) 55%);
+  pointer-events: none;
+}
+
+.tile-installbar {
+  display: block;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tile-installfill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #5b942e, #c9f58c);
+  border-radius: 2px;
+  /* Width is set inline from the server's byte count; the transition keeps it
+     from stepping once per poll. */
+  transition: width 0.35s linear;
+}
+
+.tile-installtext {
+  font: 700 0.55rem/1 var(--d-mono);
+  letter-spacing: 0.1em;
+  color: #c9f58c;
+}
+
+.tile-install.is-err {
+  background: linear-gradient(180deg, transparent, rgba(43, 6, 8, 0.95) 55%);
+}
+.tile-install.is-err .tile-installtext {
+  color: #ff5c5c;
+  /* Errors can be long mirror lists; keep them to two lines. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Badge on a not-yet-installed card, so it is obvious before any click that
+   the game downloads rather than being present. */
+.tile-installbadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 5px;
+  font: 700 0.5rem/1 var(--d-mono);
+  letter-spacing: 0.1em;
+  color: #0e1013;
+  background: #a3e05c;
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 /* ---------- right-click build menu ---------- */

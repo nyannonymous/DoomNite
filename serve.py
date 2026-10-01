@@ -27,6 +27,8 @@ exposure to anything else.
 """
 import argparse
 import json
+
+import installer as _inst
 import os
 import posixpath
 import subprocess
@@ -143,7 +145,13 @@ def load_entries():
                 "size": os.path.getsize(
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
-                "exists": os.path.isfile(os.path.join(PACK, "launchers", a["bat"])),
+                # exists means "the launcher AND its content are present". A
+                # total conversion that has not been downloaded yet must report
+                # False, or clicking PLAY silently does nothing.
+                "exists": (
+                    os.path.isfile(os.path.join(PACK, "launchers", a["bat"]))
+                    and _content_present(a)
+                ),
                 # Art resolution, in order of authority:
                 #   1. an explicit "art" on the launcher action, set in
                 #      build.py when a game has identity art of its own that
@@ -162,6 +170,13 @@ def load_entries():
                 "group": g["name"],
                 "variant": _variant_label(mods, shared_base, _own(a), a.get("label", "")),
                  "hd": bool(a.get("hd")),
+                # An on-demand total conversion is never "installed" at build
+                # time -- its files are fetched by installer.py on first click.
+                # Without this the UI reports exists=True for a game whose 4 MB
+                # of content are not on disk, and the install button never
+                # appears.
+                "needs_install": a.get("needs_install"),
+                "standalone": bool(a.get("standalone")),
                 "primary": False,
             })
         # Point every member of the group at all of its configurations, so the
@@ -199,6 +214,23 @@ def load_entries():
     # the whole new one, never a partially built one. Safe under the GIL.
     ENTRIES = built
     return man
+
+
+def _content_present(action):
+    """Is the actual game content on disk, not just the launcher script?
+
+    build.py emits a launcher for an on-demand total conversion whether or not
+    it has been downloaded yet, so the .bat existing proves nothing. The mod
+    paths are relative to the pack; check those too.
+    """
+    for m in action.get("mods", ()):
+        rel = m.replace("\\", os.sep)
+        if not os.path.isfile(os.path.join(PACK, "mods", rel)):
+            return False
+    iwad = action.get("standalone_iwad")
+    if iwad and not os.path.isfile(os.path.join(PACK, "mods", iwad.replace("\\", os.sep))):
+        return False
+    return True
 
 
 def resolve(idx):
@@ -328,6 +360,10 @@ def handler_factory():
                     return self._send(404, _json.dumps({"error": "not found"}))
                 with open(fp, "rb") as f:
                     return self._send(200, f.read(), ctype)
+            if path == "/api/install":
+                # Status for every installable entry. The UI polls this while a
+                # download runs, so it must be cheap and never block.
+                return self._send(200, _json.dumps({"entries": _inst.status()}))
             if path == "/api/dryrun":
                 q = _up.parse_qs(_up.urlparse(self.path).query)
                 try:
@@ -343,6 +379,26 @@ def handler_factory():
 
         def do_POST(self):
             path = _up.urlparse(self.path).path
+            if path.startswith("/api/install/"):
+                # Only a known installer name from the POST body, and the name
+                # is looked up in installer.SPECS -- never used to build a path
+                # or a URL, so this cannot be steered at arbitrary files.
+                name = _up.unquote(path[len("/api/install/"):])
+                if name not in _inst.SPECS:
+                    return self._send(404, _json.dumps({"error": "no such entry"}))
+                force = False
+                n = int(self.headers.get("Content-Length") or 0)
+                if n:
+                    if n > 4096:
+                        return self._send(413, _json.dumps({"error": "body too large"}))
+                    try:
+                        raw = json.loads(self.rfile.read(n) or b"{}")
+                    except ValueError:
+                        return self._send(400, _json.dumps({"error": "bad json"}))
+                    force = bool(raw.get("force"))
+                # Runs in a worker thread: these are 4 MB and 44 MB downloads
+                # and must not hold the request open.
+                return self._send(202, _json.dumps(_inst.start(name, force=force)))
             if path != "/api/launch":
                 return self._send(404, _json.dumps({"error": "not found"}))
             n = int(self.headers.get("Content-Length") or 0)

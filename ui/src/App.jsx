@@ -62,16 +62,32 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToastMsg(null), 2600);
   }, []);
 
+  // A total conversion installs itself on click, and the server's entry list
+  // still says exists:false afterwards -- only /api/install knows. So after an
+  // install finishes the entries have to be re-read, or the card stays greyed
+  // out and unlaunchable until the page is reloaded. Factored out of the mount
+  // effect so both callers share it.
+  const reloadEntries = useCallback(
+    () =>
+      fetchEntries()
+        .then((e) => {
+          setRaw(e);
+          return e;
+        })
+        .catch((err) => {
+          setError(err.message);
+          throw err;
+        }),
+    []
+  );
+
   useEffect(() => {
-    fetchEntries()
-      .then((e) => {
-        setRaw(e);
-        // Next frame, so tiles mount with --i stagger already applied.
-        requestAnimationFrame(() => setCount(e.length));
-      })
-      .catch((err) => setError(err.message));
+    reloadEntries().then((e) => {
+      // Next frame, so tiles mount with --i stagger already applied.
+      requestAnimationFrame(() => setCount(e.length));
+    });
     return () => clearTimeout(toastTimer.current);
-  }, []);
+  }, [reloadEntries]);
 
   const groups = useMemo(() => groupEntries(raw), [raw]);
 
@@ -351,6 +367,7 @@ export default function App() {
                   onHover={setSel}
                   onLaunch={launchBuild}
                   onOpenVariants={openVariants}
+                  onInstalled={reloadEntries}
                 />
               ))}
             </div>

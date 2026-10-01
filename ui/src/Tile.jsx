@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Play, Swords, Skull, Radio } from "lucide-react";
-import { artUrl } from "./api";
+import { Play, Swords, Skull, Radio, Download, Check } from "lucide-react";
+import { artUrl, startInstall } from "./api";
 import { posterFor } from "./poster";
 
 /** Entrance: cards rise from below, staggered like loading into a level. */
@@ -92,6 +92,7 @@ export default function Tile({
   onHover,
   onLaunch,
   onOpenVariants,
+  onInstalled,
   index,
 }) {
   const ref = useRef(null);
@@ -108,6 +109,58 @@ export default function Tile({
   }, [selected]);
 
   const multi = group.cfgs.length > 1;
+
+  /* ---------------------------------------------------------------- install */
+  // Installable games ship without their files. The tile owns the download
+  // state rather than App, because it is per-card and there is no reason to
+  // re-render the whole grid while a 44 MB transfer progresses.
+  const [install, setInstall] = useState(null);
+
+  async function beginInstall() {
+    if (!group.needsInstall || install?.busy) return;
+    setInstall({ busy: true, pct: 0, error: null });
+    try {
+      await startInstall(group.needsInstall);
+      pollInstall();
+    } catch (e) {
+      setInstall({ busy: false, pct: 0, error: String(e.message || e) });
+    }
+  }
+
+  // Poll until the server reports a terminal state. 700ms is quick enough to
+  // feel live and slow enough not to matter; the server call only stats a
+  // directory.
+  function pollInstall() {
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      try {
+        const r = await fetch("/api/install", { cache: "no-store" });
+        const d = await r.json();
+        const me = (d.entries || []).find((e) => e.name === group.needsInstall);
+        if (!me) throw new Error("no status");
+        if (me.state === "error") {
+          setInstall({ busy: false, pct: 0, error: me.error || "install failed" });
+          return;
+        }
+        if (me.installed && me.state === "installed") {
+          setInstall({ busy: false, pct: 100, error: null, done: true });
+          // Ask the parent to re-read entries so the card becomes launchable.
+          onInstalled?.();
+          return;
+        }
+        const pct = me.size ? Math.round((me.received / me.size) * 100) : 0;
+        setInstall({ busy: true, pct, error: null });
+      } catch (e) {
+        if (tries > 3) {
+          setInstall({ busy: false, pct: 0, error: "lost contact with the server" });
+          return;
+        }
+      }
+      if (tries < 600) setTimeout(tick, 700);
+    };
+    tick();
+  }
 
   /**
    * Pointer-tracked 3D tilt.
@@ -159,6 +212,13 @@ export default function Tile({
     // undefined, cfg came out undefined, and every card PLAY button reported
     // "files are missing" instead of launching. The sidebar PLAY button was
     // wired correctly, which is why only the cards looked broken.
+    //
+    // For an installable game the play button becomes the install button: the
+    // files genuinely are not there yet, so the useful action is to fetch them.
+    if (group.needsInstall) {
+      beginInstall();
+      return;
+    }
     onLaunch?.(group, 0);
   }
 
@@ -269,16 +329,60 @@ export default function Tile({
       <span className="tile-playwrap">
         <button
           type="button"
-          className="tile-play"
+          className={`tile-play ${group.needsInstall ? "is-install" : ""}`}
           onClick={playDefault}
-          disabled={group.missing || cfg.exists === false}
-          aria-label={`Launch ${group.label} (default build)`}
-          title="Launch (Space)"
+          // An installable game is not "missing" -- it has a button that
+          // fetches it. Disabling on exists===false would have greyed out the
+          // one control that can fix it.
+          disabled={!group.needsInstall && (group.missing || cfg.exists === false)}
+          aria-label={
+            group.needsInstall
+              ? `Install ${group.label}`
+              : `Launch ${group.label} (default build)`
+          }
+          title={group.needsInstall ? "Install on demand" : "Launch (Space)"}
         >
-          <Play size={18} strokeWidth={2.5} aria-hidden="true" />
-          <span className="tile-playtext">PLAY</span>
+          {group.needsInstall ? (
+            install?.done ? (
+              <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+            ) : (
+              <Download size={18} strokeWidth={2.5} aria-hidden="true" />
+            )
+          ) : (
+            <Play size={18} strokeWidth={2.5} aria-hidden="true" />
+          )}
+          <span className="tile-playtext">
+            {group.needsInstall
+              ? install?.done
+                ? "READY"
+                : install?.busy
+                  ? `${install.pct}%`
+                  : "INSTALL"
+              : "PLAY"}
+          </span>
         </button>
       </span>
+      {/* Download progress. A thin bar along the bottom of the cover, plus a
+          line of text, because a percentage alone on a dark card is easy to
+          miss. */}
+      {group.needsInstall && install?.busy && (
+        <span className="tile-install" role="status" aria-live="polite">
+          <span className="tile-installbar">
+            <span className="tile-installfill" style={{ width: `${install.pct}%` }} />
+          </span>
+          <span className="tile-installtext">Downloading {install.pct}%</span>
+        </span>
+      )}
+      {group.needsInstall && install?.error && (
+        <span className="tile-install is-err" role="alert">
+          <span className="tile-installtext">{install.error}</span>
+        </span>
+      )}
+      {group.needsInstall && !install && (
+        <span className="tile-installbadge" title="Downloads on first launch">
+          <Download size={10} aria-hidden="true" /> ON DEMAND
+        </span>
+      )}
       {/* Pin marker: pinned state must not be conveyed by glow alone. */}
       <span className="tile-pin" aria-hidden="true">
         <svg viewBox="0 0 24 24">

@@ -245,6 +245,18 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3", BD + r"\ERADICATION_MAPSET_2_0.wad")]),
     ("The Bikini Bottom Massacre", "SpongeBob, but in Doom.",
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
+    # On-demand total conversions. These are NOT shipped in the pack: the files
+    # are downloaded on demand by installer.py, checksum-verified, and the card
+    # offers an install button until that has happened. "install" names the
+    # spec; "standalone" marks the pk3-as-iwad case.
+    ("Adventures of Square", "Standalone total conversion. Square in Shapeland.",
+     # No art override: cover art for these two has not been chosen yet, and a
+     # name pointing at a missing file renders as a broken image instead of
+     # falling back to the mod's own TITLEPIC.
+     [("SQUARE1.PK3",
+       {"install": os.path.join("adventures-of-square"), "standalone": True})]),
+    ("Requiem", "1997 megawad, 32 levels.",
+     [("DOOM2.WAD", {"install": os.path.join("requiem")})]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
      # All three variants show the same cover art: the new Duke Boomem
      # image. Set explicitly on each because the mod-stem match in
@@ -412,7 +424,8 @@ def q(p):
     return '"' + p.replace("/", "\\") + '"'
 
 
-def launcher_line(slug, iwad, mods, engine=ENGINE_DEFAULT):
+def launcher_line(slug, iwad, mods, engine=ENGINE_DEFAULT,
+                  standalone=False):
     """The engine invocation. Relative to the pack root, so it stays portable.
 
     EVERY mod goes through -file, whatever its extension.
@@ -462,13 +475,23 @@ def launcher_line(slug, iwad, mods, engine=ENGINE_DEFAULT):
     # %~dp0 is the directory of the .bat being run, so %~dp0..\iwads is the
     # pack's iwads folder no matter what the current directory is. This works
     # for both engines and needs no config file at all.
-    parts.append(f'-iwad "%~dp0..\\iwads\\{iwad}"')
+    if standalone:
+        # A standalone total conversion ships as an IPK3 that must BE the IWAD.
+        # Adventures of Square's own site is explicit that it does not support
+        # running on top of another IWAD as a Doom modification, so there is no
+        # -file list at all -- just the pk3 as -iwad, and it lives under mods/
+        # because it is installed on demand rather than shipped in the pack.
+        parts.append(f'-iwad "%~dp0..\\mods\\{iwad}"')
+    else:
+        parts.append(f'-iwad "%~dp0..\\iwads\\{iwad}"')
     return " ".join(parts)
 
 
-def write_bat(bat, title, iwad, mods, note, engine=ENGINE_DEFAULT):
+def write_bat(bat, title, iwad, mods, note, engine=ENGINE_DEFAULT,
+              standalone=False):
     out = os.path.join(PACK, "launchers", bat)
-    line = launcher_line(bat, iwad, mods, engine=engine)
+    line = launcher_line(bat, iwad, mods, engine=engine,
+                          standalone=standalone)
     lines = [
         "@echo off",
         f"rem {title}",
@@ -546,6 +569,46 @@ def build():
             else:
                 iwad, *modsrcs = action
             is_hd = bool(opts.get("hd"))
+
+            # On-demand total conversion: installed by the launcher UI rather
+            # than shipped in the pack, so the files usually do NOT exist yet.
+            # "install" names the installer.py spec; the entry is still emitted
+            # so the card appears and offers an install button, but there are no
+            # mods to copy and nothing to record as missing.
+            inst = opts.get("install")
+            if inst:
+                entry.setdefault("install", inst)
+                suffix = "" if i == 0 else f"-d{i}"
+                bat = f"{slugify(name)}{suffix}.bat"
+                if opts.get("standalone"):
+                    # The pk3 IS the iwad and lives under mods/<name>/.
+                    entry.setdefault("standalone_iwad",
+                                     os.path.join(inst, "square1.pk3"))
+                    entry["engine"] = ENGINE_GZDOOM
+                    write_bat(bat, name,
+                              os.path.join(inst, "square1.pk3"), [],
+                              note, engine=ENGINE_GZDOOM, standalone=True)
+                    entry["actions"].append({
+                        "bat": bat, "iwad": "", "hd": is_hd,
+                        "mods": [], "exists": False,
+                        "needs_install": inst, "standalone": True,
+                        # Repeated on the action so serve.py can tell whether
+                        # the pk3 is actually on disk without reading the group.
+                        "standalone_iwad": os.path.join(inst, "square1.pk3"),
+                    })
+                    continue
+
+                iwad_p = os.path.join(inst, "REQUIEM.WAD")
+                entry.setdefault("needs_iwad", iwad_p)
+                write_bat(bat, name, "DOOM2.WAD",
+                          [(inst, "REQUIEM.WAD")], note)
+                entry["actions"].append({
+                    "bat": bat, "iwad": "DOOM2.WAD", "hd": is_hd,
+                    "mods": [os.path.join(inst, "REQUIEM.WAD")],
+                    "exists": False, "needs_install": inst,
+                })
+                continue
+
             mods, ok = [], True
             for src in modsrcs:
                 if not os.path.isfile(src):
