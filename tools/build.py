@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 
 PACK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,8 +37,35 @@ HO = r"Z:\GAMES\Hocus Doom"
 HL = r"Z:\GAMES\DOOM HALF LIFE"
 
 # Files that must exist and be copied. These are the IWADs and the runtime.
+#
+# The runtime is copied as a WHOLE SET, not a file list. GZDoom loads openal32,
+# libsndfile, libfluidsynth and friends from its own directory; copy the exe
+# without them and it dies at startup with STATUS_DLL_NOT_FOUND (0xC0000135),
+# which surfaces as "nothing happens" because there is no console output. So:
+# copy every .dll sitting next to uzdoom.exe, and fail loudly if it is missing.
+RUNTIME_EXE = "uzdoom.exe"
+RUNTIME_REQUIRED = ["game_support.pk3", "zmusic.dll", "openal32.dll"]
+# GZDoom's own data pk3s. Deliberately NOT every .pk3 in the GZDOOM folder:
+# mod pk3s (Brutal Doom, DN3DooM, SWMapPack) live there too and must not be
+# auto-loaded for every entry.
+RUNTIME_PK3 = ["uzdoom.pk3", "game_support.pk3", "brightmaps.pk3", "lights.pk3",
+               "game_widescreen_gfx.pk3", "h_PBR_v461.pk3"]
+
+
+def runtime_files():
+    """Every file GZDoom needs beside uzdoom.exe: itself, its pk3s and all DLLs."""
+    names = {RUNTIME_EXE, *RUNTIME_PK3}
+    for n in os.listdir(GZ):
+        if n.lower().endswith(".dll"):
+            names.add(n)
+    missing = [n for n in RUNTIME_REQUIRED if n not in names]
+    if missing:
+        sys.exit(f"runtime incomplete at {GZ}: missing {', '.join(missing)}\n"
+                 "GZDoom will not start without these (STATUS_DLL_NOT_FOUND).")
+    return sorted(names)
+
+
 IWADS = ["DOOM.WAD", "DOOM2.WAD"]
-RUNTIME = ["uzdoom.exe", "game_support.pk3", "zmusic.dll"]
 
 # (name, note, [(subfolder, source path, iwad)])
 # subfolder is where it lands under mods\. "extra" is a raw -file fragment.
@@ -153,12 +181,14 @@ def build():
     manifest = {"iwads": [], "runtime": [], "games": [], "standalone_games": [],
                 "missing": []}
 
-    for n in RUNTIME:
+    rt = runtime_files()
+    for n in rt:
         src = os.path.join(GZ, n)
-        if not os.path.isfile(src):
-            sys.exit(f"missing runtime file: {src}")
-        shutil.copy2(src, os.path.join(PACK, "runtime", n))
-        manifest["runtime"].append(n)
+        dest = os.path.join(PACK, "runtime", n)
+        if not (os.path.exists(dest)
+                and os.path.getsize(dest) == os.path.getsize(src)):
+            shutil.copy2(src, dest)
+    manifest["runtime"] = rt
 
     for n in IWADS:
         src = os.path.join(GZ, n)
@@ -240,11 +270,39 @@ def check():
     if not os.path.exists(man_p):
         sys.exit("no pack-manifest.json - run: python tools\\build.py")
     man = json.load(open(man_p, encoding="utf-8"))
-    for n in RUNTIME + IWADS:
-        sub = "runtime" if n in RUNTIME else "iwads"
-        p = os.path.join(PACK, sub, n)
+    for n in RUNTIME_REQUIRED + [RUNTIME_EXE]:
+        p = os.path.join(PACK, "runtime", n)
         if not os.path.isfile(p):
-            problems.append(f"missing {sub}\\{n}")
+            problems.append(f"missing runtime\\{n}")
+    # The one that matters: can the runtime actually START? A runtime missing
+    # its DLLs passes every file-exists check and still dies instantly with
+    # STATUS_DLL_NOT_FOUND, so run it and read the exit code.
+    #
+    # -norun makes GZDoom load the IWAD, init sound and video, then exit without
+    # opening a window. Plain -version is no good here: on this build it opens a
+    # window and waits for a keypress, so it would always "hang".
+    #
+    # Exit code 1337 is GZDoom's own "quit requested" result for -norun, so it
+    # is success here, not a failure. Anything non-zero that is NOT 1337, and
+    # any NTSTATUS crash code, is a real problem.
+    DLL_NOT_FOUND = {0xC0000135, -1073741515}
+    ACCESS_VIOLATION = {0xC0000005, -1073741819}
+    exe = os.path.join(PACK, "runtime", RUNTIME_EXE)
+    iwad = os.path.join(PACK, "iwads", "DOOM2.WAD")
+    if os.path.isfile(exe) and os.path.isfile(iwad):
+        try:
+            r = subprocess.run([exe, "-iwad", iwad, "-norun"],
+                               cwd=os.path.join(PACK, "runtime"),
+                               capture_output=True, timeout=120)
+            if r.returncode in DLL_NOT_FOUND:
+                problems.append("runtime cannot start: STATUS_DLL_NOT_FOUND "
+                                "(a DLL beside uzdoom.exe is missing)")
+            elif r.returncode in ACCESS_VIOLATION:
+                problems.append("runtime crashed: STATUS_ACCESS_VIOLATION")
+            elif r.returncode not in (0, 1337):
+                problems.append(f"runtime -norun exited {r.returncode}")
+        except subprocess.TimeoutExpired:
+            problems.append("runtime -norun hung")
     expected = sum(len(a) for _, _, a in GAMES)
     have = sum(len(g["actions"]) for g in man["games"])
     if expected != have:

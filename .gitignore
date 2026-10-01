@@ -9,6 +9,9 @@ pack-manifest.json
 PLAY DOOMNITE.cmd
 dryrun.log
 menu-dryrun.log
+vs_out.txt
+vs_err.txt
+srv.log
 
 # Playnite export, contains local paths
 playnite-data/

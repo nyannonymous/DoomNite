@@ -18,6 +18,32 @@ Double-click `PLAY DOOMNITE.cmd`, type a number, type it again to confirm.
 - Vanilla Doom and Doom II IWADs only. Nothing here is a total conversion that
   needs its own game data.
 
+## Run it
+
+Two ways, both from the pack root.
+
+**Web UI (the main one)**
+
+```
+python serve.py
+```
+
+Opens a browser at `http://127.0.0.1:8765/`. Search and filter 30 entries, arrow
+keys and Enter to launch, `d` to show the exact command an entry runs. `python
+serve.py --no-open` if you don't want the browser popping up.
+
+No dependencies, no npm install, no build step. It is one HTML file and one
+Python file using only the standard library.
+
+**Batch menu**
+
+```
+PLAY DOOMNITE.cmd
+```
+
+Still there and still works. It is the fallback if the browser is not an option,
+and it is what the CI-style checks below drive.
+
 ## Build it
 
 ```
@@ -55,6 +81,17 @@ just starts as vanilla Doom with no error. Playnite's library lists MoonMan as
 mod here is a `.pk3` or `.wad` and `--check` fails the build if a `.zip` ever
 reaches a mod list.
 
+**GZDoom is copied as a whole set, DLLs and all.** This is not optional. Copy
+just `uzdoom.exe` and it dies instantly with `STATUS_DLL_NOT_FOUND`
+(`0xC0000135`), because `openal32.dll`, `libsndfile-1.dll`,
+`libfluidsynth64.dll` and friends must sit beside it. It fails *silently* — no
+console output, no window, and `start` reports success — so a file-exists check
+passes happily on a pack that cannot start a single game. `build.py --check`
+therefore runs `uzdoom.exe -iwad ... -norun` and reads the exit code, treating
+only `0` and GZDoom's own quit code `1337` as success. Copy the `RUNTIME_PK3`
+list rather than every `.pk3` in the folder, or loose mod pk3s (Brutal Doom,
+DN3DooM, SWMapPack) get loaded into every entry.
+
 **Mod order matters in combos.** GZDoom loads `-file` entries in sequence, so a
 combo lists its base mod first and the patch second. Swapping them usually
 works but changes which version of a definition wins.
@@ -65,15 +102,23 @@ though it is a Doom 1 style game.
 ## Layout
 
 ```
-PLAY DOOMNITE.cmd   the menu
+PLAY DOOMNITE.cmd   the batch menu
 launchers\*.bat        one per entry, usable standalone
-runtime\               uzdoom.exe, game_support.pk3, zmusic.dll
+serve.py               local web server (stdlib only)
+index.html             the web UI
+runtime\               uzdoom.exe, its DLLs, and GZDoom's own pk3s
 iwads\                 DOOM.WAD, DOOM2.WAD
 mods\                  one folder per mod
 tools\build.py         the mod table; build and verify the pack
-tools\make_menu.py     generate the menu from pack-manifest.json
-pack-manifest.json     generated; what the menu reads
+tools\make_menu.py     generate the batch menu from pack-manifest.json
+pack-manifest.json     generated; what both UIs read
 ```
+
+`serve.py` binds to `127.0.0.1` only and its `/api/launch` endpoint accepts an
+integer index into the manifest, never a path or command string. The index is
+resolved to a known launcher server-side, so the worst a hostile page on
+localhost can do is start a game that was already in the menu. It is a
+single-user local tool, not something to expose to a network.
 
 The pack is about 5 GB. It is not in git: the runtime, IWADs and mods are
 copyrighted and far too big. The scripts are the project.
