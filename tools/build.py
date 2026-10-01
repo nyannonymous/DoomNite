@@ -432,8 +432,18 @@ def launcher_line(slug, iwad, mods, engine=ENGINE_DEFAULT):
     -file also fixes standalone wads, which never worked here either -- UZDoom
     stacks a bare .wad onto the IWAD and boots the IWAD's own game.
     """
-    parts = ['start "" "runtime\\%s"' % engine]
-    files = [f'"mods\\{sub}\\{fname}"' for sub, fname in mods]
+    # The engine is launched by ABSOLUTE path, anchored on %~dp0.
+    #
+    # The .bat does `cd /d "%~dp0.."` so a relative exe path would normally
+    # work, but `start ""` is the flaky part: it resolves the program against
+    # its own idea of the working directory, and when that does not line up the
+    # engine starts with no arguments and dies with "Cannot find a game IWAD" --
+    # an error that blames the WAD and the search paths and says nothing about
+    # the program not being found where it was asked for. Same class of problem
+    # as the relative -iwad, and fixed the same way.
+    parts = ['start "" "%~dp0..\\runtime\\' + engine + '"']
+    files = ['"%~dp0..\\mods\\' + sub + '\\' + fname + '"'
+             for sub, fname in mods]
     if files:
         parts.append("-file " + " ".join(files))
     # The IWAD is passed as an ABSOLUTE path, anchored on %~dp0.
