@@ -27,8 +27,10 @@ exposure to anything else.
 """
 import argparse
 import json
+import re
 
 import installer as _inst
+import iwadfinder as _iwad
 import os
 import posixpath
 import subprocess
@@ -217,19 +219,38 @@ def load_entries():
 
 
 def _content_present(action):
-    """Is the actual game content on disk, not just the launcher script?
+    """Is the game content actually on disk, not just the launcher script?
 
-    build.py emits a launcher for an on-demand total conversion whether or not
-    it has been downloaded yet, so the .bat existing proves nothing. The mod
-    paths are relative to the pack; check those too.
+    build.py writes a launcher for an on-demand total conversion whether or not
+    it has been downloaded, so the .bat existing proves nothing.
+
+    The manifest's `mods` list is only the tail of each path -- "foo.pk3" while
+    the file actually lives at mods\\<subfolder>\\foo.pk3 -- so resolving those
+    against mods\\ directly marked most of the shipped pack as uninstalled. The
+    launcher .bat is the authoritative record of the real paths, so parse the
+    paths out of its -file/-iwad arguments instead. Falls back to the manifest
+    only for a standalone total conversion, whose pk3 the installer owns.
     """
-    for m in action.get("mods", ()):
-        rel = m.replace("\\", os.sep)
-        if not os.path.isfile(os.path.join(PACK, "mods", rel)):
+    bat = action.get("bat")
+    if bat:
+        bp = os.path.join(PACK, "launchers", bat)
+        try:
+            txt = open(bp, "r", encoding="utf-8", errors="replace").read()
+        except OSError:
             return False
+        # Expand %~dp0.. and %~dp0 to real absolute prefixes, exactly as cmd
+        # would, then check each referenced file.
+        base = os.path.dirname(bp)
+        txt = txt.replace("%~dp0..\\", PACK + "\\").replace("%~dp0", base + "\\")
+        refs = re.findall(r'"([^"]+\.(?:pk3|pk7|wad|WAD|iwad))"', txt)
+        if refs:
+            return all(os.path.isfile(r) for r in refs)
+        # No quoted paths (a plain engine launch): nothing extra to verify.
+        return True
+
     iwad = action.get("standalone_iwad")
-    if iwad and not os.path.isfile(os.path.join(PACK, "mods", iwad.replace("\\", os.sep))):
-        return False
+    if iwad:
+        return os.path.isfile(os.path.join(PACK, "mods", iwad.replace("\\", os.sep)))
     return True
 
 
@@ -360,6 +381,20 @@ def handler_factory():
                     return self._send(404, _json.dumps({"error": "not found"}))
                 with open(fp, "rb") as f:
                     return self._send(200, f.read(), ctype)
+            if path == "/api/setup":
+                # First-run state. The UI shows the WAD finder only while
+                # needs_setup() is non-empty, so a configured install never
+                # sees it again.
+                return self._send(200, _json.dumps({
+                    "missing": _iwad.needs_setup(),
+                    "iwads": _iwad.iwads(),
+                }))
+            if path == "/api/setup/scan":
+                found, searched = _iwad.scan()
+                return self._send(200, _json.dumps({
+                    "found": found, "searched": len(searched),
+                    "missing": _iwad.needs_setup(),
+                }))
             if path == "/api/install":
                 # Status for every installable entry. The UI polls this while a
                 # download runs, so it must be cheap and never block.
@@ -377,8 +412,60 @@ def handler_factory():
                     "label": e["label"], "command": command_for(e)}))
             return self._send(404, _json.dumps({"error": "not found"}))
 
+        def do_DELETE(self):
+            # Only used to remove an installed total conversion. Routed through
+            # the same guard as POST: the name is looked up in SPECS, never
+            # turned into a path.
+            self.do_POST()
+
         def do_POST(self):
             path = _up.urlparse(self.path).path
+            if path == "/api/setup":
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 8192:
+                    return self._send(413, _json.dumps({"error": "body too large"}))
+                try:
+                    raw = json.loads(self.rfile.read(n) or b"{}")
+                except ValueError:
+                    return self._send(400, _json.dumps({"error": "bad json"}))
+                action = raw.get("action")
+                if action == "scan":
+                    found, _ = _iwad.scan()
+                    saved = _iwad.record({w: ps[0] for w, ps in found.items()})
+                elif action == "set":
+                    # The player picked a folder or named a file. Every path is
+                    # resolved and CHECKED to actually be an IWAD before it is
+                    # stored -- the UI cannot be trusted to have validated it,
+                    # and a bad path here means every launch silently fails.
+                    chosen = raw.get("iwads") or {}
+                    good = {}
+                    for w, p_ in chosen.items():
+                        if w not in _iwad.WANTED or not isinstance(p_, str):
+                            continue
+                        ap = os.path.abspath(p_)
+                        if os.path.isfile(ap) and _iwad._wad_score(ap):
+                            good[w] = ap
+                    if not good:
+                        return self._send(400, _json.dumps({
+                            "error": "no valid IWAD in that location",
+                            "rejected": [w for w in chosen if w not in good],
+                        }))
+                    saved = _iwad.record(good)
+                else:
+                    return self._send(400, _json.dumps({"error": "bad action"}))
+                return self._send(200, _json.dumps({
+                    "iwads": saved, "missing": _iwad.needs_setup()}))
+            if path.startswith("/api/install/") and self.command == "DELETE":
+                name = path[len("/api/install/"):]
+                if name not in _inst.SPECS:
+                    # Same reasoning as POST: never turn user input into a
+                    # filesystem path.
+                    return self._send(404, _json.dumps({"error": "unknown"}))
+                try:
+                    r = _inst.remove(name)
+                except RuntimeError as e:
+                    return self._send(409, _json.dumps({"error": str(e)}))
+                return self._send(200, _json.dumps(r))
             if path.startswith("/api/install/"):
                 # Only a known installer name from the POST body, and the name
                 # is looked up in installer.SPECS -- never used to build a path

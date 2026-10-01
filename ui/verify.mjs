@@ -282,7 +282,15 @@ check("show command returns a real command", /doom\.exe|\.bat/i.test(cmd), cmd.s
     return realFetch(url, opts);
   };
   try {
-    const tile = $$(".tile").find((t) => !t.className.includes("is-missing"));
+    // Skip installable tiles too. One of those is no longer "is-missing" -- it
+    // has an INSTALL button that hits /api/install, so clicking it would never
+    // reach /api/launch and this assertion would fail for the wrong reason.
+    // Find the tile whose button actually says PLAY.
+    const tile = $$(".tile").find((t) => {
+      if (t.className.includes("is-missing")) return false;
+      const b = t.querySelector(".tile-play");
+      return b && !b.disabled && /PLAY/.test(b.textContent || "");
+    });
     check("a launchable card exists", !!tile, tile ? "found" : "none");
     // Reveal the hover overlay the way a real pointer would, then click PLAY.
     const play = tile?.querySelector(".tile-play");

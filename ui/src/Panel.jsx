@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { Play, Terminal as TerminalIcon, Wrench } from "lucide-react";
+import { Play, Terminal as TerminalIcon, Wrench, Download, Trash2, Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import { dryrun, launchIndex } from "./api";
+import { dryrun, launchIndex, startInstall, removeInstall } from "./api";
 import { Cover } from "./Tile";
 import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
 
@@ -10,7 +10,7 @@ function bytes(n) {
   return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`;
 }
 
-export default function Panel({ group, onPick, toast }) {
+export default function Panel({ group, onPick, toast, inst, onInstalled }) {
   const reduced = useReducedMotion();
   const [busy, setBusy] = useState(false);
   // Brief boot readout on every game switch. Purely presentational: the details
@@ -23,6 +23,35 @@ export default function Panel({ group, onPick, toast }) {
   }, [group?.key]);
   const [cmd, setCmd] = useState(null);
   const [cmdOpen, setCmdOpen] = useState(false);
+
+  /* ---------------------------------------------------------- on-demand install */
+  // Same pattern as the card: the server's answer is authoritative. The prop
+  // is refreshed by App's poll, so this panel never invents install state.
+  const installed = !!inst?.installed;
+  const instBusy = !!inst?.state && inst.state === "downloading";
+  const instPct = inst?.size
+    ? Math.round(((inst.received || 0) / inst.size) * 100)
+    : 0;
+  const [instError, setInstError] = useState(null);
+
+  async function doInstall() {
+    setInstError(null);
+    try {
+      await startInstall(group.needsInstall);
+    } catch (e) {
+      setInstError(String(e.message || e));
+    }
+  }
+
+  async function doUninstall() {
+    setInstError(null);
+    try {
+      await removeInstall(group.needsInstall);
+      onInstalled?.();
+    } catch (e) {
+      setInstError(String(e.message || e));
+    }
+  }
 
   // Re-fetch the command whenever the selected config changes, so the panel
   // never shows a stale command for the previous variant.
@@ -213,7 +242,63 @@ export default function Panel({ group, onPick, toast }) {
           </pre>
         )}
 
-        {cfg.exists === false && (
+        {/* On-demand total conversion: install/uninstall at the bottom of the
+            sidebar, where the rest of this game's controls live. */}
+        {group.needsInstall && (
+          <div className="panel-install">
+            {instError && (
+              <p className="warn" role="alert">
+                {instError}
+              </p>
+            )}
+            {installed ? (
+              <>
+                <p className="panel-installed">
+                  <Check size={13} aria-hidden="true" />
+                  Installed{inst?.size_h ? ` · ${inst.size_h}` : ""}
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost is-danger"
+                  onClick={doUninstall}
+                  disabled={instBusy}
+                >
+                  <Trash2 size={13} aria-hidden="true" />
+                  {instBusy ? "Working..." : "UNINSTALL"}
+                </button>
+              </>
+            ) : (
+              <>
+                {instBusy ? (
+                  <div className="panel-dlbar" role="status" aria-live="polite">
+                    <span className="panel-dlfill" style={{ width: `${instPct}%` }} />
+                    <span className="panel-dltext">
+                      {inst?.size_h ? `${inst.size_h} · ` : ""}
+                      {instPct}%
+                    </span>
+                  </div>
+                ) : (
+                  <p className="panel-dlhint">
+                    <Download size={13} aria-hidden="true" />
+                    Not in the pack. Downloaded on demand
+                    {inst?.size_h ? ` (${inst.size_h})` : ""}.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={doInstall}
+                  disabled={instBusy}
+                >
+                  <Download size={13} aria-hidden="true" />
+                  {instBusy ? "Downloading..." : "INSTALL"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {cfg.exists === false && !group.needsInstall && (
           <p className="warn">This config&apos;s files are missing from the pack.</p>
         )}
       </div>

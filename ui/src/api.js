@@ -119,6 +119,13 @@ export async function startInstall(name, force = false) {
   );
 }
 
+// Delete an installed total conversion and reclaim its files.
+export async function removeInstall(name) {
+  return j(
+    await fetch(`/api/install/${encodeURIComponent(name)}`, { method: "DELETE" })
+  );
+}
+
 export const FILTERS = [
   { id: "all", label: "All" },
   { id: "doom1", label: "Doom 1" },

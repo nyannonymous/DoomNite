@@ -115,7 +115,33 @@ def runtime_files():
 # Hexen Remade is a Hexen 1.5 remake: 31 MAP## maps that belong to the Hexen
 # IWAD, not either Doom one. It was being launched with DOOM2.WAD and so
 # could never work.
-IWADS = [("DOOM.WAD", GZ), ("DOOM2.WAD", GZ), ("Hexen.wad", HD)]
+def _load_iwad_config():
+    """Read the player's IWAD choices from config.json, if there are any.
+
+    build.py lives in tools/ so this has to reach up to the pack root. A missing
+    or corrupt config is not fatal: the caller falls back to the old paths, and
+    the app shows the finder on first run.
+    """
+    import json
+    cfg = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "config.json")
+    try:
+        with open(cfg, "r", encoding="utf-8") as f:
+            return (json.load(f) or {}).get("iwads", {}) or {}
+    except (OSError, ValueError):
+        return {}
+
+
+# Where each IWAD comes from. The paths the player chose in the first-run
+# finder take precedence; these hardcoded locations are only the fallback for
+# a machine that has never been set up, and they are read once at build time
+# rather than baked into the launchers, which stay %~dp0-relative.
+_IWAD_CFG = _load_iwad_config()
+IWADS = [
+    ("DOOM.WAD", _IWAD_CFG.get("DOOM.WAD", GZ)),
+    ("DOOM2.WAD", _IWAD_CFG.get("DOOM2.WAD", GZ)),
+    ("Hexen.wad", _IWAD_CFG.get("Hexen.wad", HD)),
+]
 
 # (name, note, [(subfolder, source path, iwad)])
 # subfolder is where it lands under mods\. "extra" is a raw -file fragment.

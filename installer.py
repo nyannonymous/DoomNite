@@ -111,6 +111,44 @@ def installed(name):
         os.path.isfile(os.path.join(dest, f)) for f in spec["want"])
 
 
+def remove(name):
+    """Delete an installed total conversion and reclaim its files.
+
+    Only ever removes DEST[name] for a name in SPECS -- the same lookup that
+    guards install(). Building the path from user input here would be a
+    directory-traversal primitive, so it is deliberately never done: an
+    unknown name is rejected rather than sanitised.
+
+    The cache zip is kept. Removing it would save a little space but mean the
+    next install has to re-download; the extracted tree is the part that
+    actually costs the player disk.
+    """
+    spec = SPECS.get(name)
+    if not spec:
+        raise KeyError(name)
+    if _jobs.get(name, {}).get("state") == "downloading":
+        # Deleting the destination out from under a running extract would leave
+        # a half-written directory that installed() then reports as broken.
+        raise RuntimeError("install in progress")
+    dest = DEST[name]
+    freed = 0
+    if os.path.isdir(dest):
+        for root, _dirs, files in os.walk(dest):
+            for f in files:
+                try:
+                    freed += os.path.getsize(os.path.join(root, f))
+                except OSError:
+                    pass
+        # The destination is validated to sit under mods\ by DEST's
+        # construction, and rmtree is refused for a symlinked root, so this
+        # cannot escape the pack.
+        if os.path.islink(dest):
+            raise RuntimeError("refusing to remove a symlink")
+        shutil.rmtree(dest)
+    _jobs.pop(name, None)
+    return {"removed": name, "freed": freed}
+
+
 def status():
     """Every spec plus whatever is known about an in-flight job."""
     out = []

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchEntries, groupEntries, FILTERS, launchIndex, artUrl } from "./api";
 import { posterFor } from "./poster";
 import Tile from "./Tile";
+import Setup from "./Setup";
 import Panel from "./Panel";
 import EmberField from "./EmberField";
 import VariantMenu from "./VariantMenu";
@@ -88,6 +89,54 @@ export default function App() {
     });
     return () => clearTimeout(toastTimer.current);
   }, [reloadEntries]);
+
+  /* ------------------------------------------------- first-run IWAD setup */
+  // null = not asked yet. The modal shows only while /api/setup reports a
+  // missing WAD, so a configured install never sees it. Dismissal is allowed
+  // and permanent-per-session: someone with a working config on disk should
+  // never be trapped in a dialog they cannot leave.
+  const [showSetup, setShowSetup] = useState(null);
+
+  /* ------------------------------------------------------- install status */
+  // Keyed by the install name. Held here rather than per-tile because the
+  // status is a property of the install, not of any one card: every card wants
+  // the same answer, and asking once per tile meant N requests and, worse, a
+  // card that never asked showed INSTALL forever after a reload even though
+  // the game was installed.
+  const [inst, setInst] = useState({});
+
+  const loadInst = useCallback(
+    () =>
+      fetch("/api/install", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          const m = {};
+          for (const e of d.entries || []) m[e.name] = e;
+          setInst(m);
+          return m;
+        })
+        .catch(() => {}),
+    []
+  );
+
+  useEffect(() => {
+    loadInst();
+  }, [loadInst]);
+
+  // While anything is downloading, keep the status fresh so progress moves and
+  // a finished install flips the card without a reload.
+  useEffect(() => {
+    const busy = Object.values(inst).some((e) => e.state === "downloading");
+    if (!busy) return;
+    const t = setInterval(loadInst, 800);
+    return () => clearInterval(t);
+  }, [inst, loadInst]);
+  useEffect(() => {
+    fetch("/api/setup", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setShowSetup((d.missing || []).length > 0))
+      .catch(() => setShowSetup(false));
+  }, []);
 
   const groups = useMemo(() => groupEntries(raw), [raw]);
 
@@ -290,9 +339,22 @@ export default function App() {
   const heroArt = current?.art ? artUrl(current.art) : current ? posterFor(current.label, current.note) : null;
 
   return (
-    // uac-root is what switches the native cursor off for the crosshair, and
-    // d-noise is the app-wide film grain.
-    <div className="app uac-root">
+    <>
+      {/* First-run IWAD finder. Gated on the server's missing list, so it is
+          absent entirely once the player has pointed DoomNite at their WADs. */}
+      {showSetup && (
+        <Setup
+          onDone={() => {
+            setShowSetup(false);
+            // The launchers embed the resolved IWAD path, so a change here
+            // means the pack has to be rebuilt before PLAY uses the new one.
+            reloadEntries();
+          }}
+        />
+      )}
+      {/* uac-root is what switches the native cursor off for the crosshair, and
+          d-noise is the app-wide film grain. */}
+      <div className="app uac-root">
       {heroArt && (
         <>
           <div
@@ -368,6 +430,7 @@ export default function App() {
                   onLaunch={launchBuild}
                   onOpenVariants={openVariants}
                   onInstalled={reloadEntries}
+                  inst={g.needsInstall ? inst[g.needsInstall] : null}
                 />
               ))}
             </div>
@@ -380,6 +443,11 @@ export default function App() {
             current && setPicks((p) => ({ ...p, [current.key]: n }))
           }
           toast={toast}
+          inst={current?.needsInstall ? inst[current.needsInstall] : null}
+          onInstalled={() => {
+            loadInst();
+            reloadEntries();
+          }}
         />
       </main>
 
@@ -412,5 +480,7 @@ export default function App() {
 
       <Toast msg={toastMsg} bad={toastBad} />
     </div>
+  );
+    </>
   );
 }

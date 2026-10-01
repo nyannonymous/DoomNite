@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Play, Swords, Skull, Radio, Download, Check } from "lucide-react";
-import { artUrl, startInstall } from "./api";
+import { Play, Swords, Skull, Radio, Download, Check, Trash2 } from "lucide-react";
+import { artUrl, startInstall, removeInstall } from "./api";
 import { posterFor } from "./poster";
 
 /** Entrance: cards rise from below, staggered like loading into a level. */
@@ -93,6 +93,7 @@ export default function Tile({
   onLaunch,
   onOpenVariants,
   onInstalled,
+  inst,
   index,
 }) {
   const ref = useRef(null);
@@ -111,56 +112,66 @@ export default function Tile({
   const multi = group.cfgs.length > 1;
 
   /* ---------------------------------------------------------------- install */
-  // Installable games ship without their files. The tile owns the download
-  // state rather than App, because it is per-card and there is no reason to
-  // re-render the whole grid while a 44 MB transfer progresses.
-  const [install, setInstall] = useState(null);
+  // An installable total conversion has no files until it is downloaded. This
+  // tile renders that state; it does not own it.
+  //
+  // The previous version kept its own `install` state initialised to null and
+  // only ever set it from beginInstall(), so after a page reload an ALREADY
+  // INSTALLED game still read "INSTALL" -- the card never asked the server. The
+  // authoritative answer is the server's, passed in as `inst`, and the local
+  // state is now only the transient progress while a download runs.
+  const [dl, setDl] = useState(null);
+
+  // Derived, not stored. `installed` is the server's verdict; this is just a
+  // convenience alias so the JSX below reads plainly.
+  const installed = !!inst?.installed;
+  const busy = !!dl || inst?.state === "downloading";
+  const error = dl === null ? inst?.state === "error" ? inst.error : null : dl.error;
+
+  // Progress as a percentage of the real byte total, so the bar is honest
+  // rather than a spinner that implies nothing.
+  const pct =
+    dl?.pct ??
+    (inst?.size ? Math.round(((inst.received || 0) / inst.size) * 100) : 0);
 
   async function beginInstall() {
-    if (!group.needsInstall || install?.busy) return;
-    setInstall({ busy: true, pct: 0, error: null });
+    if (!group.needsInstall || busy) return;
+    setDl({ pct: 0, error: null });
     try {
       await startInstall(group.needsInstall);
-      pollInstall();
+      // The server does the work and /api/install is polled by App, so there
+      // is nothing to poll for here. Clear the transient state once App's next
+      // fetch reports a terminal condition, which it does within ~800ms.
     } catch (e) {
-      setInstall({ busy: false, pct: 0, error: String(e.message || e) });
+      setDl({ pct: 0, error: String(e.message || e) });
+      return;
     }
   }
 
-  // Poll until the server reports a terminal state. 700ms is quick enough to
-  // feel live and slow enough not to matter; the server call only stats a
-  // directory.
-  function pollInstall() {
-    let tries = 0;
-    const tick = async () => {
-      tries += 1;
-      try {
-        const r = await fetch("/api/install", { cache: "no-store" });
-        const d = await r.json();
-        const me = (d.entries || []).find((e) => e.name === group.needsInstall);
-        if (!me) throw new Error("no status");
-        if (me.state === "error") {
-          setInstall({ busy: false, pct: 0, error: me.error || "install failed" });
-          return;
-        }
-        if (me.installed && me.state === "installed") {
-          setInstall({ busy: false, pct: 100, error: null, done: true });
-          // Ask the parent to re-read entries so the card becomes launchable.
-          onInstalled?.();
-          return;
-        }
-        const pct = me.size ? Math.round((me.received / me.size) * 100) : 0;
-        setInstall({ busy: true, pct, error: null });
-      } catch (e) {
-        if (tries > 3) {
-          setInstall({ busy: false, pct: 0, error: "lost contact with the server" });
-          return;
-        }
-      }
-      if (tries < 600) setTimeout(tick, 700);
-    };
-    tick();
+  // Drop the local progress as soon as the server says the install finished,
+  // so the button flips to READY. Without this the card would sit at a stale
+  // 100% spinner forever if the server's fetch raced the local one.
+  useEffect(() => {
+    if (dl && inst?.state === "installed") {
+      setDl(null);
+      onInstalled?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inst?.state]);
+
+  async function uninstall() {
+    if (!group.needsInstall || busy) return;
+    setDl({ pct: 0, error: null, removing: true });
+    try {
+      await removeInstall(group.needsInstall);
+      onInstalled?.();
+    } catch (e) {
+      setDl({ pct: 0, error: String(e.message || e) });
+      return;
+    }
+    setDl(null);
   }
+
 
   /**
    * Pointer-tracked 3D tilt.
@@ -342,43 +353,64 @@ export default function Tile({
           }
           title={group.needsInstall ? "Install on demand" : "Launch (Space)"}
         >
-          {group.needsInstall ? (
-            install?.done ? (
-              <Check size={18} strokeWidth={2.5} aria-hidden="true" />
-            ) : (
-              <Download size={18} strokeWidth={2.5} aria-hidden="true" />
-            )
+          {group.needsInstall && !installed ? (
+            <Download size={18} strokeWidth={2.5} aria-hidden="true" />
+          ) : group.needsInstall ? (
+            <Play size={18} strokeWidth={2.5} aria-hidden="true" />
           ) : (
             <Play size={18} strokeWidth={2.5} aria-hidden="true" />
           )}
           <span className="tile-playtext">
+            {/* Once the files are on disk the button goes back to being a
+                launcher. Deriving this from the server's answer rather than a
+                local flag is what fixes the "reverts to INSTALL" bug. */}
             {group.needsInstall
-              ? install?.done
-                ? "READY"
-                : install?.busy
-                  ? `${install.pct}%`
+              ? busy
+                ? `${pct}%`
+                : installed
+                  ? "PLAY"
                   : "INSTALL"
               : "PLAY"}
           </span>
         </button>
       </span>
-      {/* Download progress. A thin bar along the bottom of the cover, plus a
-          line of text, because a percentage alone on a dark card is easy to
-          miss. */}
-      {group.needsInstall && install?.busy && (
+      {/* Uninstall, only while there is something to uninstall. Placed beside
+          the play button rather than in a menu because an on-demand download
+          is the one thing in the pack that occupies disk without being part of
+          it, and the player should be able to reclaim that space. */}
+      {group.needsInstall && installed && !busy && (
+        <span className="tile-uninstall">
+          <button
+            type="button"
+            className="tile-uninst"
+            onClick={(e) => {
+              e.stopPropagation();
+              uninstall();
+            }}
+            disabled={busy}
+            title={`Uninstall ${group.label} and free its files`}
+            aria-label={`Uninstall ${group.label}`}
+          >
+            <Trash2 size={13} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        </span>
+      )}
+      {group.needsInstall && busy && (
         <span className="tile-install" role="status" aria-live="polite">
           <span className="tile-installbar">
-            <span className="tile-installfill" style={{ width: `${install.pct}%` }} />
+            <span className="tile-installfill" style={{ width: `${pct}%` }} />
           </span>
-          <span className="tile-installtext">Downloading {install.pct}%</span>
+          <span className="tile-installtext">
+            {dl?.removing ? "Removing..." : `Downloading ${pct}%`}
+          </span>
         </span>
       )}
-      {group.needsInstall && install?.error && (
+      {group.needsInstall && error && (
         <span className="tile-install is-err" role="alert">
-          <span className="tile-installtext">{install.error}</span>
+          <span className="tile-installtext">{error}</span>
         </span>
       )}
-      {group.needsInstall && !install && (
+      {group.needsInstall && !installed && !busy && !error && (
         <span className="tile-installbadge" title="Downloads on first launch">
           <Download size={10} aria-hidden="true" /> ON DEMAND
         </span>

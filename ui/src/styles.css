@@ -2225,6 +2225,270 @@ kbd {
   .tile-play:active { transform: none; }
 }
 
+/* ---------- on-demand install: card + sidebar ---------- */
+
+/* Card-level uninstall. Sits top-left of the cover so it cannot collide with
+   the play button (bottom-centre) or the ON DEMAND badge (top-right). */
+.tile-uninstall {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+}
+
+.tile-uninst {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--fg-dim);
+  background: rgba(10, 6, 9, 0.82);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tile-uninst:hover {
+  color: #ff5c5c;
+  border-color: var(--blood);
+  background: rgba(43, 6, 8, 0.9);
+}
+.tile-uninst:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Sidebar install block, below Details. */
+.panel-install {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-2);
+}
+
+.panel-installed,
+.panel-dlhint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font: 400 0.66rem/1.4 var(--d-mono);
+  color: var(--fg-dim);
+}
+.panel-installed {
+  color: #a3e05c;
+}
+.panel-dlhint {
+  align-items: flex-start;
+}
+.panel-dlhint svg,
+.panel-installed svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* Progress in the sidebar, matching the card's bar but with the size shown
+   alongside the percentage so the player knows what they are waiting for. */
+.panel-dlbar {
+  position: relative;
+  display: block;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.panel-dlfill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #5b942e, #a3e05c);
+  transition: width 0.35s linear;
+}
+
+.panel-dltext {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 0.6rem/1 var(--d-mono);
+  letter-spacing: 0.06em;
+  color: var(--fg);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.btn-ghost.is-danger {
+  color: #ff8a8a;
+  border-color: #5a2020;
+}
+.btn-ghost.is-danger:hover {
+  color: #fff;
+  background: var(--blood);
+  border-color: var(--blood-hot);
+}
+
+/* ---------- first-run IWAD setup ---------- */
+
+/* A modal, not a page: the app is unusable without the IWADs, but the player
+   must still be able to dismiss it -- someone who has a working config on disk
+   should never be trapped here. */
+.setup {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 2, 6, 0.86);
+  backdrop-filter: blur(3px);
+}
+
+.setup-card {
+  width: min(560px, 100%);
+  padding: 20px;
+  background: linear-gradient(180deg, #17120f, #100b0d);
+  border: 1px solid #4a2020;
+  border-radius: 4px;
+  box-shadow: 0 24px 70px -12px rgba(0, 0, 0, 0.9);
+}
+
+.setup-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.setup-hd h2 {
+  margin: 0;
+  font: 700 1.05rem/1 var(--d-head);
+  letter-spacing: 0.14em;
+  color: var(--ember);
+}
+
+.setup-x {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.setup-x:hover {
+  color: var(--fg);
+  border-color: var(--blood);
+}
+
+.setup-lede {
+  margin: 0 0 14px;
+  font: 400 0.82rem/1.5 var(--d-mono);
+  color: var(--fg-dim);
+}
+.setup-lede b {
+  color: var(--fg);
+}
+
+.setup-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font: 700 0.8rem/1 var(--d-mono);
+  letter-spacing: 0.08em;
+  color: #a3e05c;
+}
+
+.setup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 10px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+}
+.setup-row.is-done {
+  border-color: #2f5a17;
+  background: rgba(60, 100, 30, 0.1);
+}
+
+.setup-name {
+  font: 700 0.72rem/1 var(--d-mono);
+  letter-spacing: 0.1em;
+  color: var(--fg);
+}
+
+.setup-found {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 400 0.68rem/1.35 var(--d-mono);
+  color: #a3e05c;
+  word-break: break-all;
+}
+
+.setup-pick {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.setup-path {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font: 400 0.72rem/1.2 var(--d-mono);
+  color: var(--fg);
+  background: #0a0709;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+}
+.setup-path:focus {
+  outline: none;
+  border-color: var(--ember);
+}
+.setup-path::placeholder {
+  color: #5a4a4a;
+}
+
+.setup-err {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  font: 700 0.7rem/1.4 var(--d-mono);
+  color: #ff5c5c;
+}
+
+.setup-ft {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.btn-ghost.is-sm {
+  padding: 6px 9px;
+  font: 700 0.65rem/1 var(--d-mono);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
 /* ---------- on-demand install (total conversions) ---------- */
 
 /* The install button reuses .tile-play's shape but reads as a fetch rather
