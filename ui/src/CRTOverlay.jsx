@@ -27,6 +27,18 @@ export function CRTOverlay({ intensity = 1, showCursor = true }) {
 
   const motion = !reduced && intensity > 0;
 
+  // Decide ONCE, here, whether a custom cursor will actually exist, and tell
+  // the DOM. The old CSS hid the native cursor unconditionally while this
+  // component could bail out and render nothing, so on a reduced-motion or
+  // touch machine the app had no cursor of any kind.
+  const coarse =
+    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const customCursor = !reduced && !coarse;
+  useEffect(() => {
+    document.documentElement.classList.toggle("d-has-crosshair", customCursor);
+    return () => document.documentElement.classList.remove("d-has-crosshair");
+  }, [customCursor]);
+
   return (
     <>
       <div className="d-scanlines" style={{ opacity: 0.85 * intensity }} aria-hidden="true" />
@@ -39,7 +51,7 @@ export function CRTOverlay({ intensity = 1, showCursor = true }) {
       )}
       <div className="d-vignette" style={{ opacity: intensity }} aria-hidden="true" />
       <div className="d-aberration" aria-hidden="true" />
-      {showCursor && <Crosshair reduced={reduced} />}
+      {showCursor && customCursor && <Crosshair reduced={reduced} />}
     </>
   );
 }
@@ -54,9 +66,6 @@ export function CRTOverlay({ intensity = 1, showCursor = true }) {
 function Crosshair({ reduced }) {
   useEffect(() => {
     if (reduced) return;
-    // Coarse pointer means touch: no hover, so a cursor overlay is pointless.
-    if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) return;
-
     let raf = 0;
     let x = 0;
     let y = 0;
@@ -68,6 +77,13 @@ function Crosshair({ reduced }) {
       }
       raf = 0;
     };
+
+    // A pointer that never enters the window leaves the crosshair stranded at
+    // the origin. Seed it mid-screen and paint once so it is never invisible.
+    x = window.innerWidth / 2;
+    y = window.innerHeight / 2;
+    el?.classList.remove("is-out");
+    paint();
 
     const onMove = (e) => {
       x = e.clientX;

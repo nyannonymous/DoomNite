@@ -58,9 +58,13 @@
      gradients so there is no image to load. `cursor` is set on the app
      shell; native cursors are kept for form fields and text so typing and
      text selection still work normally. */
-  .uac-root,
-  .uac-root .tile,
-  .uac-root button:not(.keep-cursor) {
+  /* Gated on .d-has-crosshair, which CRTOverlay sets only when it has actually
+     mounted a crosshair. Unconditional `cursor: none` was a trap: the
+     component returns null under prefers-reduced-motion and on coarse
+     pointers, so those users got no cursor at all. The DOM now decides. */
+  .d-has-crosshair .uac-root,
+  .d-has-crosshair .uac-root .tile,
+  .d-has-crosshair .uac-root button:not(.keep-cursor) {
     cursor: none;
   }
   .uac-root input,
@@ -696,26 +700,6 @@
   }
 
   /* Boot overlay: covers the panel body for ~half a second on game switch. */
-  .panel-boot {
-    position: absolute;
-    inset: 0;
-    z-index: 4;
-    display: grid;
-    place-items: center;
-    padding: 0 18px;
-    background: linear-gradient(180deg, rgba(6, 12, 6, 0.9), rgba(4, 8, 4, 0.96));
-    backdrop-filter: blur(1px);
-  }
-
-  .panel-termrows {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: 12px 0 4px;
-    padding: 9px 11px;
-    background: rgba(4, 10, 5, 0.5);
-    border-left: 2px solid color-mix(in srgb, var(--d-toxic-500) 55%, transparent);
-  }
 
   /* The panel body is the terminal: green-on-black with a glow, matching the
      .d-term recipe but softer, since the whole pane already sits on a
@@ -730,6 +714,41 @@
 
   /* The panel must sit above the hero art and its veil. */
   .panel, .stage, .statusbar, .topbar { position: relative; z-index: 2; }
+
+  /* The panel's own `animation: panel-in` and Framer's slide-in both animate
+     transform. The boot overlay used to sit on a panel that was mid-animation,
+     and `inset: 0` resolved against the animating box -- so the overlay
+     tracked a moving, skewed target and the CRT layers above it sheared
+     against it. It is now a static block in flow, not an absolutely
+     positioned overlay, and Framer owns the transform outright. */
+  .panel { animation: none; }
+
+  .panel-boot {
+    position: relative;
+    z-index: 4;
+    margin: 12px 0;
+    padding: 11px 12px;
+    background: linear-gradient(180deg, rgba(6, 12, 6, 0.92), rgba(4, 8, 4, 0.96));
+    border: 1px solid color-mix(in srgb, var(--d-toxic-500) 40%, transparent);
+  }
+
+  /* DataStreams was absolutely positioned against .panel-scroll, a scrolling
+     flex child, so the falling streaks were pinned to the scroll CONTENT box
+     and slid with it. Scoped to the panel itself instead. */
+  .panel > .d-streamwrap { position: absolute; inset: 0; z-index: 0; }
+  .panel > .d-streamwrap .d-streams { opacity: 0.22; }
+  .panel > *:not(.d-streamwrap) { position: relative; z-index: 1; }
+
+  .panel-termrows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 12px 0 4px;
+    padding: 9px 11px;
+    background: rgba(4, 10, 5, 0.5);
+    border-left: 2px solid color-mix(in srgb, var(--d-toxic-500) 55%, transparent);
+  }
+
 
   /* ---------- headers ---------- */
 

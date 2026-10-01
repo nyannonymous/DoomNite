@@ -212,18 +212,22 @@ GAMES = [
        BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
        BDBE + r"\addons\DoomHDTextures.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"hd": True, "label": "HD"}),
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad",
+       {"hd": True, "label": "HD", "art": "HontE_remastered_Experimental_REV1.103.png"}),
       ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_NeuralUpscale.pk3",
        BDBE + r"\addons\DoomHDTextures.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"hd": True, "label": "HD"}),
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad",
+       {"hd": True, "label": "HD", "art": "HontE_remastered_Experimental_REV1.103.png"}),
       ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"label": "no addons"}),
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad",
+       {"label": "no addons", "art": "HontE_remastered_Experimental_REV1.103.png"}),
       ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
-       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad", {"label": "no addons"})]),
+       BDBE + r"\HontE_remastered_Experimental_REV1.103.wad",
+       {"label": "no addons", "art": "HontE_remastered_Experimental_REV1.103.png"})]),
     ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign.",
      # Two files, per the author's Readme_2_0.txt: "run both files (pk3 and wad)
      # with the pk3 first and the wad second." The mapset carries MAP01-MAP08;
@@ -239,7 +243,11 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
      [("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad"),
-      ("DOOM2.WAD", BD + r"\Duke-Boomem-Aliens-Only.wad"),
+      # Aliens-Only ships no TITLEPIC, so the default art rule finds
+      # nothing and this tile fell back to a generated poster while its
+      # two siblings showed the real title screen. Same game, same art.
+      ("DOOM2.WAD", BD + r"\Duke-Boomem-Aliens-Only.wad",
+       {"art": "Duke-Boomem-2.5D.png"}),
       ("DOOM2.WAD", BD + r"\Duke-Boomem-2.5D.wad", BD + r"\Duke-Textures.pk3")]),
     ("QuakinDoom: Total 3-D Edition", "Quake's guns and monsters, Doom's maps.",
      [("DOOM2.WAD", BD + r"\QuakinDoomT3DE.pk3"),
@@ -422,6 +430,12 @@ def build():
                 # infers one from the mod list, which goes unreadable once a
                 # variant carries four mods.
                 "label": opts.get("label", ""),
+                # Optional explicit cover art, by filename in art\. Set this
+                # when a game has identity art of its own that load order would
+                # otherwise mask -- HontE Remastered ships its own logo but
+                # loads BDBE_v3.38.pk3 first, so the default "first mod with art
+                # wins" rule handed it the Black Edition picture instead.
+                "art": opts.get("art", ""),
                 "mod": mods[0][1] and f"mods\\{mods[0][0]}\\{mods[0][1]}",
                 "mods": [f"mods\\{s}\\{f}" for s, f in mods],
             })

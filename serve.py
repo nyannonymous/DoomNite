@@ -144,11 +144,21 @@ def load_entries():
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
                 "exists": os.path.isfile(os.path.join(PACK, "launchers", a["bat"])),
-                # First mod that ships title art wins; the game is usually
-                # named after that mod.
-                "art": next((art[m] for m in
-                             (os.path.splitext(os.path.basename(x))[0] for x in a.get("mods", []))
-                             if m in art), None),
+                # Art resolution, in order of authority:
+                #   1. an explicit "art" on the launcher action, set in
+                #      build.py when a game has identity art of its own that
+                #      load order would otherwise mask;
+                #   2. the first mod that ships title art -- the usual case,
+                #      since a game is usually named after its main mod;
+                #   3. None, and the UI draws a generated poster.
+                #
+                # Step 1 exists because BDBE loads BDBE_v3.38.pk3 first, so the
+                # plain "first match wins" rule gave both Black Edition groups
+                # the BDBE art and masked HontE Remastered's own logo.
+                "art": a.get("art") or next(
+                    (art[m] for m in
+                     (os.path.splitext(os.path.basename(x))[0] for x in a.get("mods", []))
+                     if m in art), None),
                 "group": g["name"],
                 "variant": _variant_label(mods, shared_base, _own(a), a.get("label", "")),
                  "hd": bool(a.get("hd")),
