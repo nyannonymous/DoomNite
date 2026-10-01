@@ -25,6 +25,8 @@ Usage:
 import argparse
 import json
 import os
+import re
+import struct
 import shutil
 import subprocess
 import sys
@@ -99,8 +101,14 @@ GAMES = [
      "HontE Remastered, experimental REV1.103. Standalone -file wad on the Doom 1 IWAD.",
      [("DOOM.WAD", BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
     ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign. Optionally on top of Brutal Doom.",
-     [("DOOM2.WAD", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3"),
-      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3")]),
+     # Two files, per the author's Readme_2_0.txt: "run both files (pk3 and wad)
+     # with the pk3 first and the wad second." The mapset carries MAP01-MAP08;
+     # the pk3 alone has an 8-line MAPINFO and no map lumps, so loading it alone
+     # boots the IWAD's own maps wearing Aliens enemies and guns -- which is
+     # exactly the symptom. pk3 first, mapset second, DOOM2 IWAD only.
+     [("DOOM2.WAD", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3", BD + r"\ERADICATION_MAPSET_2_0.wad"),
+      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3",
+       BD + r"\ERADICATION_MAPSET_2_0.wad")]),
     ("The Bikini Bottom Massacre", "SpongeBob, but in Doom.",
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
@@ -118,8 +126,10 @@ GAMES = [
     ("MoonMan", "Vanilla-friendly. Uses the pk3: ZDoom cannot load the zip.",
      [("DOOM2.WAD", BD + r"\moon_man_v1_3_1.pk3"),
       ("DOOM.WAD", BD + r"\moon_man_v1_3_1.pk3")]),
-    ("MyHouse.pk3", "A recreation of a childhood home.",
-     [("DOOM2.WAD", BD + r"\myhouse.pk3")]),
+    ("MyHouse.pk3", "A recreation of a childhood home. 33 maps, mostly Doom 2 "
+     "maps reskinned via MAPINFO lookup; MAP01 is the author's own and needs "
+     "myhouse.wad alongside the pk3.",
+     [("DOOM2.WAD", BD + r"\myhouse.wad", BD + r"\myhouse.pk3")]),
     ("Hocus Pocus 3D", "Hocus Pocus, but 3D. Runs on the Doom II IWAD.",
      [("DOOM2.WAD", HO + r"\HOCUS.pk3")]),
     ("Hexen Remade", "The cancelled Hexen 1.5, finished.",
@@ -279,6 +289,14 @@ def build():
         print(f"pruned {len(pruned)} stale launcher(s): "
               + ", ".join(sorted(pruned)))
 
+    # A mod that ships a MAPINFO but no map lumps needs a companion file, or it
+    # silently boots the IWAD's own maps wearing the mod's monsters -- the
+    # Aliens: Eradication TC pk3 shipped alone did exactly that for days. The
+    # file being present on disk proves nothing, so warn on the pattern and let
+    # a human confirm it is intentional.
+    for w in _mapless_mods(manifest):
+        print(f"  NOTE: {w}")
+
     total = 0
     for root, _, files in os.walk(PACK):
         if ".git" in root:
@@ -296,6 +314,65 @@ def build():
         for m in manifest["missing"]:
             print("  " + m)
     return manifest
+
+
+def _has_map_lumps(path):
+    """True if a pk3/wad contains at least one playable map lump.
+
+    Deliberately broad: anything under maps/, anything named like E1M1/MAP01
+    or a nested .wad under maps/. A mod may legitimately reuse vanilla maps, so
+    this only detects the absence of maps, which is the actual failure.
+    """
+    s = os.path.splitext(path)[1].lower()
+    try:
+        if s in (".pk3", ".pk7"):
+            import zipfile
+            with zipfile.ZipFile(path) as z:
+                names = z.namelist()
+            pat = re.compile(r"(maps?/map\d\d|^map\d\d|/\w\d\d\.wad$)", re.I)
+            return any(pat.search(n) for n in names)
+        if s == ".wad":
+            with open(path, "rb") as f:
+                head = f.read(12)
+                if len(head) < 12 or head[:4] not in (b"IWAD", b"PWAD"):
+                    return False
+                num, off = struct.unpack("<II", head[4:12])
+                f.seek(0)
+                data = f.read()
+            pat = re.compile(rb"^(E\dM\d|MAP\d\d|UMAP\d\d)\x00")
+            for i in range(min(num, 20000)):
+                e = data[off + i * 16: off + i * 16 + 16]
+                if len(e) < 16:
+                    break
+                if pat.match(e[8:16]):
+                    return True
+    except Exception:
+        return True          # unreadable: do not cry wolf
+    return False
+
+
+def _mapless_mods(manifest):
+    """Report launchers whose only mod is a total conversion with no maps.
+
+    If ANY file in the launcher supplies maps, the set is fine -- Aliens pairs
+    a mapless pk3 with a mapset wad, and that is the whole point of the check.
+    """
+    out = []
+    for g in manifest["games"]:
+        for a in g["actions"]:
+            mods = a.get("mods", [])
+            if not mods:
+                continue
+            paths = [os.path.join(PACK, m) for m in mods]
+            paths = [p for p in paths if os.path.isfile(p)]
+            if not paths:
+                continue
+            if any(_has_map_lumps(p) for p in paths):
+                continue
+            out.append(f"{g['name']}: no map lumps in "
+                       + ", ".join(sorted(os.path.basename(p) for p in paths))
+                       + " -- confirm it is meant to reuse the IWAD's maps")
+    return sorted(set(out))
 
 
 def check():
