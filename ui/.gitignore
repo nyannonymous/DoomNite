@@ -1,0 +1,4 @@
+node_modules/
+# verify.mjs scratch file: holds the pinned key between the two jsdom
+# passes of the reload check.
+.pintest.json

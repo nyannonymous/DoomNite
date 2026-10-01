@@ -36,7 +36,7 @@ import webbrowser
 
 PACK = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(PACK, "pack-manifest.json")
-INDEX = os.path.join(PACK, "index.html")
+INDEX = os.path.join(PACK, "dist", "index.html")
 
 # Resolved once at startup: a flat, ordered list of runnable entries. The UI and
 # the launch endpoint both work off this, so a number always means the same game.
@@ -192,11 +192,15 @@ def launch(idx):
 # ----------------------------------------------------------------- HTTP
 
 def page():
-    """Read index.html per request.
+    """Read the built UI's index.html per request.
 
-    Deliberately not cached at startup: during development the file changes far
-    more often than the server does, and a cached copy means every UI edit
+    Deliberately not cached at startup: during development the bundle changes far
+    more often than the server does, and a cached copy means every rebuild
     silently does nothing until you restart. One small file, one disk read.
+
+    The UI is a Vite/React bundle built to dist/ by `npm run build` in ui/. The
+    old hand-written index.html is kept as index.html.vanilla so it can be
+    compared against or restored without a git checkout.
     """
     with open(INDEX, encoding="utf-8") as f:
         return f.read()
@@ -227,7 +231,30 @@ def handler_factory():
         def do_GET(self):
             path = _up.urlparse(self.path).path
             if path in ("/", "/index.html"):
+                if not os.path.isfile(INDEX):
+                    # No bundle yet: say so, rather than serving a 404 and
+                    # letting it look like a broken server.
+                    return self._send(
+                        503,
+                        "<h1>DoomNite UI not built</h1>"
+                        "<p>Run <code>npm run build</code> in "
+                        "<code>ui/</code>, or <code>npm run dev</code> for "
+                        "hot reload.</p>",
+                        "text/html; charset=utf-8",
+                    )
                 return self._send(200, page(), "text/html; charset=utf-8")
+            # Vite emits content-hashed files into dist/assets/. Serving them is
+            # what lets the built UI run without a bundler in the request path.
+            if path.startswith("/assets/"):
+                fn = os.path.basename(path)
+                target = os.path.join(PACK, "dist", "assets", fn)
+                if not os.path.isfile(target):
+                    return self._send(404, "", "text/plain")
+                ctype = "text/css" if fn.endswith(".css") else (
+                    "application/javascript" if fn.endswith(".js") else "application/octet-stream"
+                )
+                with open(target, "rb") as f:
+                    return self._send(200, f.read(), ctype)
             if path == "/api/entries":
                 man = load_entries()
                 return self._send(200, _json.dumps({

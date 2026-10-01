@@ -1,0 +1,1205 @@
+/* DoomNite UI
+ *
+ * Inspiration: the Nexus Oracle card archive -- a dark void, a live canvas that
+ * reacts to the pointer, glass panels floating in it. Borrowed, not copied.
+ *
+ * The Doom half: ember palette instead of gold, bevelled panel edges and chunky
+ * bevel highlights like the DOS menu widgets, CRT scanlines and a vignette, and
+ * a blood-red accent that only appears on the thing you can act on.
+ *
+ * Motion rules followed throughout:
+ *   - transform/opacity only, so transitions stay on the compositor
+ *   - a shared --ease so curves feel consistent
+ *   - hover adds (lift, glow, sheen, glare), never shifts layout
+ *   - pointer effects write CSS vars directly, bypassing React re-renders
+ *   - prefers-reduced-motion disables the lot
+ */
+
+:root {
+  /* Near-black with a red undertone, so the whole UI sits in Doom's world. */
+  --void: #05030a;
+  --bg: #07040d;
+  --panel: #0d0714;
+  --panel-2: #120a1c;
+  --line: #2a1a2e;
+  --line-2: #3d2642;
+  --fg: #ece4f0;
+  --fg-dim: #a996b4;
+  --fg-faint: #6b5a78;
+
+  /* The one saturated colour, reserved for action. */
+  --blood: #e02a1c;
+  --blood-hot: #ff5a3c;
+  --blood-dim: #8f1a12;
+  --ember: #ff9a3c;
+  --brass: #d9a441;
+  --ok: #5cffa8;
+
+  --radius: 8px;
+  --radius-lg: 10px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --fast: 130ms;
+  --med: 260ms;
+  --slow: 520ms;
+
+  --tile-w: 208px;
+
+  /* The DOS bevel: light top-left, dark bottom-right. */
+  --bevel-lt: rgba(255, 200, 150, 0.16);
+  --bevel-dk: rgba(0, 0, 0, 0.7);
+
+  --glass: rgba(14, 9, 22, 0.72);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 12px 34px -10px rgba(0, 0, 0, 0.85);
+  --shadow-3: 0 28px 70px -20px rgba(0, 0, 0, 0.95);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3 {
+  /* Chakra Petch reads as industrial/technical, which fits better than a
+     literal serif nod. Letter-spaced caps do the rest of the work. */
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--line-2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #100a1a;
+  color: var(--fg-dim);
+}
+
+/* ---------------------------------------------------------------- backdrop */
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* The ember canvas sits behind everything and reacts to the pointer. */
+.embers {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+/* Static darkening at the edges, so the eye lands on the grid. Combined with
+   the scanlines below this is most of the CRT read. */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(2, 0, 4, 0.72) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.014) 0 1px,
+      transparent 1px 3px
+    );
+}
+
+/* ------------------------------------------------------------------ boot */
+
+.boot {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.boot-mark {
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.4em;
+  color: var(--fg);
+  text-shadow: 0 0 30px rgba(224, 42, 28, 0.75);
+  animation: pulse 1.9s var(--ease-in-out) infinite;
+}
+
+.boot-bar {
+  width: 200px;
+  height: 3px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.boot-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--blood-hot), transparent);
+  animation: sweep 1.15s var(--ease-in-out) infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(360%);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.boot-error code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  color: var(--blood-hot);
+  background: #100a16;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+
+.boot-error .hint {
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- topbar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line);
+  /* Glass, lifted off the ember field the way the Oracle's panels float. */
+  background: linear-gradient(180deg, rgba(16, 10, 24, 0.86), rgba(10, 6, 16, 0.7));
+  backdrop-filter: blur(16px) saturate(120%);
+  box-shadow:
+    inset 0 1px 0 var(--bevel-lt),
+    0 8px 24px -14px rgba(0, 0, 0, 0.9);
+  animation: drop-in var(--slow) var(--ease) both;
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  /* An imp-red core rather than the Oracle's gold conic sweep. */
+  background:
+    radial-gradient(circle at 50% 50%, var(--ember), var(--blood) 45%, #3a0a06 100%);
+  box-shadow:
+    0 0 20px rgba(224, 42, 28, 0.65),
+    inset 0 1px 0 rgba(255, 190, 150, 0.35);
+  animation: breathe 3.4s var(--ease-in-out) infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.3);
+  }
+}
+
+.brand-text {
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.2em;
+}
+
+.brand-text span {
+  color: var(--blood-hot);
+  text-shadow: 0 0 14px rgba(255, 90, 60, 0.6);
+}
+
+/* ---------------------------------------------------------------- search */
+
+.search {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--fg-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: stroke var(--fast) var(--ease);
+}
+
+.search input {
+  width: 100%;
+  padding: 9px 32px 9px 34px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  /* The inset bevel is what makes these read as DOS widgets. */
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  transition:
+    border-color var(--med) var(--ease),
+    box-shadow var(--med) var(--ease);
+}
+
+.search input::placeholder {
+  color: var(--fg-faint);
+}
+
+.search input:hover {
+  border-color: var(--line-2);
+}
+
+.search input:focus {
+  border-color: var(--blood-dim);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 3px rgba(224, 42, 28, 0.16),
+    0 0 26px -8px rgba(224, 42, 28, 0.7);
+}
+
+.search:focus-within .search-icon {
+  stroke: var(--blood-hot);
+}
+
+.search-clear {
+  position: absolute;
+  right: 7px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--line-2);
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.search-clear:hover {
+  background: var(--blood);
+  transform: rotate(90deg) scale(1.12);
+}
+
+/* ----------------------------------------------------------------- chips */
+
+.chips {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.chip {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease),
+    transform var(--fast) var(--ease);
+}
+
+.chip:hover {
+  color: var(--fg);
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.chip:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.chip.is-on {
+  color: #fff;
+  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim));
+  border-color: var(--blood-hot);
+  box-shadow:
+    0 0 24px -4px rgba(224, 42, 28, 0.85),
+    inset 0 1px 0 rgba(255, 200, 180, 0.35);
+}
+
+/* ----------------------------------------------------------------- stage */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  min-height: 0;
+}
+
+.grid-wrap {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.grid-wrap::-webkit-scrollbar,
+.panel-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.grid-wrap::-webkit-scrollbar-thumb,
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.grid-wrap::-webkit-scrollbar-thumb:hover,
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--line-2);
+  background-clip: content-box;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-w), 1fr));
+  gap: 16px;
+  align-content: start;
+  /* Tiles tilt in 3D, so the grid needs a shared perspective. */
+  perspective: 1100px;
+}
+
+.none {
+  color: var(--fg-faint);
+  padding: 40px;
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ tile */
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  /* Pointer-tracked values, written by Tile.onMove. Defaults are flat. */
+  --mx: 0;
+  --my: 0;
+  --gx: 50%;
+  --gy: 50%;
+  transform: rotateX(calc(var(--my) * -6deg)) rotateY(calc(var(--mx) * 8deg))
+    translateZ(0);
+  transform-style: preserve-3d;
+  box-shadow:
+    var(--shadow-1),
+    inset 0 1px 0 var(--bevel-lt),
+    inset 0 -1px 0 var(--bevel-dk);
+  transition:
+    transform var(--med) var(--ease),
+    border-color var(--med) var(--ease),
+    box-shadow var(--med) var(--ease);
+  animation: tile-in var(--slow) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) rotateX(14deg) scale(0.96);
+  }
+}
+
+.tile:hover {
+  /* Lift toward the viewer and stop tracking, so the tilt reads as depth
+     rather than as the whole card sliding. */
+  transform: rotateX(calc(var(--my) * -6deg)) rotateY(calc(var(--mx) * 8deg))
+    translateZ(14px) scale(1.015);
+  border-color: var(--line-2);
+  box-shadow:
+    var(--shadow-2),
+    0 0 34px -10px rgba(224, 42, 28, 0.55),
+    inset 0 1px 0 rgba(255, 200, 150, 0.22);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--blood-hot);
+  outline-offset: 3px;
+}
+
+.tile.is-sel {
+  border-color: var(--blood);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 1px var(--blood),
+    0 0 40px -10px rgba(224, 42, 28, 0.9),
+    inset 0 1px 0 rgba(255, 200, 150, 0.25);
+}
+
+/* Bottom bar that wipes in on the selected tile. */
+.tile-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--blood-hot), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--med) var(--ease);
+}
+
+.tile.is-sel .tile-edge {
+  transform: scaleX(1);
+}
+
+/* A locked tile: stays lifted and lit regardless of the pointer. This is the
+   state that survives the cursor leaving, so it must be unmistakable. */
+.tile.is-pin {
+  transform: rotateX(calc(var(--my) * -4deg)) rotateY(calc(var(--mx) * 6deg))
+    translateZ(18px);
+  border-color: var(--ember);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 1px var(--ember),
+    0 0 46px -8px rgba(255, 154, 60, 0.95),
+    inset 0 1px 0 rgba(255, 220, 180, 0.3);
+}
+
+/* Brass, not blood: the pin is a distinct commitment from the hover selection. */
+.tile.is-pin .tile-edge {
+  background: linear-gradient(90deg, transparent, var(--ember), transparent);
+  transform: scaleX(1);
+}
+
+.tile-pin {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(8, 4, 14, 0.82);
+  border: 1px solid var(--line-2);
+  color: var(--fg-faint);
+  opacity: 0;
+  transform: scale(0.6) rotate(-25deg);
+  transition:
+    opacity var(--fast) var(--ease),
+    transform var(--med) var(--ease),
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+  pointer-events: none;
+}
+
+.tile-pin svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tile:hover .tile-pin {
+  opacity: 0.55;
+  transform: scale(1) rotate(0deg);
+}
+
+.tile.is-pin .tile-pin {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  color: var(--ember);
+  border-color: var(--ember);
+  background: rgba(40, 18, 4, 0.9);
+  box-shadow: 0 0 18px -4px rgba(255, 154, 60, 0.9);
+}
+
+.tile.is-missing {
+  border-color: #4a2020;
+}
+
+.tile.is-missing .tile-sub {
+  color: var(--blood-hot);
+}
+
+/* ----------------------------------------------------------------- cover */
+
+.cover {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #050208;
+  overflow: hidden;
+  /* Lift the art slightly off the panel body on hover. */
+  transform: translateZ(0);
+  transition: transform var(--med) var(--ease);
+}
+
+.tile:hover .cover {
+  transform: translateZ(18px);
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  opacity: 0;
+  transform: scale(1.04);
+  transition:
+    opacity var(--slow) var(--ease),
+    transform var(--slow) var(--ease),
+    filter var(--slow) var(--ease);
+  filter: saturate(0.85) brightness(0.88) contrast(1.05);
+}
+
+.cover.is-loaded img {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tile:hover .cover img {
+  transform: scale(1.07);
+  /* Doom title screens are dark; lift them on hover instead of leaving a
+     grey rectangle. */
+  filter: saturate(1.15) brightness(1.12) contrast(1.08);
+}
+
+/* A light sweep, fired on hover. */
+.cover-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    104deg,
+    transparent 32%,
+    rgba(255, 160, 120, 0.16) 46%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  transition: transform 760ms var(--ease);
+  pointer-events: none;
+}
+
+.tile:hover .cover-sheen {
+  transform: translateX(120%);
+}
+
+/* Specular glare following the cursor: a soft highlight at the pointer
+   position, which is what sells "physical surface". */
+.cover-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    60% 60% at var(--gx) var(--gy),
+    rgba(255, 190, 150, 0.2),
+    transparent 70%
+  );
+  transition: opacity var(--med) var(--ease);
+}
+
+.tile:hover .cover-glare {
+  opacity: 1;
+}
+
+/* -------------------------------------------------------------- tile body */
+
+.tile-body {
+  padding: 9px 11px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transform: translateZ(0);
+  transition: transform var(--med) var(--ease);
+}
+
+.tile:hover .tile-body {
+  transform: translateZ(26px);
+}
+
+.tile-name {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tile-sub {
+  font-size: 11px;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------------- panel */
+
+.panel {
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(15, 9, 24, 0.9), rgba(9, 5, 15, 0.94));
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 1px 0 0 rgba(255, 200, 150, 0.06);
+  animation: panel-in var(--slow) var(--ease) both;
+}
+
+/* Remounts per game (key=group.key), so this replays on selection change. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+.panel-empty {
+  display: grid;
+  place-items: center;
+  color: var(--fg-faint);
+}
+
+.panel-cover {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-scroll {
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel-title {
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.panel-note {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+}
+
+.panel-section h3 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--fg-faint);
+  margin-bottom: 9px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.facts dt {
+  color: var(--fg-faint);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.mods {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mods li {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--line);
+  /* Blood-red spine on the left, like a highlighted list row. */
+  border-left: 2px solid var(--blood-dim);
+  border-radius: 5px;
+  padding: 5px 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: mod-in var(--med) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+@keyframes mod-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+/* ------------------------------------------------------------------ cfgs */
+
+.cfgs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cfg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--fg-dim);
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease),
+    transform var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease);
+}
+
+.cfg:hover {
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.045);
+  transform: translateX(3px);
+}
+
+.cfg-radio {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 50%;
+  position: relative;
+  transition: border-color var(--fast) var(--ease);
+}
+
+.cfg.is-on {
+  border-color: var(--blood);
+  background: rgba(224, 42, 28, 0.09);
+  color: var(--fg);
+  box-shadow: inset 0 1px 0 rgba(255, 180, 150, 0.12);
+}
+
+.cfg.is-on .cfg-radio {
+  border-color: var(--blood-hot);
+}
+
+.cfg.is-on .cfg-radio::after {
+  content: "";
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: var(--blood-hot);
+  animation: dot-pop var(--med) var(--ease);
+  box-shadow: 0 0 10px rgba(255, 90, 60, 0.9);
+}
+
+@keyframes dot-pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+
+.cfg-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cfg-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.cfg-mods {
+  font-size: 10.5px;
+  color: var(--fg-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfg-iwad {
+  flex: none;
+  font-size: 10px;
+  color: var(--fg-faint);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* --------------------------------------------------------------- actions */
+
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.play {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--blood-hot);
+  border-radius: var(--radius);
+  /* Chunky vertical gradient: the DOOM "press to continue" energy bar. */
+  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim) 55%, #5c0f08);
+  color: #fff;
+  font-family: "Chakra Petch", sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  /* Bevel highlight: this is the single most DOS-looking element. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 180, 0.5),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
+    0 10px 26px -12px rgba(224, 42, 28, 0.95);
+  transition:
+    transform var(--fast) var(--ease),
+    box-shadow var(--med) var(--ease),
+    filter var(--fast) var(--ease);
+}
+
+.play:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 210, 190, 0.6),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
+    0 16px 36px -12px rgba(224, 42, 28, 1),
+    0 0 46px -14px rgba(255, 90, 60, 0.95);
+}
+
+.play:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  /* Pressing pushes the bevel in: the highlight flips to the bottom edge. */
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.65),
+    0 4px 12px -8px rgba(224, 42, 28, 0.8);
+}
+
+.play:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.play-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Heat sweep across the button on hover. */
+.play-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 220, 190, 0.5) 50%,
+    transparent 65%
+  );
+  transform: translateX(-130%);
+  transition: transform 640ms var(--ease);
+}
+
+.play:hover:not(:disabled) .play-glow {
+  transform: translateX(130%);
+}
+
+.play.busy {
+  animation: throb 900ms var(--ease-in-out) infinite;
+}
+
+@keyframes throb {
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+.play-key {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  opacity: 0.7;
+  border: 1px solid rgba(255, 220, 200, 0.35);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.showcmd {
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fg-faint);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition:
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.showcmd:hover {
+  color: var(--fg);
+  border-color: var(--line-2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cmd {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--ember);
+  border-radius: var(--radius);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  animation: cmd-in var(--med) var(--ease) both;
+}
+
+@keyframes cmd-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.warn {
+  margin: 0;
+  padding: 9px 11px;
+  background: rgba(224, 42, 28, 0.12);
+  border: 1px solid rgba(224, 42, 28, 0.45);
+  border-radius: var(--radius);
+  color: var(--blood-hot);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------ status bar */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 18px;
+  border-top: 1px solid var(--line);
+  background: rgba(10, 6, 16, 0.88);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 200, 150, 0.05);
+  font-size: 11.5px;
+  color: var(--fg-faint);
+  animation: drop-in var(--slow) var(--ease) both 80ms;
+  position: relative;
+  z-index: 2;
+}
+
+.statusbar .grow {
+  flex: 1;
+}
+
+.statusbar .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+
+.statusbar .status-pin {
+  color: var(--ember);
+  text-shadow: 0 0 12px rgba(255, 154, 60, 0.5);
+}
+
+.statusbar .keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ------------------------------------------------------------------ toast */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 50px;
+  z-index: 900;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  background: rgba(20, 10, 14, 0.95);
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  color: var(--fg);
+  font-size: 12.5px;
+  box-shadow: var(--shadow-3), 0 0 40px -14px rgba(92, 255, 168, 0.7);
+  animation: toast-in 340ms var(--ease);
+}
+
+.toast.is-bad {
+  border-color: var(--blood-hot);
+  color: var(--blood-hot);
+  box-shadow: var(--shadow-3), 0 0 40px -14px rgba(255, 90, 60, 0.9);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.96);
+  }
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+@media (max-width: 900px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel {
+    display: none;
+  }
+  .search {
+    max-width: none;
+  }
+  /* Tilt reads as a glitch on touch, where there is no pointer position. */
+  .tile {
+    transform: none !important;
+  }
+}
+
+/* ------------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .tile {
+    transform: none !important;
+  }
+}
