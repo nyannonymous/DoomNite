@@ -42,7 +42,7 @@ INDEX = os.path.join(PACK, "index.html")
 ENTRIES = []
 
 
-def _variant_label(mods, shared_base, iwads_differ):
+def _variant_label(mods, shared_base, other_iwad):
     """A short human label for one variant of a game.
 
     When every variant of a game shares the same leading mod, that mod is the
@@ -50,16 +50,18 @@ def _variant_label(mods, shared_base, iwads_differ):
     the leading mods differ the variants are genuinely different games wearing
     one name (DukeBoomem ships 2.5D, Aliens-Only and 2.5D+Textures), so fall
     back to naming the mods rather than pretending one is a superset.
+
+    other_iwad is the OTHER iwad this game offers, or None when every variant
+    uses the same one -- so only the differing half gets an IWAD tag.
     """
     base = mods[0] if mods else ""
-    label = ""
     if shared_base and base:
         extras = mods[1:]
         label = "base" if not extras else "with " + ", ".join(extras)
     else:
         label = ", ".join(mods) or "no mod"
-    if iwads_differ:
-        label += "  [Doom 1]" if iwads_differ == "DOOM.WAD" else "  [Doom 2]"
+    if other_iwad:
+        label += "  [Doom 1]" if other_iwad == "DOOM.WAD" else "  [Doom 2]"
     return label
 
 
@@ -77,13 +79,17 @@ def load_entries():
     for g in man.get("games", []):
         acts = g.get("actions", [])
         iwads = {a["iwad"] for a in acts}
-        iwads_differ = next(iter(iwads)) if (len(iwads) == 1 and len(acts) > 1) else \
-            ("DOOM.WAD" if "DOOM.WAD" in iwads else "DOOM2.WAD")
         # Shared base = every variant starts with the same mod.
         firsts = {tuple(a.get("mods", []))[:1] for a in acts}
         shared_base = len(firsts) == 1
         start = len(ENTRIES)
+        # Per-variant IWAD tag: None where every variant shares one IWAD, so the
+        # label stops saying "[Doom 1]" on two identical rows. The tag names the
+        # entry's OWN iwad, matching the card label in the manifest.
+        def _own(a):
+            return a["iwad"] if len(iwads) > 1 else None
         for a in acts:
+            mods = [os.path.basename(m) for m in a.get("mods", [])]
             label = g["name"]
             if len(acts) > 1 and len(iwads) > 1:
                 label += " [Doom 1]" if a["iwad"] == "DOOM.WAD" else " [Doom 2]"
@@ -93,21 +99,20 @@ def load_entries():
                 "note": g.get("note", ""),
                 "iwad": a["iwad"],
                 # Mods in load order; the UI shows these.
-                "mods": [os.path.basename(m) for m in a.get("mods", [])],
+                "mods": mods,
                 "bat": a["bat"],
                 "size": os.path.getsize(
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
                 "exists": os.path.isfile(os.path.join(PACK, "launchers", a["bat"])),
                 "group": g["name"],
-                "variant": _variant_label(
-                    [os.path.basename(m) for m in a.get("mods", [])],
-                    shared_base, iwads_differ if len(iwads) > 1 else None),
+                "variant": _variant_label(mods, shared_base, _own(a)),
                 "primary": False,
             })
         # Point every member of the group at all of its configurations, so the
-        # UI can offer them without a second request.
-        members = list(range(start, len(ENTRIES)))
+        # UI can offer them without a second request. Ordered fewest-mods-first
+        # so "base" is the default the user sees at the top.
+        members = sorted(range(start, len(ENTRIES)), key=lambda i: len(ENTRIES[i]["mods"]))
         variants = [{"index": i,
                      "label": ENTRIES[i]["variant"],
                      "mods": ENTRIES[i]["mods"],
