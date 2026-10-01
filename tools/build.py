@@ -103,15 +103,17 @@ GAMES = [
     ("Brutal Doom Black Edition (HontE Remastered)",
      "HontE Remastered, experimental REV1.103. Standalone -file wad on the Doom 1 IWAD.",
      [("DOOM.WAD", BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
-    ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign. Optionally on top of Brutal Doom.",
+    ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign.",
      # Two files, per the author's Readme_2_0.txt: "run both files (pk3 and wad)
      # with the pk3 first and the wad second." The mapset carries MAP01-MAP08;
      # the pk3 alone has an 8-line MAPINFO and no map lumps, so loading it alone
      # boots the IWAD's own maps wearing Aliens enemies and guns -- which is
      # exactly the symptom. pk3 first, mapset second, DOOM2 IWAD only.
-     [("DOOM2.WAD", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3", BD + r"\ERADICATION_MAPSET_2_0.wad"),
-      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3",
-       BD + r"\ERADICATION_MAPSET_2_0.wad")]),
+     #
+     # Single variant on purpose: stacking brutal22test6.pk3 underneath was tried
+     # and dropped. It fights the campaign's own MAPINFO for episode/map control,
+     # and this is a total conversion, not a weapon pack to layer on top.
+     [("DOOM2.WAD", BD + r"\ALIENS_ERADICATION_TC_2_0.pk3", BD + r"\ERADICATION_MAPSET_2_0.wad")]),
     ("The Bikini Bottom Massacre", "SpongeBob, but in Doom.",
      [("DOOM2.WAD", BD + r"\The Bikini Bottom Massacre 1,3.wad")]),
     ("DukeBoomem", "Duke Nukem with the Boomstick.",
