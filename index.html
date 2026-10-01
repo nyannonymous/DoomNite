@@ -132,14 +132,6 @@
     box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(0,0,0,.6);
   }
   .tile.missing { opacity: .5; }
-  .badge {
-    position: absolute; top: 6px; left: 6px; z-index: 1;
-    font-size: 9.5px; letter-spacing: .4px; text-transform: uppercase;
-    padding: 2px 6px; border-radius: 3px;
-    background: rgba(4,10,18,.82); color: var(--accent);
-    border: 1px solid var(--line2);
-  }
-  .badge.multi { color: var(--warn); border-color: rgba(249,115,22,.45); }
   .empty { color: var(--faint); text-align: center; padding: 70px 0; position: relative; z-index: 1; }
 
   /* ------------------------------------------------------ details panel */
@@ -422,16 +414,12 @@ function drawTile(canvas, g) {
    tile box and let the caption gradient carry the title. Games without a title
    screen fall back to the generated poster. */
 function tileHTML(g, i) {
-  const badge = g.cfgs.length > 1
-    ? '<span class="badge multi">' + g.cfgs.length + " configs</span>"
-    : '<span class="badge">' + (g.kind === "pack" ? "UZDoom" : "standalone") + "</span>";
   const miss = g.cfgs.every(c => c.exists === false) ? " missing" : "";
   const art = cfg(g).art;
   const body = art
     ? '<img class="cover" src="/art/' + encodeURIComponent(art) + '" alt="">'
     : '<canvas data-g="' + i + '"></canvas>';
-  return '<div class="tile' + miss + '" data-i="' + i + '">' +
-         badge + body +
+  return '<div class="tile' + miss + '" data-i="' + i + '">' + body +
          '<div class="cap"><span class="ctitle">' + esc(g.label) + "</span>" +
          '<span class="cmods"></span></div></div>';
 }
