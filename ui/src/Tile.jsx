@@ -386,22 +386,31 @@ export default function Tile({
           </span>
         </button>
       </span>
-      {/* Uninstall, only while there is something to uninstall. An on-demand
-          download is the one thing in the pack that occupies disk without being
-          part of it, so it is the only thing that can be reclaimed.
+      {/* Trash button, only while there is genuinely something to remove.
+          An on-demand download occupies disk without being part of the pack,
+          so it is the only thing that can be reclaimed. The server rejects
+          DELETE for anything else with 404 "unknown", so offering the button
+          would be a lie.
 
-          The other 31 games ship inside the pack, so they have nothing to
-          uninstall -- the server rejects DELETE for them with 404 "unknown".
-          They are labelled IN PACK instead of being left blank, because an
+          Everything else is labelled IN PACK rather than left blank, because an
           absent button reads as a missing feature rather than as "there was
-          never anything here to remove". */}
+          never anything here to remove". The label is honest today: no file in
+          sources.json has a hosted URL yet, so nothing can be fetched.
+
+          When the operator publishes hosting and a URL appears in sources.json,
+          serve.py flips these cards to fetchable and this corner changes with
+          it -- no edit here. */}
       {!group.needsInstall && (
         <span className="tile-uninstall">
           <span
             className="tile-inpack"
-            title="Ships inside the pack - nothing to download or remove"
+            title={
+              group.fetchable
+                ? "Can be re-fetched from hosted URLs"
+                : "Ships inside the pack - nothing to download or remove"
+            }
           >
-            IN PACK
+            {group.fetchable ? "ON DEMAND" : "IN PACK"}
           </span>
         </span>
       )}

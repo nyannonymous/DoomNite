@@ -10,7 +10,50 @@ import { useEffect, useState } from "react";
  * state -- re-rendering the whole app on every mouse move would make the grid
  * unusable.
  */
-export function CRTOverlay({ intensity = 1, showCursor = true }) {
+export function CRTOverlay({ showCursor = true }) {
+  // CRT strength, user-adjustable and remembered. The overlay is three stacked
+  // full-screen darkening layers (scanlines, vignette, aberration); on a dense
+  // UI that adds up to a visibly dim screen, and there was no way to dial it
+  // back. Persisted so the choice survives a reload, and default lower than the
+  // original hardcoded 1 because 1 was simply too much.
+  const [intensity, setIntensity] = useState(() => {
+    try {
+      const v = localStorage.getItem("doomnite.crt");
+      return v === null ? 0.5 : Math.max(0, Math.min(1, parseFloat(v)));
+    } catch {
+      return 0.5;   // private mode / storage disabled
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("doomnite.crt", String(intensity));
+    } catch {
+      /* nothing to do; the setting just will not persist */
+    }
+    // Class rather than a [style*=...] selector: opacity 0 already hides these,
+    // but the sweep animation would keep running on a screen the user has asked
+    // to make plain.
+    document.documentElement.classList.toggle("crt-on", intensity > 0);
+  }, [intensity]);
+
+  // Ctrl+Alt+C steps it. Deliberately awkward: it is a preference, not a
+  // control that belongs in the toolbar, and nothing else in the app uses this
+  // chord.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!e.ctrlKey || !e.altKey) return;
+      if (e.code !== "KeyC") return;
+      e.preventDefault();
+      setIntensity((v) => {
+        const steps = [0, 0.25, 0.5, 0.75, 1];
+        const i = steps.findIndex((s) => s >= v - 1e-6);
+        return steps[(i + 1) % steps.length];
+      });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Respect the OS setting. The scanlines and sweep are pure decoration; some
   // people find motion genuinely uncomfortable and this is a full-screen
   // moving element, so it is opt-out rather than merely toned down.
@@ -41,7 +84,7 @@ export function CRTOverlay({ intensity = 1, showCursor = true }) {
 
   return (
     <>
-      <div className="d-scanlines" style={{ opacity: 0.85 * intensity }} aria-hidden="true" />
+      <div className="d-scanlines" style={{ opacity: intensity }} aria-hidden="true" />
       {motion && (
         <div className="d-scan-sweep" aria-hidden="true">
           {/* Fixed keyframe name so the intensity prop can scale the speed
@@ -50,7 +93,7 @@ export function CRTOverlay({ intensity = 1, showCursor = true }) {
         </div>
       )}
       <div className="d-vignette" style={{ opacity: intensity }} aria-hidden="true" />
-      <div className="d-aberration" aria-hidden="true" />
+      <div className="d-aberration" style={{ opacity: 0.7 * intensity }} aria-hidden="true" />
       {showCursor && customCursor && <Crosshair reduced={reduced} />}
     </>
   );

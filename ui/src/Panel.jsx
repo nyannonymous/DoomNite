@@ -307,7 +307,9 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
           <div className="panel-install">
             <p className="panel-inpack">
               <HardDrive size={13} aria-hidden="true" />
-              Ships inside the pack
+              {group.fetchable
+                ? "Can be re-fetched from hosted URLs"
+                : "Ships inside the pack"}
             </p>
           </div>
         )}

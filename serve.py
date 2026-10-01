@@ -93,6 +93,28 @@ def art_map():
             if os.path.isfile(os.path.join(d, f))}
 
 
+def _fetchable():
+    """Which pack-relative files sources.json gives a hosted URL for.
+
+    Empty today -- hosting is the operator's choice -- but the point is that
+    the UI reads this instead of hardcoding "only two games are installable".
+    Add a URL to sources.json and the affected cards become installable with no
+    further code change.
+
+    Returns a set of normalised, forward-slash relative paths. Files with no
+    URL are absent from the set, which is what makes them "in pack".
+    """
+    p = os.path.join(PACK, "sources.json")
+    if not os.path.isfile(p):
+        return set()
+    try:
+        doc = json.load(open(p, encoding="utf-8"))
+    except (ValueError, OSError):
+        return set()
+    return {k.replace("\\", "/") for k, v in (doc.get("files") or {}).items()
+            if v.get("urls")}
+
+
 def load_entries():
     """Build the flat entry list from the manifest.
 
@@ -119,6 +141,7 @@ def load_entries():
     built = []
     art = art_map()
     man = json.load(open(MANIFEST, encoding="utf-8"))
+    fetchable = _fetchable()
     for g in man.get("games", []):
         acts = g.get("actions", [])
         iwads = {a["iwad"] for a in acts}
@@ -178,6 +201,14 @@ def load_entries():
                 # of content are not on disk, and the install button never
                 # appears.
                 "needs_install": a.get("needs_install"),
+                # True when every mod this action loads has a hosted URL in
+                # sources.json. The UI offers INSTALL for these and labels
+                # the rest "in pack", instead of hardcoding which games those
+                # are. Empty today, so nothing changes yet.
+                "fetchable": bool(
+                    a.get("mods")
+                    and all(m.replace("\\", "/") in fetchable
+                            for m in a["mods"])),
                 "standalone": bool(a.get("standalone")),
                 "primary": False,
             })
@@ -213,6 +244,11 @@ def load_entries():
             # build.py, ignored here, and the tiles fell back to a generated
             # poster.
             "art": s.get("art") or "",
+            # Present on every entry, not just pack ones. A standalone game has
+            # no mods, so there is nothing sources.json could host for it, but
+            # leaving the key off made the UI read .fetchable on an entry that
+            # did not have it.
+            "fetchable": False,
         })
     # Single atomic rebind: concurrent readers see either the whole old list or
     # the whole new one, never a partially built one. Safe under the GIL.

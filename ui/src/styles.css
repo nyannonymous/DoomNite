@@ -131,15 +131,34 @@
     inset: 0;
     z-index: 60;
     pointer-events: none;
+    /* Was 1px dark every 3px at 0.28 -- three layers of darkening at once
+       (scanlines + vignette + aberration) turned that into visible vertical
+       banding over the dense sidebar text. A 1-in-4 duty cycle at 0.16 reads
+       as a screen texture instead of stripes, and costs less contrast. */
     background-image: repeating-linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.28) 0px,
-      rgba(0, 0, 0, 0.28) 1px,
+      rgba(0, 0, 0, 0.16) 0px,
+      rgba(0, 0, 0, 0.16) 1px,
       transparent 1px,
-      transparent 3px
+      transparent 4px
     );
     mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
     -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
+  }
+
+  /* CRT intensity 0 means the effect is off, not merely faint. opacity:0
+     already hides it, but the sweep animation keeps running and burning frames
+     on a screen the user has explicitly asked to make plain. */
+  .d-scan-sweep,
+  .d-crosshair {
+    display: none;
+  }
+  .crt-on .d-scan-sweep,
+  .crt-on .d-crosshair {
+    display: block;
+  }
+  .crt-on .d-crosshair {
+    position: fixed;
   }
 
   /* A brighter band rolling slowly down the screen, like a CRT refresh. */
@@ -176,23 +195,30 @@
     inset: 0;
     z-index: 59;
     pointer-events: none;
+    /* 180px spread at 0.82 black was darkening the whole viewport, not just
+       its corners -- with the scanlines on top, the UI read as dim rather than
+       as vignetted. Pulled back to a corner-weighted falloff. */
     box-shadow:
-      inset 0 0 180px 40px rgba(0, 0, 0, 0.82),
-      inset 0 0 60px 0 rgba(0, 0, 0, 0.5);
+      inset 0 0 140px 10px rgba(0, 0, 0, 0.55),
+      inset 0 0 50px 0 rgba(0, 0, 0, 0.28);
   }
 
   /* Very low-alpha colour fringing on the whole screen. Kept subtle on
      purpose; at higher values it makes text look broken rather than CRT. */
+  /* Left/right edge fringing. 90deg means vertical bands, which is the point
+     -- but at 12% of the viewport they reached far enough in to tint panels
+     and read as unintended stripes rather than as lens fringing. Pulled back to
+     the outer 5% and dimmed, so it only shows where a real lens would fringe. */
   .d-aberration {
     position: fixed;
     inset: 0;
     z-index: 62;
     pointer-events: none;
     mix-blend-mode: screen;
-    opacity: 0.05;
+    opacity: 0.035;
     background:
-      linear-gradient(90deg, rgba(224, 47, 47, 0.5), transparent 12%),
-      linear-gradient(270deg, rgba(127, 194, 60, 0.5), transparent 12%);
+      linear-gradient(90deg, rgba(224, 47, 47, 0.45), transparent 5%),
+      linear-gradient(270deg, rgba(127, 194, 60, 0.45), transparent 5%);
   }
 
   /* ---------- jagged clip-path borders ---------- */
@@ -946,18 +972,23 @@ kbd {
 
 /* Static darkening at the edges, so the eye lands on the grid. Combined with
    the scanlines below this is most of the CRT read. */
+/* A background-level vignette, underneath the content (z-index 0) where
+   CRTOverlay's own sits above it. Two vignettes stacked meant the UI was
+   darkened twice before a single card was drawn, which is most of why the
+   whole thing read as dim.
+
+   This one is now just the corner falloff -- the shared screen texture belongs
+   to d-scanlines, so the second repeating-gradient here is gone. */
 .vignette {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(120% 90% at 50% 40%, transparent 35%, rgba(2, 0, 4, 0.72) 100%),
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.014) 0 1px,
-      transparent 1px 3px
-    );
+  background: radial-gradient(
+    125% 95% at 50% 40%,
+    transparent 45%,
+    rgba(2, 0, 4, 0.5) 100%
+  );
 }
 
 /* ------------------------------------------------------------------ boot */
