@@ -33,6 +33,16 @@ ROOTS = ("runtime", "iwads", "mods")
 SKIP_DIRS = {".git", "__pycache__", "downloads", ".staging", "node_modules",
              "dist", "ui", "playnite-data", "art"}
 
+# Never publish these, whatever else is true of them. DOOM2.WAD and Hexen.wad
+# are commercial retail IWADs: freely redistributing them is not ours to
+# decide, so they are excluded from hosting at the source rather than by
+# remembering to leave a URL off them. DOOM.WAD is v1.9 shareware and is NOT
+# on this list -- it is hosted like anything else.
+VETOED = {
+    "iwads/DOOM2.WAD",
+    "iwads/Hexen.wad",
+}
+
 
 def human(n):
     for unit in ("B", "KB", "MB", "GB"):
@@ -84,6 +94,20 @@ def main():
     if not files:
         print("nothing to hash -- are runtime/ iwads/ mods/ present?")
         return 1
+
+    # Carry forward the per-file settings this generator must not invent.
+    # "no_host" is a legal decision, not a measurement: it marks the commercial
+    # IWADs (DOOM2.WAD, Hexen.wad) that must never be published. Regenerating
+    # without preserving it would quietly re-arm them for publication the next
+    # time anyone ran this -- the exact opposite of what the flag is for. An
+    # operator who removes one by hand gets it stripped back out here, loudly.
+    for rel, rec in files.items():
+        old = existing.get(rel) or {}
+        if old.get("no_host"):
+            rec["no_host"] = True
+        elif rec.get("no_host") is None and rel in VETOED:
+            print(f"  note: {rel} is commercial; keeping it out of hosting")
+            rec["no_host"] = True
 
     total = sum(f["size"] for f in files.values())
     print(f"{len(files)} files, {human(total)}")

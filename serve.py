@@ -93,26 +93,81 @@ def art_map():
             if os.path.isfile(os.path.join(d, f))}
 
 
-def _fetchable():
-    """Which pack-relative files sources.json gives a hosted URL for.
-
-    Empty today -- hosting is the operator's choice -- but the point is that
-    the UI reads this instead of hardcoding "only two games are installable".
-    Add a URL to sources.json and the affected cards become installable with no
-    further code change.
-
-    Returns a set of normalised, forward-slash relative paths. Files with no
-    URL are absent from the set, which is what makes them "in pack".
-    """
+def _sources_files():
+    """The files map from sources.json, or {} if it is absent or unreadable."""
     p = os.path.join(PACK, "sources.json")
     if not os.path.isfile(p):
-        return set()
+        return {}
     try:
         doc = json.load(open(p, encoding="utf-8"))
     except (ValueError, OSError):
-        return set()
-    return {k.replace("\\", "/") for k, v in (doc.get("files") or {}).items()
-            if v.get("urls")}
+        return {}
+    return {k.replace("\\", "/"): (v or {})
+            for k, v in (doc.get("files") or {}).items()}
+
+
+def _has_host(rec):
+    """True when sources.json gives this file somewhere to fetch it from.
+
+    A per-file "urls" list wins. Failing that, a top-level "base_url" means
+    every file is fetchable, so the operator sets one line instead of 90.
+
+    "no_host" is the veto from fetcher.py, honoured identically here: if the two
+    disagreed, the UI would offer to fetch a file the fetcher then refuses,
+    which is the worst possible combination -- a button that always fails.
+    """
+    if rec.get("no_host"):
+        return False
+    if [u for u in (rec.get("urls") or []) if u]:
+        return True
+    return bool((SOURCES.get("_base_url") or "").strip())
+
+
+# Top-level manifest config, read once. fetcher.py understands the same keys.
+SOURCES = {}
+
+
+def load_sources():
+    global SOURCES
+    p = os.path.join(PACK, "sources.json")
+    SOURCES = {}
+    if not os.path.isfile(p):
+        return
+    try:
+        doc = json.load(open(p, encoding="utf-8"))
+    except (ValueError, OSError):
+        return
+    SOURCES["_base_url"] = doc.get("base_url") or ""
+    SOURCES["_files"] = doc.get("files") or {}
+
+
+def _fetchable():
+    """Which pack files are BOTH hosted AND not already here.
+
+    Two conditions, and the second one is the one that was missing. Before any
+    URL existed the set was always empty, so "fetchable" was really "has a URL"
+    and every card read IN PACK for the wrong reason -- by luck. The moment a
+    base_url appeared, all 90 files would have flipped to ON DEMAND even though
+    every one of them is sitting on disk, which is a lie the UI would tell on
+    every tile.
+
+    ON DEMAND means "we can get this if it goes missing". A file that is
+    present is IN PACK regardless of whether a URL exists. Presence is decided
+    by size, not by hashing: this runs on every /api/entries request and
+    re-hashing 3.7 GB of IWADs to label a tile would hang the UI.
+    """
+    out = set()
+    for rel, rec in _sources_files().items():
+        if not _has_host(rec):
+            continue
+        fp = os.path.join(PACK, rel.replace("/", os.sep))
+        try:
+            if os.path.getsize(fp) == (rec.get("size") or -1):
+                continue        # present at the right size -> in pack
+        except OSError:
+            pass                # absent -> fetchable
+        out.add(rel)
+    return out
 
 
 def load_entries():
@@ -560,6 +615,7 @@ def main():
 
     if not os.path.exists(MANIFEST):
         sys.exit(f"no {MANIFEST}\nrun: python tools\\build.py")
+    load_sources()
     man = load_entries()
     missing = [e for e in ENTRIES if not e.get("exists")]
 

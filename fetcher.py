@@ -78,7 +78,48 @@ def load():
     if not files:
         print("error: sources.json lists no files")
         return None
+    # A top-level base_url means every file is fetchable from the same place,
+    # so the operator sets one line instead of editing 90. Per-file "urls" are
+    # merged in as higher-priority mirrors, so a file with a hand-added mirror
+    # keeps it and can still fall back to the base.
+    base = (doc.get("base_url") or "").strip()
+    if base:
+        if not base.endswith("/"):
+            base += "/"
+        BASE_URL.clear()
+        BASE_URL.update({"url": base})
     return files
+
+
+# Set by load(). Deliberately a dict rather than a global string: it is written
+# once at startup and read from worker threads during downloads, and rebinding a
+# name is atomic under the GIL whereas mutating one is not.
+BASE_URL = {}
+
+
+def urls_for(rel, rec):
+    """Every place this file can be fetched from, most-preferred first.
+
+    Per-file urls come first because they are the deliberate override, then the
+    base_url mirror. Returns [] when neither exists, which the caller reports as
+    "no hosted URL" rather than treating as an error.
+
+    "no_host": true is a hard veto that beats everything, including an
+    explicit per-file url. It exists for files that must never be published:
+    DOOM2.WAD and Hexen.wad are commercial retail IWADs, and a blanket
+    base_url would otherwise silently hand the world a copy of each. A veto that
+    could be overridden by a later edit is not a veto, so it is checked first and
+    ignores "urls" entirely.
+    """
+    if rec.get("no_host"):
+        return []
+    out = [u for u in (rec.get("urls") or []) if u]
+    base = (BASE_URL.get("url") or "").strip()
+    if base:
+        guess = base + rel.replace(os.sep, "/").lstrip("/")
+        if guess not in out:
+            out.append(guess)
+    return out
 
 
 def file_state(rel, rec):
@@ -137,7 +178,7 @@ def fetch_one(rel, rec, force=False, verbose=True):
     if state == "ok" and not force:
         return rel, "ok", "present"
 
-    urls = [u for u in (rec.get("urls") or []) if u]
+    urls = urls_for(rel, rec)
     if not urls:
         return rel, "no-url", "no hosted URL in sources.json"
 
@@ -220,7 +261,7 @@ def main():
         if not todo:
             print("\nnothing to do -- pack is complete.")
         else:
-            nourl = sum(1 for _, r in todo if not (r.get("urls") or []))
+            nourl = sum(1 for r, rec in todo if not urls_for(r, rec))
             if nourl:
                 print(f"{nourl} of these have no hosted URL yet.")
         return 0
