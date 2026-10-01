@@ -122,44 +122,48 @@ GAMES = [
       ("DOOM.WAD", BD + r"\brutal22test6.pk3"),
       ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad"),
       ("DOOM.WAD", BD + r"\brutal22test6.pk3", BD + r"\DoomMetalVol5_44100.wad")]),
-    # Brutal Doom Black Edition is NOT a standalone wad, and treating it as one
-    # is what made it launch as plain Brutal Doom. BDBE_v3.38.pk3 has 12,525 zip
-    # entries and zero map lumps -- no ExMy, no MAPxx -- just a MAPINFO with
-    # AddDefaultMap and its own actor classes (BEDoomer, EvilMarine). It is a
-    # game-support pk3 that upgrades a Brutal Doom base and inherits the base's
-    # maps. Loading the episode wad alone boots vanilla BD wearing nothing.
+    # Brutal Doom Black Edition is a COMPLETE standalone total conversion, and
+    # that is now proven rather than assumed. BDBE_v3.38.pk3 carries 10,496
+    # sprites, 923 sounds, 80 actor-definition lumps and its own DECORATE for
+    # Doom 1's entire cast (Zombie_Man, ShotgunGuy1, Imp, BaronofHell2, BEDoomer).
     #
-    # Load order, as the pk3 expects:
-    #   1. brutal22test6.pk3  the Brutal Doom base that owns the maps
-    #   2. BDBE_v3.38.pk3     Black Edition, loaded last so it wins conflicts
-    #   3. the episode wad    via -file, adds maps on top
+    # A previous version of this file stacked brutal22test6.pk3 underneath,
+    # on the theory that BDBE had no maps and needed a base to borrow them. The
+    # engine proved that wrong, directly:
     #
-    # IWAD per RaZZoR's "! READ !.txt": Enhanced E1 is played on DOOM, HontE
-    # Remastered on DOOM 2. Both were pinned to DOOM.WAD, which is why HontE
-    # quietly fell back to base-game content.
+    #   Script error, "BDBE_v3.38.pk3:cvarinfo.txt" line 1:
+    #   cvar 'zdoombrutalblood' already exists
     #
-    # The weapon-sounds pk3 is built against v3.35 but only adds sounds, so it is
-    # safe to append after v3.38. The HD-texture, neural-upscale, music, visor
-    # and terrain-splash addons are deliberately NOT loaded: that is the
-    # optional layer and belongs behind its own configs, not forced on everyone.
+    # BDBE and BD22 are two forks of the same base and both declare
+    # "server int zdoombrutalblood = 2;" and "zdoombrutaljanitor" -- byte
+    # identical. UZDoom refuses duplicate cvar declarations outright, so
+    # loading both aborts the game before the menu. They are alternatives, not
+    # layers.
     #
-    # Each mod becomes its own subfolder (slugified from its filename), so these
-    # land in mods/brutal22test6, mods/bdbe-v3-38 and mods/
-    # bd-black-editionv3-35-weapon-sounds.
+    # BDBE uses AddDefaultMap, so with no other mod loaded it plays the IWAD's
+    # own maps, and the episode wad then supplies its own on top. That is the
+    # correct arrangement, and it is what RaZZoR's own 30-byte .bat does:
+    # "doom.exe -file enh_e1v1.8c.wad" -- no BD base, no -iwad.
+    #
+    # The weapon-sounds pk3 is built against v3.35 and only adds sounds, so it
+    # is safe after v3.38. HD textures, neural upscale, music, visor and
+    # terrain splashes stay out: that is the optional addon layer.
+    #
+    # Each mod lands in its own subfolder, slugified from its filename.
     ("Brutal Doom Black Edition (Enhanced Episode 1)",
-     "RaZZoR's Black Edition v3.38 over Brutal Doom 22, with Enhanced Episode 1.",
-     [("DOOM.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+     "RaZZoR's Black Edition v3.38, standalone, with Enhanced Episode 1.",
+     [("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
        BDBE + r"\enh_e1v1.8c.wad"),
-      ("DOOM2.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+      ("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
        BDBE + r"\enh_e1v1.8c.wad")]),
     ("Brutal Doom Black Edition (HontE Remastered)",
-     "RaZZoR's Black Edition v3.38 over Brutal Doom 22, with HontE Remastered REV1.103. Doom 2 IWAD.",
-     [("DOOM2.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+     "RaZZoR's Black Edition v3.38, standalone, with HontE Remastered REV1.103. Doom 2 IWAD.",
+     [("DOOM2.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
        BDBE + r"\HontE_remastered_Experimental_REV1.103.wad"),
-      ("DOOM.WAD", BD + r"\brutal22test6.pk3", BDBE + r"\addons\BDBE_v3.38.pk3",
+      ("DOOM.WAD", BDBE + r"\addons\BDBE_v3.38.pk3",
        BDBE + r"\addons\BD_Black_Editionv3.35_WeaponSounds.pk3",
        BDBE + r"\HontE_remastered_Experimental_REV1.103.wad")]),
     ("Aliens: Eradication TC", "Full 8-level Aliens-style campaign.",
