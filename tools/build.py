@@ -58,7 +58,18 @@ RUNTIME_EXE = "doom.exe"
 # The pack uses the UZDoom build, copied in under the pack's own name so it
 # matches the doom.exe the Playnite library launches.
 SOURCE_EXE = "uzdoom.exe"
-RUNTIME_REQUIRED = ["game_support.pk3", "zmusic.dll", "openal32.dll"]
+# soft_oal.dll, NOT openal32.dll. UZDoom loads OpenAL Soft by its canonical
+# name -- the binary literally contains "$PROGDIR/soft_oal.dll" -- so a pack
+# carrying only openal32.dll silently falls back to the null sound module:
+# the game runs, with no audio and no error message. The GZDOOM source folder
+# ships both names, so the pack happens to have been correct, but nothing was
+# checking that. RUNTIME_REQUIRED is checked at build time, so putting the
+# UZDoom name here turns a silent failure into a build failure.
+# Soundfonts are NOT listed here: they live in runtime\soundfonts\ and are
+# verified separately in check(), where the subfolder path can be checked
+# properly. Listing a bare name would fail the flat-path existence test.
+RUNTIME_REQUIRED = ["game_support.pk3", "zmusic.dll", "soft_oal.dll", "sndfile.dll",
+                    "libsndfile-1.dll"]
 # UZDoom's own data pk3s. Deliberately NOT every .pk3 in the source folder:
 # mod pk3s (Brutal Doom, DN3DooM, SWMapPack) live there too and must not be
 # auto-loaded for every entry.
@@ -76,7 +87,21 @@ def runtime_files():
     for n in os.listdir(GZ):
         if n.lower().endswith(".dll"):
             names.add(n)
-    missing = [n for n in RUNTIME_REQUIRED if n not in names]
+    # Soundfonts live in a subfolder and are looked up by name at
+    # $PROGDIR/soundfonts/<engine>.sf2, so the copy must carry them there.
+    sf_dir = os.path.join(GZ, "soundfonts")
+    soundfonts = []
+    if os.path.isdir(sf_dir):
+        for n in sorted(os.listdir(sf_dir)):
+            if n.lower().endswith(".sf2"):
+                names.add(os.path.join("soundfonts", n))
+                soundfonts.append(n)
+    # Compare on the normalised path: soundfont entries are "soundfonts/x.sf2"
+    # while the requirement reads "uzdoom.sf2", so match on the basename being
+    # present somewhere under soundfonts/.
+    have = {n.lower() for n in names}
+    have |= {os.path.basename(n).lower() for n in names if os.sep in n}
+    missing = [n for n in RUNTIME_REQUIRED if n.lower() not in have]
     if missing:
         sys.exit(f"runtime incomplete at {GZ}: missing {', '.join(missing)}\n"
                  "UZDoom will not start without these (STATUS_DLL_NOT_FOUND).")
@@ -234,6 +259,8 @@ def build():
     for n in rt:
         src = os.path.join(GZ, n)
         dest = os.path.join(PACK, "runtime", RUNTIME_EXE if n == SOURCE_EXE else n)
+        # Soundfonts arrive as "soundfonts/x.sf2"; copy2 will not mkdir for us.
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
         if not (os.path.exists(dest)
                 and os.path.getsize(dest) == os.path.getsize(src)):
             shutil.copy2(src, dest)
@@ -418,6 +445,18 @@ def check():
         p = os.path.join(PACK, "runtime", n)
         if not os.path.isfile(p):
             problems.append(f"missing runtime\\{n}")
+    # Hard requirement, not a nicety: UZDoom loads OpenAL Soft as
+    # $PROGDIR/soft_oal.dll. If only openal32.dll is present it falls back to
+    # the null sound module -- the game runs silently and prints no error, which
+    # is exactly the bug that cost BDBE its audio.
+    for must in ("soft_oal.dll", "zmusic.dll", "sndfile.dll"):
+        if not os.path.isfile(os.path.join(PACK, "runtime", must)):
+            problems.append(f"missing runtime\\{must} (sound will be SILENT)")
+    # MIDI lumps in brutal22test6 / HOCUS / QuakinDoom need a soundfont.
+    sf = os.path.join(PACK, "runtime", "soundfonts", "uzdoom.sf2")
+    if not os.path.isfile(sf):
+        problems.append("missing runtime\\soundfonts\\uzdoom.sf2 "
+                        "(MIDI tracks in Brutal Doom / Hocus / QuakinDoM will be silent)")
     # The one that matters: can the runtime actually START? A runtime missing
     # its DLLs passes every file-exists check and still dies instantly with
     # STATUS_DLL_NOT_FOUND, so run it and read the exit code.
