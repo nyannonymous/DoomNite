@@ -1913,11 +1913,13 @@ kbd {
   justify-content: center;
   gap: 10px;
   padding: 14px 16px;
-  border: 1px solid var(--blood-hot);
+  border: 1px solid #7fc23c;
   border-radius: var(--radius);
-  /* Chunky vertical gradient: the DOOM "press to continue" energy bar. */
-  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim) 55%, #5c0f08);
-  color: #fff;
+  /* Chunky vertical gradient, same recipe as the card PLAY button. Green here
+     to match it: both launch something, so both are green. The sidebar INSTALL
+     below is the ember one. */
+  background: linear-gradient(180deg, #a3e05c 0%, #5b942e 100%);
+  color: var(--void);
   font-family: "Chakra Petch", sans-serif;
   font-weight: 700;
   font-size: 15px;
@@ -1927,9 +1929,9 @@ kbd {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   /* Bevel highlight: this is the single most DOS-looking element. */
   box-shadow:
-    inset 0 1px 0 rgba(255, 200, 180, 0.5),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
-    0 10px 26px -12px rgba(224, 42, 28, 0.95);
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 10px 26px -12px rgba(127, 194, 60, 0.9);
   transition:
     transform var(--fast) var(--ease),
     box-shadow var(--med) var(--ease),
@@ -1940,18 +1942,18 @@ kbd {
   transform: translateY(-2px);
   filter: brightness(1.12);
   box-shadow:
-    inset 0 1px 0 rgba(255, 210, 190, 0.6),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.45),
-    0 16px 36px -12px rgba(224, 42, 28, 1),
-    0 0 46px -14px rgba(255, 90, 60, 0.95);
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 16px 36px -12px rgba(127, 194, 60, 1),
+    0 0 46px -14px rgba(163, 224, 92, 0.9);
 }
 
 .play:active:not(:disabled) {
   transform: translateY(0) scale(0.985);
   /* Pressing pushes the bevel in: the highlight flips to the bottom edge. */
   box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.65),
-    0 4px 12px -8px rgba(224, 42, 28, 0.8);
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    0 4px 12px -8px rgba(127, 194, 60, 0.8);
 }
 
 .play:disabled {
@@ -1969,6 +1971,7 @@ kbd {
 .play-glow {
   position: absolute;
   inset: 0;
+  /* Retinted from the old orange sweep to match the green face. */
   background: linear-gradient(
     100deg,
     transparent 35%,
@@ -2210,8 +2213,12 @@ kbd {
   font: 700 0.95rem/1 "Chakra Petch", system-ui, sans-serif;
   letter-spacing: 0.14em;
   color: var(--void);
-  background: linear-gradient(180deg, var(--ember) 0%, color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
-  border: 1px solid color-mix(in srgb, var(--ember) 70%, #fff);
+  /* PLAY is green. The palette already calls this "toxic" and used it for the
+     HD tag, so the colour was in the design all along; PLAY just predated it.
+     Green for launch, ember/orange for install: the button's colour now says
+     which of the two it does without reading the label. */
+  background: linear-gradient(180deg, #a3e05c 0%, #5b942e 100%);
+  border: 1px solid color-mix(in srgb, #c9f58c 70%, #fff);
   border-radius: var(--radius);
   cursor: pointer;
   /* Heavy industrial switch: a hard drop shadow that collapses on press. */
@@ -2235,18 +2242,27 @@ kbd {
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
 }
 
+/* The lift shadow is green to match the face. These were ember from when the
+   button was orange, which left an orange glow under a green button. */
 .tile-play:hover {
   filter: brightness(1.12);
   transform: translateY(-1px);
   box-shadow:
-    0 5px 0 color-mix(in srgb, var(--blood) 70%, #000),
-    0 14px 30px -6px color-mix(in srgb, var(--ember) 75%, transparent),
+    0 5px 0 #2f5a17,
+    0 14px 30px -6px rgba(127, 194, 60, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .tile-play:active {
   /* Press down: the shadow is the button's thickness, so it collapses to 0. */
   transform: translateY(4px);
+  box-shadow:
+    0 0 0 #2f5a17,
+    0 4px 12px -4px rgba(127, 194, 60, 0.55),
+    inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+/* INSTALL keeps the ember glow for its own press state. */
+.tile-play.is-install:active {
   box-shadow:
     0 0 0 color-mix(in srgb, var(--blood) 70%, #000),
     0 4px 12px -4px color-mix(in srgb, var(--ember) 60%, transparent),
@@ -2547,16 +2563,18 @@ kbd {
    than a launch: cool green against the ember PLAY button, so the two are
    never confused at a glance. Green is the palette's "safe/go" colour
    (--toxic), already used for the HD tag. */
+/* INSTALL takes the ember orange that PLAY used to have. It is the colour the
+   interface already uses for "act on this", and it is now only ever a download. */
 .tile-play.is-install {
   color: var(--void);
-  background: linear-gradient(180deg, #a3e05c 0%, #5b942e 100%);
-  border-color: color-mix(in srgb, #c9f58c 70%, #fff);
+  background: linear-gradient(180deg, var(--ember) 0%, color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
+  border-color: color-mix(in srgb, var(--ember) 70%, #fff);
   animation: none;
 }
 .tile-play.is-install:hover {
   box-shadow:
-    0 5px 0 #2f5a17,
-    0 14px 30px -6px rgba(127, 194, 60, 0.5),
+    0 5px 0 color-mix(in srgb, var(--blood) 70%, #000),
+    0 14px 30px -6px color-mix(in srgb, var(--ember) 75%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
@@ -2866,4 +2884,69 @@ kbd {
 .cfg-go.is-primary {
   color: var(--ember);
   border-color: color-mix(in srgb, var(--ember) 45%, var(--line-2));
+}
+
+
+/* ------------------------------------------------- sidebar install button */
+
+/* .btn-primary was used by the sidebar INSTALL button but had no rule anywhere
+   in the sheet, so it rendered as an unstyled browser default button. Defined
+   here rather than left implicit, and ember to match the card's INSTALL: every
+   orange button in the interface now means "this downloads something". */
+.panel-install .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.6em 1.2em;
+  font: 700 0.8rem/1 var(--d-display, "Chakra Petch", sans-serif);
+  letter-spacing: 0.14em;
+  color: var(--void);
+  background: linear-gradient(180deg, var(--ember) 0%, color-mix(in srgb, var(--ember) 62%, var(--blood)) 100%);
+  border: 1px solid color-mix(in srgb, var(--ember) 70%, #fff);
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 4px 0 color-mix(in srgb, var(--blood) 70%, #000),
+    0 10px 24px -10px color-mix(in srgb, var(--ember) 75%, transparent);
+  transition:
+    transform var(--med) var(--ease),
+    box-shadow var(--med) var(--ease),
+    filter var(--med) var(--ease);
+}
+.panel-install .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+.panel-install .btn-primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.5),
+    0 1px 0 color-mix(in srgb, var(--blood) 70%, #000);
+}
+.panel-install .btn-primary:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.6);
+}
+
+/* The counterpart to the trash button. Same corner, but it states a fact rather
+   than offering an action, so it is flat and dim -- a trash button that cannot
+   be clicked would look broken, which is why this is a span, not a button. */
+.tile-inpack {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  font: 700 0.5rem/1 var(--d-mono, "JetBrains Mono", monospace);
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  opacity: 0.55;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  cursor: default;
+}
+.tile:hover .tile-inpack {
+  opacity: 0.8;
 }

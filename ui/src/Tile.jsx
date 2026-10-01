@@ -386,10 +386,25 @@ export default function Tile({
           </span>
         </button>
       </span>
-      {/* Uninstall, only while there is something to uninstall. Placed beside
-          the play button rather than in a menu because an on-demand download
-          is the one thing in the pack that occupies disk without being part of
-          it, and the player should be able to reclaim that space. */}
+      {/* Uninstall, only while there is something to uninstall. An on-demand
+          download is the one thing in the pack that occupies disk without being
+          part of it, so it is the only thing that can be reclaimed.
+
+          The other 31 games ship inside the pack, so they have nothing to
+          uninstall -- the server rejects DELETE for them with 404 "unknown".
+          They are labelled IN PACK instead of being left blank, because an
+          absent button reads as a missing feature rather than as "there was
+          never anything here to remove". */}
+      {!group.needsInstall && (
+        <span className="tile-uninstall">
+          <span
+            className="tile-inpack"
+            title="Ships inside the pack - nothing to download or remove"
+          >
+            IN PACK
+          </span>
+        </span>
+      )}
       {group.needsInstall && installed && !busy && (
         <span className="tile-uninstall">
           <button
