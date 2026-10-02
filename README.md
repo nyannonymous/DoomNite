@@ -175,13 +175,17 @@ python tools/make_sources.py --verify   # report drift, write nothing
 
 ```bash
 cd ui
-npm install
+npm ci          # or npm install
 npm run dev
 ```
 
 React, Vite, Tailwind, Framer Motion. `dist/` is committed so `serve.py` works
 on a fresh clone with no `npm install` — rebuild it before committing UI
 changes.
+
+`npm run build` and `npm run dev` both check for `node_modules` first and tell
+you to run `npm ci` if it's missing, rather than failing with npm's
+`'vite' is not recognized`.
 
 ---
 

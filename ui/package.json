@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "prebuild": "node preflight.mjs",
     "build": "vite build",
+    "predev": "node preflight.mjs",
+    "dev": "vite",
     "preview": "vite preview"
   },
   "dependencies": {
