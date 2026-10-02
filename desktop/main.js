@@ -30,13 +30,29 @@ let server = null;
 let win = null;
 let quitting = false;
 
+// Location of the bundled embeddable runtime. In a packaged build it sits in
+// resources/python; in a dev checkout, build/python where prepare-python.js
+// staged it. Shared with startServer, which rewrites its ._pth file.
+function bundledPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "python", "python.exe")
+    : path.join(__dirname, "build", "python", "python.exe");
+}
+
 // Which Python to use, and whether there is one at all. Checked before we make
 // a window, so the user gets a dialog naming the actual problem instead of a
 // window that loads forever.
+//
+// The bundled embeddable runtime wins outright when present. It ships in
+// resources/python, so an installer user needs nothing preinstalled -- which is
+// the entire point of bundling it. A system Python is only a fallback for
+// someone running from source in a dev checkout.
 function findPython(packRoot) {
   const candidates = [];
 
   if (process.env.DOOMNITE_PYTHON) candidates.push(process.env.DOOMNITE_PYTHON);
+
+  if (fs.existsSync(bundledPath())) return { cmd: bundledPath(), args: [] };
 
   // A venv inside the pack wins, if the pack has one.
   for (const rel of ["venv/Scripts/python.exe", ".venv/Scripts/python.exe"]) {
@@ -121,14 +137,39 @@ async function startServer(packRoot) {
   const py = findPython(packRoot);
   if (!py) {
     fail(
-      "No Python found.",
-      "DoomNite's server is Python and needs Python 3.11 or newer.\n\n" +
-        "Install it from python.org, or set DOOMNITE_PYTHON to a python.exe."
+      "No Python runtime found.",
+      "This build should include one in resources/python.\n\n" +
+        "If you are running from source, install Python 3.11+ or set\n" +
+        "DOOMNITE_PYTHON to a python.exe."
     );
     return false;
   }
 
   // --no-open: we are the window now, so serve.py must not also open a browser.
+  //
+  // The embeddable runtime cannot be told where the pack is through the
+  // environment. PYTHONPATH looks like it should work and does not: the runtime
+  // ships with `import site` commented out in python311._pth, which disables the
+  // machinery that reads PYTHONPATH at all. Verified -- serve.py still died with
+  // ModuleNotFoundError: No module named 'installer'.
+  //
+  // The one mechanism that does work is the ._pth file itself, so it is rewritten
+  // at startup with the resolved pack root baked in. This also explains the
+  // original packaging bug: a relative "..\..\.." entry can only ever resolve to
+  // the install directory, never to wherever the user keeps their pack.
+  //
+  // try/except because the install dir may not be writable (Program Files, a
+  // read-only USB stick). If the rewrite fails the server may still start if the
+  // pack happens to sit beside the runtime, so this warns rather than aborts.
+  if (py.cmd === bundledPath()) {
+    try {
+      const pth = path.join(path.dirname(bundledPath()), "python311._pth");
+      fs.writeFileSync(pth, `python311.zip\n.\n${packRoot}\n`, "utf8");
+    } catch (e) {
+      console.warn(`could not update python311._pth: ${e.message}`);
+    }
+  }
+
   server = spawn(py.cmd, [...py.args, servePy, "--no-open", "--port", String(PORT)], {
     cwd: packRoot,
     windowsHide: true,

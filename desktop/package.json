@@ -9,9 +9,10 @@
     "prestart": "node preflight.js",
     "start": "electron .",
     "prepack": "node preflight.js",
-    "pack": "electron-builder --dir",
+    "pack": "npm run prepare-python && electron-builder --dir",
     "predist": "node preflight.js",
-    "dist": "electron-builder"
+    "dist": "npm run prepare-python && electron-builder",
+    "prepare-python": "node build/prepare-python.js"
   },
   "devDependencies": {
     "electron": "^44.5.1",
@@ -39,6 +40,12 @@
     "directories": {
       "output": "release",
       "buildResources": "build"
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/python",
+        "to": "python"
+      }
+    ]
   }
 }

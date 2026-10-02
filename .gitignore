@@ -40,3 +40,8 @@ upload.log
 # is ~200 MB of installer -- none of it belongs in git.
 desktop/node_modules/
 desktop/release/
+# Staged embeddable Python runtime and its source zip. prepare-python.js
+# downloads and hash-checks these at build time, so committing a copy would
+# mean shipping an unreviewed binary and ~11 MB for nothing.
+desktop/build/python/
+desktop/build/python-embed.zip
