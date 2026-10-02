@@ -10,6 +10,7 @@
   "ours to redistribute; the operator supplies those. DOOM.WAD is v1.9",
   "shareware and is hosted like any other file."
  ],
+ "base_url": "https://pub-4107f3f242334e8ebba09603c5b43cb5.r2.dev/",
  "files": {
   "iwads/DOOM.WAD": {
    "sha256": "fafde8468cf2f900436a1b37307796be2b86460e8d557249a1b70f950173b873",
