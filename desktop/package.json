@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "preflight.js",
+      "first-run.html",
       "package.json"
     ],
     "win": {
@@ -45,6 +46,42 @@
       {
         "from": "build/python",
         "to": "python"
+      },
+      {
+        "from": "../serve.py",
+        "to": "pack/serve.py"
+      },
+      {
+        "from": "../installer.py",
+        "to": "pack/installer.py"
+      },
+      {
+        "from": "../iwadfinder.py",
+        "to": "pack/iwadfinder.py"
+      },
+      {
+        "from": "../fetcher.py",
+        "to": "pack/fetcher.py"
+      },
+      {
+        "from": "../sources.json",
+        "to": "pack/sources.json"
+      },
+      {
+        "from": "../pack-manifest.json",
+        "to": "pack/pack-manifest.json"
+      },
+      {
+        "from": "../launchers",
+        "to": "pack/launchers"
+      },
+      {
+        "from": "../art",
+        "to": "pack/art"
+      },
+      {
+        "from": "../app",
+        "to": "pack/app"
       }
     ]
   }

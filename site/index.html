@@ -12,66 +12,171 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --bg: #0b0b0f;
-        --panel: #14141b;
-        --line: #26262f;
+        --bg: #07070a;
+        --panel: #121216;
+        --panel2: #1a1a20;
+        --line: #2a2a32;
         --text: #e8e8ef;
         --dim: #9a9aab;
         --accent: #ff6b1a;
         --accent-dim: #b8480f;
+        --blood: #c91f1f;
+        --blood-dim: #6e1313;
+        --toxic: #8fe34a;
       }
       * { box-sizing: border-box; }
+      html { background: var(--bg); }
       body {
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font-family: Inter, system-ui, sans-serif;
-        line-height: 1.6;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 1.65;
+        position: relative;
+        overflow-x: hidden;
       }
-      .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 96px; }
+      ::selection { background: var(--blood); color: #fff; }
+
+      /* ---------------------------------------------------- ember backdrop */
+      canvas#embers {
+        position: fixed; inset: 0; width: 100%; height: 100%;
+        z-index: 0; pointer-events: none;
+      }
+
+      /* ----------------------------------------------------- CRT / vignette */
+      body::before {
+        /* scanlines */
+        content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none;
+        background: repeating-linear-gradient(
+          0deg, rgba(0,0,0,0.0) 0px, rgba(0,0,0,0.0) 2px,
+          rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.0) 4px
+        );
+        mix-blend-mode: multiply;
+        opacity: .55;
+      }
+      body::after {
+        /* vignette */
+        content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none;
+        background: radial-gradient(ellipse 75% 65% at 50% 15%, transparent 45%, rgba(0,0,0,.55) 100%);
+      }
+
+      .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 96px; position: relative; z-index: 1; }
+
+      /* --------------------------------------------------------- hazard bar */
+      .hazard {
+        height: 7px;
+        background: repeating-linear-gradient(
+          -45deg, var(--accent) 0 14px, #0a0a0c 14px 28px
+        );
+      }
 
       header {
         border-bottom: 1px solid var(--line);
-        padding: 64px 0 48px;
-        /* faint scanline grid, same industrial feel as the launcher */
+        padding: 60px 0 48px;
         background-image:
-          linear-gradient(rgba(255, 107, 26, 0.035) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 107, 26, 0.035) 1px, transparent 1px);
-        background-size: 44px 44px;
+          linear-gradient(rgba(255, 107, 26, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 107, 26, 0.045) 1px, transparent 1px),
+          radial-gradient(ellipse 60% 100% at 50% 0%, rgba(201, 31, 31, 0.16), transparent 70%);
+        background-size: 44px 44px, 44px 44px, 100% 100%;
+        position: relative;
       }
       .kicker {
-        font-family: "Chakra Petch", monospace;
+        font-family: "Oswald", sans-serif;
+        font-weight: 600;
         font-size: 12px;
-        letter-spacing: 0.28em;
+        letter-spacing: 0.32em;
         text-transform: uppercase;
         color: var(--accent);
-        margin: 0 0 16px;
+        margin: 0 0 18px;
+        display: flex; align-items: center; gap: 10px;
       }
+      .kicker::before {
+        content: ""; width: 8px; height: 8px; background: var(--blood);
+        box-shadow: 0 0 8px 2px rgba(201,31,31,.8);
+        display: inline-block; border-radius: 1px;
+        animation: blink 1.6s steps(1) infinite;
+      }
+      @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .25; } }
+
       h1 {
-        font-family: "Chakra Petch", monospace;
-        font-size: clamp(44px, 9vw, 82px);
-        line-height: 0.95;
+        font-family: "Black Ops One", "Oswald", sans-serif;
+        font-weight: 400;
+        font-size: clamp(46px, 10vw, 92px);
+        line-height: 0.92;
         margin: 0 0 20px;
-        letter-spacing: -0.02em;
+        letter-spacing: 0.01em;
+        position: relative;
+        width: fit-content;
+        text-shadow:
+          0 0 10px rgba(255, 107, 26, .35),
+          0 0 34px rgba(201, 31, 31, .25);
       }
-      h1 em { color: var(--accent); font-style: normal; }
-      .tagline { font-size: 18px; color: var(--dim); max-width: 60ch; margin: 0; }
+      h1 em {
+        color: var(--accent);
+        font-style: normal;
+        text-shadow:
+          0 0 12px rgba(255, 107, 26, .7),
+          0 0 40px rgba(255, 107, 26, .35);
+      }
+      /* glitch duplicate layers -- quiet almost all the time, snaps briefly */
+      h1::before, h1::after {
+        content: "DOOMNITE";
+        position: absolute; left: 0; top: 0; width: 100%;
+        overflow: hidden; color: var(--text);
+        background: var(--bg);
+        clip-path: inset(0 0 0 0);
+      }
+      h1::before {
+        color: #00e5ff;
+        animation: glitch-1 7s infinite linear;
+        opacity: 0;
+      }
+      h1::after {
+        color: var(--blood);
+        animation: glitch-2 7s infinite linear;
+        opacity: 0;
+      }
+      @keyframes glitch-1 {
+        0%, 91%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+        92% { opacity: .7; transform: translate(-3px, 1px); clip-path: inset(10% 0 60% 0); }
+        93% { opacity: .5; transform: translate(2px, -2px); clip-path: inset(55% 0 10% 0); }
+        94% { opacity: .6; transform: translate(-2px, 0); clip-path: inset(30% 0 40% 0); }
+        95% { opacity: 0; transform: translate(0, 0); }
+      }
+      @keyframes glitch-2 {
+        0%, 90%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 0 0); }
+        91% { opacity: .55; transform: translate(3px, -1px); clip-path: inset(70% 0 5% 0); }
+        92.5% { opacity: .65; transform: translate(-2px, 2px); clip-path: inset(5% 0 75% 0); }
+        94% { opacity: .4; transform: translate(2px, 1px); clip-path: inset(40% 0 30% 0); }
+        95.5% { opacity: 0; transform: translate(0, 0); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        h1::before, h1::after { animation: none; display: none; }
+        .kicker::before { animation: none; }
+      }
+
+      .tagline { font-size: 16.5px; color: var(--dim); max-width: 62ch; margin: 0; }
+      .tagline strong { color: var(--text); font-weight: 500; }
 
       h2 {
-        font-family: "Chakra Petch", monospace;
+        font-family: "Oswald", sans-serif;
+        font-weight: 600;
         font-size: 13px;
-        letter-spacing: 0.2em;
+        letter-spacing: 0.24em;
         text-transform: uppercase;
         color: var(--dim);
         border-bottom: 1px solid var(--line);
         padding-bottom: 12px;
         margin: 56px 0 24px;
+        display: flex; align-items: baseline; gap: 10px;
       }
+      h2::before { content: "//"; color: var(--accent); }
 
       .btn {
         display: flex;
@@ -80,76 +185,102 @@
         gap: 20px;
         padding: 22px 26px;
         margin-bottom: 12px;
-        background: var(--panel);
+        background: linear-gradient(180deg, var(--panel2), var(--panel));
         border: 1px solid var(--line);
         border-left: 3px solid var(--accent);
         border-radius: 4px;
         text-decoration: none;
         color: var(--text);
-        transition: background 0.15s, border-color 0.15s, transform 0.15s;
+        position: relative;
+        transition: background .15s, border-color .15s, transform .15s, box-shadow .15s;
       }
       .btn:hover {
-        background: #1b1b24;
+        background: linear-gradient(180deg, #212129, #17171d);
         border-color: var(--accent-dim);
-        transform: translateX(2px);
+        transform: translateX(3px);
+        box-shadow: 0 0 0 1px rgba(255,107,26,.15), 0 10px 28px -8px rgba(255, 107, 26, .35);
       }
-      .btn-main { border-left-width: 5px; padding: 28px 26px; }
+      .btn-main {
+        border-left-width: 6px;
+        padding: 28px 26px;
+        box-shadow: 0 0 0 1px rgba(255,107,26,.08), 0 0 32px -10px rgba(255, 107, 26, .4);
+        animation: pulse-glow 3.4s ease-in-out infinite;
+      }
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 0 1px rgba(255,107,26,.08), 0 0 28px -10px rgba(255,107,26,.35); }
+        50% { box-shadow: 0 0 0 1px rgba(255,107,26,.18), 0 0 46px -8px rgba(255,107,26,.6); }
+      }
       .btn-main .name { font-size: 22px; }
-      .name { font-family: "Chakra Petch", monospace; font-size: 18px; font-weight: 600; }
-      .meta { color: var(--dim); font-size: 14px; margin-top: 4px; }
+      .name { font-family: "Oswald", sans-serif; font-size: 17px; font-weight: 600; letter-spacing: .01em; }
+      .meta { color: var(--dim); font-size: 13px; margin-top: 4px; }
       .pill {
         flex-shrink: 0;
-        font-family: "Chakra Petch", monospace;
+        font-family: "Oswald", sans-serif;
         font-size: 12px;
-        letter-spacing: 0.1em;
+        font-weight: 600;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: var(--accent);
-        border: 1px solid var(--accent-dim);
+        color: #0b0a08;
+        background: var(--accent);
+        border: 1px solid var(--accent);
         border-radius: 3px;
-        padding: 7px 12px;
+        padding: 8px 14px;
+      }
+      .btn:not(.btn-main) .pill {
+        color: var(--accent); background: transparent; border-color: var(--accent-dim);
       }
 
-      table { width: 100%; border-collapse: collapse; font-size: 15px; }
-      td { padding: 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-      td:first-child { font-family: "Chakra Petch", monospace; white-space: nowrap; padding-right: 20px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+      td { padding: 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+      td:first-child {
+        font-family: "Oswald", sans-serif; font-weight: 600;
+        color: var(--accent); white-space: nowrap; padding-right: 20px;
+        text-transform: uppercase; font-size: 12.5px; letter-spacing: .06em;
+      }
       code {
-        font-family: ui-monospace, monospace;
-        background: #1b1b24;
-        padding: 2px 6px;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        background: #000;
+        border: 1px solid var(--line);
+        padding: 2px 7px;
         border-radius: 3px;
-        font-size: 14px;
-        color: var(--accent);
+        font-size: 13.5px;
+        color: var(--toxic);
       }
       ul { color: var(--dim); padding-left: 20px; }
       li { margin-bottom: 8px; }
+      li::marker { color: var(--accent); }
       strong { color: var(--text); font-weight: 600; }
       .note {
-        background: var(--panel);
+        background: linear-gradient(180deg, var(--panel2), var(--panel));
         border: 1px solid var(--line);
-        border-left: 3px solid var(--accent);
+        border-left: 3px solid var(--blood);
         border-radius: 4px;
         padding: 20px 24px;
         color: var(--dim);
-        font-size: 15px;
+        font-size: 14.5px;
       }
+      .note strong { color: var(--blood); }
       footer {
         border-top: 1px solid var(--line);
         margin-top: 64px;
         padding-top: 28px;
-        color: #6b6b7b;
-        font-size: 14px;
+        color: #5c5c6b;
+        font-size: 13px;
       }
       a { color: var(--accent); }
     </style>
   </head>
   <body>
+    <canvas id="embers" aria-hidden="true"></canvas>
+    <div class="hazard"></div>
+
     <header>
       <div class="wrap">
-        <p class="kicker">Portable Doom launcher</p>
-        <h1>DOOM<em>NITE</em></h1>
+        <p class="kicker">UAC Portable Doom launcher</p>
+        <h1 data-text="DOOMNITE">DOOM<em>NITE</em></h1>
         <p class="tagline">
-          Sixteen games. Thirty-one launch configurations. One folder with the
-          engine, the IWADs and every mod — and not one absolute path inside it.
+          <strong>Sixteen games. Thirty-one launch configurations.</strong> One folder with
+          the engine, the IWADs and every mod — and not one absolute path inside it.
           Copy it to a USB stick, plug it in anywhere, play.
         </p>
       </div>
@@ -216,5 +347,74 @@
         contributors. Nothing on this page is mine to license.
       </footer>
     </div>
+
+    <script>
+      (function () {
+        var cv = document.getElementById("embers");
+        var ctx = cv.getContext("2d", { alpha: true });
+        if (!ctx) return;
+        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        var w = 0, h = 0, dpr = 1, raf = 0, running = false;
+        var N = reduce ? 18 : 46;
+        var p = [];
+
+        function seed() {
+          p.length = 0;
+          for (var i = 0; i < N; i++) {
+            p.push({
+              x: Math.random(), y: Math.random(),
+              z: 0.35 + Math.random() * 0.65,
+              r: Math.random() * Math.PI * 2,
+              s: 0.25 + Math.random() * 0.9,
+            });
+          }
+        }
+        function resize() {
+          dpr = Math.min(2, window.devicePixelRatio || 1);
+          w = cv.clientWidth; h = cv.clientHeight;
+          cv.width = Math.max(1, Math.floor(w * dpr));
+          cv.height = Math.max(1, Math.floor(h * dpr));
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        function frame(t) {
+          ctx.clearRect(0, 0, w, h);
+          var tsec = t / 1000;
+          for (var i = 0; i < p.length; i++) {
+            var q = p[i];
+            q.y -= 0.0014 * q.z * q.s;
+            if (q.y < -0.05) { q.y = 1.05; q.x = Math.random(); }
+            var px = q.x * w, py = q.y * h;
+            var wob = Math.sin(tsec * 0.8 + q.r) * 9 * q.z;
+            var flick = 0.55 + 0.45 * Math.sin(tsec * 3.1 * q.s + q.r * 2);
+            var rad = (0.7 + q.z * 1.6) * flick;
+            var hot = q.s > 1.05;
+            var g = ctx.createRadialGradient(px + wob, py, 0, px + wob, py, rad * 5);
+            if (hot) {
+              g.addColorStop(0, "rgba(255,214,150,0.8)");
+              g.addColorStop(0.35, "rgba(255,120,50,0.3)");
+            } else {
+              g.addColorStop(0, "rgba(255,90,50,0.55)");
+              g.addColorStop(0.35, "rgba(190,30,20,0.18)");
+            }
+            g.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(px + wob, py, rad * 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          raf = requestAnimationFrame(frame);
+        }
+        function start() { if (running) return; running = true; raf = requestAnimationFrame(frame); }
+        function stop() { running = false; cancelAnimationFrame(raf); }
+
+        window.addEventListener("resize", resize);
+        document.addEventListener("visibilitychange", function () {
+          if (document.hidden) stop(); else start();
+        });
+
+        resize(); seed(); start();
+      })();
+    </script>
   </body>
 </html>

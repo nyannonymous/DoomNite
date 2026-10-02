@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark" />
+    <title>DoomNite — first run</title>
+    <style>
+      /* Deliberately dependency-free and offline: this page is the only thing on
+         screen while 3.4 GB arrives, so it must not wait on a font or a bundle
+         that has itself not been downloaded yet. System faces only. */
+      :root {
+        --bg: #0b0b0f;
+        --panel: #14141b;
+        --line: #26262f;
+        --text: #e8e8ef;
+        --dim: #9a9aab;
+        --accent: #ff6b1a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 28px 30px 24px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        overflow: hidden;
+      }
+      .kicker {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 10px;
+      }
+      h1 { font-size: 22px; margin: 0 0 8px; letter-spacing: -0.01em; }
+      .lede { color: var(--dim); margin: 0 0 20px; max-width: 62ch; }
+      .bar {
+        height: 8px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        transition: width 0.2s linear;
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        color: var(--dim);
+        margin: 10px 0 14px;
+      }
+      #current { color: var(--accent); }
+      pre {
+        margin: 0;
+        padding: 14px 16px;
+        height: 210px;
+        overflow: hidden;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--dim);
+        font-family: ui-monospace, monospace;
+        font-size: 11.5px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .foot { color: #6b6b7b; font-size: 12px; margin: 14px 0 0; }
+    </style>
+  </head>
+  <body>
+    <p class="kicker">First run</p>
+    <h1>Fetching the pack</h1>
+    <p class="lede">
+      The engine, the IWADs and every mod — verified against its own sha256 as it
+      lands. It happens once; later launches start immediately.
+    </p>
+
+    <div class="bar"><span id="fill"></span></div>
+    <p class="status">
+      <span id="count">starting…</span>
+      <span id="current"></span>
+    </p>
+    <pre id="log"></pre>
+    <p class="foot">Closing this window cancels the download. Launching again resumes where it stopped.</p>
+
+    <script>
+      // Called from the main process with the whole progress state, rather than
+      // with a stream of events: one assignment per update means the page never
+      // has to be able to handle a partial view of a download.
+      const $ = (id) => document.getElementById(id);
+
+      window.dnUpdate = (s) => {
+        const state = s || {};
+        const done = state.done || 0;
+        const total = state.total || 0;
+        const pct = total ? Math.min(100, (done / total) * 100) : 0;
+
+        $("fill").style.width = pct + "%";
+        $("count").textContent = total
+          ? `${done} of ${total} files` + (state.bytes ? ` · ${state.bytes}` : "")
+          : "starting…";
+        $("current").textContent = state.current || "";
+
+        const box = $("log");
+        box.textContent = (state.log || []).slice(-24).join("\n");
+        box.scrollTop = box.scrollHeight;
+      };
+    </script>
+  </body>
+</html>
