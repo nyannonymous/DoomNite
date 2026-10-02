@@ -57,13 +57,19 @@ on disk, skips anything correct, and fetches only the rest.
 
 ### What it will not do
 
-It will not hand you `DOOM2.WAD` or `Hexen.wad`. Those are commercial
-id Software releases, so they are marked `no_host` in `sources.json`, refused
-at upload, and absent from the bucket — `HTTP 404`, verified.
+It will not hand you `Hexen.wad`. That is a commercial id Software release, so
+it is marked `no_host` in `sources.json`, refused at upload, and absent from the
+bucket — `HTTP 404`, verified.
 
 Shareware `DOOM.WAD` **is** included. That is the freely distributable one.
 
-If you own `DOOM2.WAD`, drop it in `iwads/` yourself and it will be picked up.
+`DOOM2.WAD` **is** included too, on the operator's decision: the bucket hosting
+this pack is theirs and they publish it deliberately. If you are reading this
+and did not expect that, note it is retail commercial content and the operator
+is the one making that call, not the project.
+
+If you would rather supply your own, drop it in `iwads/` and the finder will
+use that instead — it prefers a copy already in the pack.
 
 ---
 

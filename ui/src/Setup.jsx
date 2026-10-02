@@ -3,10 +3,12 @@ import { Search, FolderOpen, Check, X, AlertTriangle } from "lucide-react";
 
 /* First-run IWAD finder.
 
-   DOOM.WAD and DOOM2.WAD are commercial id Software / Bethesda content, so
-   Doomnite never downloads one -- it locates the copy the player already owns.
-   This dialog appears only while /api/setup reports a missing WAD, so a
-   configured install never sees it again.
+   The pack ships DOOM.WAD (shareware) and DOOM2.WAD; Hexen.wad is not
+   published, so Hexen Remade can only be reached by a player who owns it.
+   This dialog therefore appears when a WAD is genuinely absent -- a failed
+   download, or Hexen -- and it locates the copy the player already owns.
+   It appears only while /api/setup reports a missing WAD, so a configured
+   install never sees it again.
 
    It scans Steam/GOG first because that is right nearly every time and is
    less work than making someone dig through Program Files. The browse button
@@ -19,8 +21,13 @@ const j = async (r) => {
 
 export default function Setup({ onDone }) {
   const [missing, setMissing] = useState([]);
-  const [found, setFound] = useState({});
-  const [searched, setSearched] = useState(0);
+    const [found, setFound] = useState({});
+    // Where the server says each WAD is right now, which is not always a place
+    // scan() looks: a path the player typed in last run can be anywhere, and the
+    // launchers only read pack\iwads\. Without this a WAD that IS available
+    // renders as an empty "done" row, or worse, as missing.
+    const [live, setLive] = useState({});
+    const [searched, setSearched] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [manual, setManual] = useState({});
@@ -32,17 +39,36 @@ export default function Setup({ onDone }) {
   }, []);
 
   async function scan() {
-    setBusy(true);
+      setBusy(true);
+      setErr(null);
+      try {
+        const d = await j(await fetch("/api/setup/scan", { cache: "no-store" }));
+        setFound(d.found || {});
+        setSearched(d.searched || 0);
+        setMissing(d.missing || []);
+        // scan reports where it looked; /api/setup reports what is usable now.
+        // After a save the two can differ, so refresh both.
+        try {
+          setLive((await j(await fetch("/api/setup", { cache: "no-store" }))).iwads || {});
+        } catch { /* the scan result is still worth showing */ }
+      } catch (e) {
+        setErr(String(e.message || e));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+  async function browse(wad) {
     setErr(null);
+    if (typeof window.doomnite?.browseIwad !== "function") {
+      setErr("Browse is available in the DoomNite desktop app. You can enter the full WAD file path below.");
+      return;
+    }
     try {
-      const d = await j(await fetch("/api/setup/scan", { cache: "no-store" }));
-      setFound(d.found || {});
-      setSearched(d.searched || 0);
-      setMissing(d.missing || []);
+      const path = await window.doomnite.browseIwad(wad);
+      if (path) setManual((m) => ({ ...m, [wad]: path }));
     } catch (e) {
       setErr(String(e.message || e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -58,7 +84,9 @@ export default function Setup({ onDone }) {
         })
       );
       setMissing(d.missing || []);
-      if (!d.missing.length) onDone?.();
+            if (d.iwads) setLive(d.iwads);
+            if (d.error) setErr(d.error);
+            if (!d.missing.length) onDone?.();
     } catch (e) {
       setErr(String(e.message || e));
     } finally {
@@ -66,15 +94,16 @@ export default function Setup({ onDone }) {
     }
   }
 
-  // Every path goes to the server for validation, which checks the IWAD magic
-  // itself -- a total conversion ships its own DOOM2.WAD that a size check
-  // would happily accept and boot the wrong game.
+  // Paths may be a WAD file or its containing install folder. The server
+  // resolves the expected filename and checks the IWAD magic before saving.
 
   const NEED = ["DOOM.WAD", "DOOM2.WAD"];
-  const outstanding = NEED.filter((w) => missing.includes(w));
-  const chosen = { ...manual };
-  // A scan hit counts as a choice unless the player overrode it.
-  for (const w of NEED) if (found[w]?.length && !chosen[w]) chosen[w] = found[w][0];
+    const outstanding = NEED.filter((w) => missing.includes(w));
+    const chosen = { ...live, ...manual };
+    // A scan hit counts as a choice unless the player overrode it. live[] wins
+    // over found[] because it is the path the server confirmed is usable, and
+    // pack\iwads\ is the one a launch actually reads.
+    for (const w of NEED) if (found[w]?.length && !chosen[w]) chosen[w] = found[w][0];
 
   return (
     <div className="setup" role="dialog" aria-modal="true" aria-labelledby="setup-h">
@@ -87,8 +116,9 @@ export default function Setup({ onDone }) {
         </header>
 
         <p className="setup-lede">
-          Doom needs <b>DOOM.WAD</b> and <b>DOOM2.WAD</b> to run. They ship with
-          the games, so point DoomNite at yours -- it will not download them.
+          Doom needs <b>DOOM.WAD</b> and <b>DOOM2.WAD</b>. Both normally arrive with
+          the download — this is for when one is missing, or for supplying
+          your own copy instead.
         </p>
 
         {outstanding.length === 0 ? (
@@ -99,7 +129,6 @@ export default function Setup({ onDone }) {
           <>
             <ul className="setup-list">
               {NEED.map((w) => {
-                const auto = found[w]?.[0];
                 const pick = chosen[w];
                 const done = !missing.includes(w);
                 return (
@@ -109,29 +138,20 @@ export default function Setup({ onDone }) {
                       <span className="setup-found">
                         <Check size={14} aria-hidden="true" /> {pick}
                       </span>
-                    ) : auto ? (
-                      <span className="setup-found">
-                        <Check size={14} aria-hidden="true" /> {auto}
-                      </span>
                     ) : (
-                      /* A <input type=file> cannot do this job. Browsers no
-                         longer expose the real path to JS, and picking a file
-                         sends its contents rather than its location -- but the
-                         server needs a path to launch from. So this is a plain
-                         text field, which always works. */
                       <span className="setup-pick">
                         <input
                           type="text"
                           className="setup-path"
-                          placeholder="C:\\SteamLibrary\\steamapps\\common\\DOOM2"
-                          value={manual[w] || ""}
+                          placeholder={`Path to ${w} or its folder`}
+                          value={pick || ""}
                           onChange={(e) =>
                             setManual((m) => ({ ...m, [w]: e.target.value }))
                           }
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && manual[w]) {
+                            if (e.key === "Enter" && pick) {
                               e.preventDefault();
-                              save({ [w]: manual[w] });
+                              save({ [w]: pick });
                             }
                           }}
                           aria-label={`Full path to ${w}`}
@@ -139,10 +159,19 @@ export default function Setup({ onDone }) {
                         <button
                           type="button"
                           className="btn-ghost is-sm"
-                          onClick={() => manual[w] && save({ [w]: manual[w] })}
-                          disabled={busy || !manual[w]}
+                          onClick={() => browse(w)}
+                          disabled={busy}
+                          title={`Browse for ${w}`}
                         >
-                          <FolderOpen size={13} aria-hidden="true" /> Use
+                          <FolderOpen size={13} aria-hidden="true" /> Browse
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost is-sm"
+                          onClick={() => pick && save({ [w]: pick })}
+                          disabled={busy || !pick}
+                        >
+                          <Check size={13} aria-hidden="true" /> Use
                         </button>
                       </span>
                     )}

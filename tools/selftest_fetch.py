@@ -42,10 +42,23 @@ def main():
     files = src["files"]
     pub_files = {r: v for r, v in files.items() if not v.get("no_host")}
     vetoed = [r for r, v in files.items() if v.get("no_host")]
+    # Only files actually on disk can be served as a mirror. A published file
+    # the operator does not hold locally is not a failure -- it lives in the
+    # bucket, and this self-test never reaches the network. Copying or linking
+    # it used to raise FileNotFoundError here and take the whole run down,
+    # which is why this only bites once a WAD is published but not owned.
+    local = {}
+    absent = []
+    for rel in pub_files:
+        fp = os.path.join(PACK, rel.replace("/", os.sep))
+        if os.path.isfile(fp):
+            local[rel] = pub_files[rel]
+        else:
+            absent.append(rel)
 
     tmp = tempfile.mkdtemp(prefix="doomnite-selftest-")
     pub = os.path.join(tmp, "pub")
-    for rel in pub_files:
+    for rel in local:
         dst = os.path.join(pub, rel.replace("/", os.sep))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         try:
@@ -72,7 +85,9 @@ def main():
         with open(os.path.join(clone, "sources.json"), "w", encoding="utf-8") as f:
             json.dump(dict(src, base_url=base), f, indent=1, sort_keys=True)
 
-        print(f"serving {len(pub_files)} files at {base}")
+        print(f"serving {len(local)} files at {base}")
+        if absent:
+            print(f"  not local, not served: {', '.join(sorted(absent))}")
         print(f"clone at {clone} (fetcher.py + sources.json, nothing else)\n")
 
         r = subprocess.run([sys.executable, "fetcher.py", "--check"],
@@ -87,10 +102,13 @@ def main():
         # Fetch one small file and one big one. Small proves correctness fast;
         # big proves the streaming, Content-Length and .part->rename path.
         picks = []
-        small = min(pub_files, key=lambda r: pub_files[r].get("size", 0))
+        # Pick from what is actually being served: a published file the
+        # operator lacks is a 404 on this mirror, and the self-test would then
+        # report a fetch failure that says nothing about the fetcher.
+        small = min(local, key=lambda r: local[r].get("size", 0))
         picks.append(small)
-        big = max((r for r in pub_files if r.startswith("mods/")),
-                  key=lambda r: pub_files[r].get("size", 0))
+        big = max((r for r in local if r.startswith("mods/")),
+                  key=lambda r: local[r].get("size", 0))
         if big != small:
             picks.append(big)
 

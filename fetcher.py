@@ -28,7 +28,9 @@ trustworthy:
 * A certificate this machine cannot verify is retried without verification
   rather than failed. See the note on unverified_ctx: the sha256 above is what
   provides integrity, and a machine whose root store is stale would otherwise
-  be unable to obtain a pack at all.
+  be unable to obtain a pack at all. This fallback is announced once per host.
+* Free space is checked before starting, and a disk-full error stops further
+  writes and removes incomplete .part files so retries do not waste space.
 * One file's failure is never allowed to abort the run. Anything a download can
   raise is caught per file and reported as that file's result.
 
@@ -37,12 +39,15 @@ its own final path, so nothing needs a lock.
 """
 
 import argparse
+import errno
 import hashlib
 import http.client
 import json
 import os
+import shutil
 import ssl
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -56,6 +61,9 @@ UA = "DoomNite/1.0 (+fetcher)"
 CHUNK = 1024 * 256
 TIMEOUT = 120
 RETRIES = 2
+_DISK_FULL = threading.Event()
+_UNVERIFIED_HOSTS = set()
+_UNVERIFIED_HOSTS_LOCK = threading.Lock()
 
 
 def human(n):
@@ -137,6 +145,23 @@ def is_cert_failure(err):
     return isinstance(reason, ssl.SSLCertVerificationError) or isinstance(
         err, ssl.SSLCertVerificationError
     )
+
+
+def is_disk_full(err):
+    """Recognize POSIX and Windows errors for an exhausted target volume."""
+    return (
+        getattr(err, "errno", None) in (errno.ENOSPC, getattr(errno, "EDQUOT", -1))
+        or getattr(err, "winerror", None) in (39, 112)
+    )
+
+
+def remove_part_files(items):
+    """Remove unverified leftovers; they are never resumed or trusted."""
+    for rel, _rec in items:
+        try:
+            os.remove(os.path.join(PACK, rel.replace("/", os.sep)) + ".part")
+        except OSError:
+            pass
 
 
 def urls_for(rel, rec):
@@ -237,17 +262,32 @@ def fetch_one(rel, rec, force=False, verbose=True):
     if not urls:
         return rel, "no-url", "no hosted URL in sources.json"
 
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except OSError as e:
+        if is_disk_full(e):
+            _DISK_FULL.set()
+            return rel, "failed", (
+                "not enough free disk space; free space on the pack drive "
+                "and try again"
+            )
+        return rel, "failed", f"could not create destination directory: {e}"
     want = rec.get("sha256")
     errors = []
 
     for url in urls:
+        if _DISK_FULL.is_set():
+            return rel, "skipped", "stopped because the target disk is full"
         host = url.split("/")[2] if "://" in url else url[:40]
-        # Per URL, not per file: a mirror that fails to verify says nothing about
-        # whether the next one will, and the failure is usually the machine's
-        # trust store rather than the mirror.
-        ctx = CTX
+        # Once this host's certificate failure is known, reuse the same fallback
+        # for its other files instead of emitting the same warning for each one.
+        # The downloaded bytes are still accepted only after their sha256 matches.
+        with _UNVERIFIED_HOSTS_LOCK:
+            host_is_unverified = host in _UNVERIFIED_HOSTS
+        ctx = unverified_ctx() if host_is_unverified else CTX
         for attempt in range(1, RETRIES + 1):
+            if _DISK_FULL.is_set():
+                return rel, "skipped", "stopped because the target disk is full"
             last = (attempt == RETRIES)
             try:
                 cb = _progress_printer(host) if verbose else None
@@ -274,9 +314,24 @@ def fetch_one(rel, rec, force=False, verbose=True):
                 if verbose:
                     print("\r" + " " * 62 + "\r", end="", flush=True)
                 errors.append(f"{host}: {type(e).__name__} {e}")
+                if is_disk_full(e):
+                    _DISK_FULL.set()
+                    try:
+                        os.remove(path + ".part")
+                    except OSError:
+                        pass
+                    return rel, "failed", (
+                        "not enough free disk space; free space on the pack drive "
+                        "and try again"
+                    )
+                if _DISK_FULL.is_set():
+                    return rel, "skipped", "stopped because the target disk is full"
                 if is_cert_failure(e) and ctx is CTX:
                     ctx = unverified_ctx()
-                    if verbose:
+                    with _UNVERIFIED_HOSTS_LOCK:
+                        first_warning = host not in _UNVERIFIED_HOSTS
+                        _UNVERIFIED_HOSTS.add(host)
+                    if verbose and first_warning:
                         print(f"    {host}: certificate cannot be verified on "
                               f"this machine; retrying without verification "
                               f"(every file is checked against its sha256)")
@@ -336,8 +391,27 @@ def main():
                 print(f"{nourl} of these have no hosted URL yet.")
         return 0
 
+    fetchable = [(r, rec) for r, rec in todo if urls_for(r, rec)]
+    # Earlier versions left interrupted, unverified .part files behind. They
+    # cannot be resumed safely, so remove them before measuring free space.
+    remove_part_files(fetchable)
+    required = sum(rec.get("size") or 0 for _, rec in fetchable)
+    safety = min(128 * 1024 * 1024, max(4 * 1024 * 1024, required // 100))
+    try:
+        free = shutil.disk_usage(PACK).free
+    except OSError as e:
+        print(f"\nwarning: could not check free space on the pack drive: {e}")
+        free = None
+    if free is not None and required and free < required + safety:
+        print("\nerror: insufficient disk space for the remaining downloads.")
+        print(f"  needed:    {human(required)} plus {human(safety)} safety margin")
+        print(f"  available: {human(free)} on the drive containing {PACK}")
+        print("Free disk space on that drive, then run the fetch again.")
+        return 2
+
+    _DISK_FULL.clear()
     print(f"fetching with {args.jobs} parallel connections\n")
-    done = {"ok": 0, "no-url": 0, "failed": 0}
+    done = {"ok": 0, "no-url": 0, "failed": 0, "skipped": 0}
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futs = {pool.submit(fetch_one, r, c, args.force): r for r, c in todo}
         for fut in as_completed(futs):
@@ -345,16 +419,23 @@ def main():
             done[status] = done.get(status, 0) + 1
             n = sum(done.values())
             mark = {"ok": "ok", "fetched": "ok", "no-url": "--",
-                    "failed": "!!"}.get(status, "  ")
+                    "failed": "!!", "skipped": "--"}.get(status, "  ")
             print(f"[{n:>3}/{len(todo)}] {mark} {rel}"
-                  + (f"\n         {detail}" if status in ("failed", "no-url")
-                     else ""))
+                  + (f"\n         {detail}"
+                     if status in ("failed", "no-url", "skipped") else ""))
 
+    if done.get("failed") or done.get("skipped"):
+        # Failed downloads are not resumable; discard their unverified temp data
+        # so a later retry starts clean and has enough room to proceed.
+        remove_part_files(fetchable)
+
+    failed = done.get("failed", 0) + done.get("skipped", 0)
     print(f"\nfetched {done.get('fetched', 0)}   "
-          f"no-url {done.get('no-url', 0)}   "
-          f"failed {done.get('failed', 0)}")
+          f"no-url {done.get('no-url', 0)}   failed {failed}")
+    if done.get("skipped"):
+        print(f"stopped early: {done['skipped']} file(s) after disk space ran out")
 
-    if done.get("no-url") or done.get("failed"):
+    if done.get("no-url") or failed:
         print("\nPack is still incomplete. See above per file; run --check anytime.")
         return 2
 

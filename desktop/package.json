@@ -24,6 +24,7 @@
     "productName": "DoomNite",
     "files": [
       "main.js",
+      "preload.js",
       "preflight.js",
       "first-run.html",
       "package.json"

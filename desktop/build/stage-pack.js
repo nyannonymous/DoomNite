@@ -9,6 +9,7 @@ const REQUIRED = [
   "installer.py",
   "iwadfinder.py",
   "fetcher.py",
+  "preload.js",
   "sources.json",
   "pack-manifest.json",
   "launchers",

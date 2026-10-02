@@ -483,10 +483,12 @@ def handler_factory():
             if path == "/api/setup":
                 # First-run state. The UI shows the WAD finder only while
                 # needs_setup() is non-empty, so a configured install never
-                # sees it again.
+                # sees it again. The paths reported are the ones a launch
+                # actually uses, not whatever config.json happens to say.
                 return self._send(200, _json.dumps({
                     "missing": _iwad.needs_setup(),
-                    "iwads": _iwad.iwads(),
+                    "iwads": {w: p for w in _iwad.WANTED
+                              if (p := _iwad.available(w))},
                 }))
             if path == "/api/setup/scan":
                 found, searched = _iwad.scan()
@@ -528,9 +530,20 @@ def handler_factory():
                 except ValueError:
                     return self._send(400, _json.dumps({"error": "bad json"}))
                 action = raw.get("action")
+                install_problem = None
                 if action == "scan":
                     found, _ = _iwad.scan()
-                    saved = _iwad.record({w: ps[0] for w, ps in found.items()})
+                    # A WAD already sitting in the pack needs no scan hit and no
+                    # copy -- record what is actually there so the launchers and
+                    # config.json cannot disagree.
+                    for w in ("DOOM.WAD", "DOOM2.WAD", "Hexen.wad"):
+                        if not found.get(w) and _iwad.available(w):
+                            found[w] = [_iwad.available(w)]
+                    try:
+                        saved = _iwad.record({w: ps[0] for w, ps in found.items()})
+                    except OSError as e:
+                        saved = _iwad.iwads()
+                        install_problem = str(e)
                 elif action == "set":
                     # The player picked a folder or named a file. Every path is
                     # resolved and CHECKED to actually be an IWAD before it is
@@ -541,19 +554,28 @@ def handler_factory():
                     for w, p_ in chosen.items():
                         if w not in _iwad.WANTED or not isinstance(p_, str):
                             continue
-                        ap = os.path.abspath(p_)
-                        if os.path.isfile(ap) and _iwad._wad_score(ap):
+                        ap = _iwad.resolve_wad_path(w, p_)
+                        if ap:
                             good[w] = ap
                     if not good:
                         return self._send(400, _json.dumps({
                             "error": "no valid IWAD in that location",
                             "rejected": [w for w in chosen if w not in good],
                         }))
-                    saved = _iwad.record(good)
+                    try:
+                        saved = _iwad.record(good)
+                    except OSError as e:
+                        saved = _iwad.iwads()
+                        install_problem = str(e)
                 else:
                     return self._send(400, _json.dumps({"error": "bad action"}))
-                return self._send(200, _json.dumps({
-                    "iwads": saved, "missing": _iwad.needs_setup()}))
+                missing = _iwad.needs_setup()
+                body = {"iwads": saved, "missing": missing}
+                if install_problem:
+                    body["error"] = (
+                        "saved your choice, but DoomNite could not put the WAD "
+                        f"where the launcher reads it: {install_problem}")
+                return self._send(200, _json.dumps(body))
             if path.startswith("/api/install/") and self.command == "DELETE":
                 name = path[len("/api/install/"):]
                 if name not in _inst.SPECS:

@@ -36,13 +36,18 @@ ROOTS = ("runtime", "iwads", "mods")
 SKIP_DIRS = {".git", "__pycache__", "downloads", ".staging", "node_modules",
               "dist", "app", "ui", "playnite-data", "art"}
 
-# Never publish these, whatever else is true of them. DOOM2.WAD and Hexen.wad
-# are commercial retail IWADs: freely redistributing them is not ours to
-# decide, so they are excluded from hosting at the source rather than by
-# remembering to leave a URL off them. DOOM.WAD is v1.9 shareware and is NOT
-# on this list -- it is hosted like anything else.
+# Never publish these, whatever else is true of them. Hexen.wad is a
+# commercial retail IWAD: freely redistributing it is not ours to decide, so
+# it is excluded from hosting at the source rather than by remembering to
+# leave a URL off it.
+#
+# DOOM2.WAD was on this list and is not any more. The operator owns the
+# bucket hosting the pack and has taken that decision deliberately, so the
+# veto is lifted here rather than only in sources.json -- otherwise the next
+# `make_sources.py` run would re-arm it silently, which is the whole reason
+# the carry-forward below exists. DOOM.WAD is v1.9 shareware and was never
+# on this list.
 VETOED = {
-    "iwads/DOOM2.WAD",
     "iwads/Hexen.wad",
 }
 
@@ -100,13 +105,21 @@ def main():
 
     # Carry forward the per-file settings this generator must not invent.
     # "no_host" is a legal decision, not a measurement: it marks the commercial
-    # IWADs (DOOM2.WAD, Hexen.wad) that must never be published. Regenerating
-    # without preserving it would quietly re-arm them for publication the next
-    # time anyone ran this -- the exact opposite of what the flag is for. An
-    # operator who removes one by hand gets it stripped back out here, loudly.
+    # IWADs that must never be published. Regenerating without preserving it
+    # would quietly re-arm them for publication the next time anyone ran this --
+    # the exact opposite of what the flag is for. An operator who removes one
+    # by hand gets it stripped back out here, loudly.
+    #
+    # "publish" is the operator overriding that decision for one file: it is
+    # how the DOOM2.WAD veto was lifted. Without it the carry-forward would
+    # undo the override on the very next run, silently.
+    PUBLISH = {"iwads/DOOM2.WAD"}
     for rel, rec in files.items():
         old = existing.get(rel) or {}
-        if old.get("no_host"):
+        if rel in PUBLISH:
+            rec.pop("no_host", None)
+            print(f"  note: {rel} is explicitly published; veto lifted")
+        elif old.get("no_host"):
             rec["no_host"] = True
         elif rec.get("no_host") is None and rel in VETOED:
             print(f"  note: {rel} is commercial; keeping it out of hosting")

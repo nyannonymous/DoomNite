@@ -11,7 +11,7 @@
 // launch logic in Python rather than porting it to Node means that guarantee is
 // the one serve.py already makes, instead of a second weaker version of it.
 
-const { app, BrowserWindow, shell, dialog, Menu } = require("electron");
+const { app, BrowserWindow, shell, dialog, Menu, ipcMain } = require("electron");
 const { spawn } = require("node:child_process");
 const net = require("node:net");
 const path = require("node:path");
@@ -49,6 +49,28 @@ let quitting = false;
 // True until the launcher window exists. Distinguishes "the app has no windows
 // yet" from "the user closed the last one", which window-all-closed cannot.
 let starting = true;
+
+// Native IWAD chooser. The renderer never receives Node access; it asks through
+// a narrowly-scoped IPC channel and the main process returns one local file path.
+ipcMain.handle("doomnite:browse-iwad", async (event, wad) => {
+  if (!["DOOM.WAD", "DOOM2.WAD"].includes(wad)) {
+    throw new Error("Unsupported IWAD selection.");
+  }
+  const frameUrl = event.senderFrame?.url;
+  if (!frameUrl || new URL(frameUrl).origin !== ORIGIN) {
+    throw new Error("IWAD browsing is only available from the local launcher.");
+  }
+  const owner = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(owner || undefined, {
+    title: `Locate ${wad}`,
+    properties: ["openFile"],
+    filters: [
+      { name: `${wad} file`, extensions: ["wad"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
 
 // Location of the bundled embeddable runtime. In a packaged build it sits in
 // resources/python; in a dev checkout, build/python where prepare-python.js
@@ -510,10 +532,10 @@ async function fetchPack(root, py, ui) {
   const text = lines.join("\n");
   const summary = summarise(text);
 
-  // Exit 2 means "finished, but not everything is here", and the expected case
-  // for it is the deliberately unhosted commercial IWADs -- DOOM2.WAD and
-  // Hexen.wad are vetoed in sources.json and always count as no-url. Failures
-  // are the ones that mean a real file is missing.
+  // Exit 2 means "finished, but not everything is here". The expected case
+  // for it is Hexen.wad, which is vetoed in sources.json and always counts as
+  // no-url; the pack deliberately does not publish it. Failures are the ones
+  // that mean a real file is missing.
   if (code === 0 || (summary && summary.failed === 0)) {
     fs.writeFileSync(
       path.join(root, MARKER),
@@ -530,7 +552,7 @@ async function fetchPack(root, py, ui) {
   const why = summary
     ? `${summary.failed} file(s) could not be downloaded.`
     : `The fetcher exited with code ${code}.`;
-  return { ok: false, reason: `${why}\n\n${text.slice(-700)}` };
+  return { ok: false, reason: `${why}\n\n${text.slice(-700)}`, output: text };
 }
 
 function fail(message, detail) {
@@ -646,11 +668,11 @@ function createWindow() {
     title: "DoomNite",
     show: false,
     webPreferences: {
-      // No node integration: this window shows a local server's output, and it
-      // does not need to run any of it.
+      // No node integration: expose only the native IWAD picker through preload.
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
@@ -737,21 +759,32 @@ app.whenReady().then(async () => {
     if (got.cancelled) break;
 
     whyNoPack = got.reason;
+    const diskFull = /insufficient disk space|not enough free disk space|no space left on device|winerror 112/i.test(
+      `${got.reason}\n${got.output || ""}`
+    );
+    const buttons = diskFull
+      ? ["Open the launcher anyway", "Quit"]
+      : ["Try again", "Open the launcher anyway", "Quit"];
     const pick = dialog.showMessageBoxSync({
       type: "warning",
       title: "DoomNite",
-      message: "The pack did not finish downloading.",
+      message: diskFull
+        ? "There is not enough disk space to finish downloading."
+        : "The pack did not finish downloading.",
       detail:
         `${got.reason}\n\n` +
-        "Files already downloaded are kept and re-verified, so trying again " +
-        "resumes rather than starting over.",
-      buttons: ["Try again", "Open the launcher anyway", "Quit"],
+        (diskFull
+          ? "Free space on the drive that contains the DoomNite pack, then " +
+            "restart the app. Verified downloads will be kept."
+          : "Files already downloaded are kept and re-verified, so trying again " +
+            "resumes rather than starting over."),
+      buttons,
       defaultId: 0,
-      cancelId: 2,
+      cancelId: buttons.length - 1,
       noLink: true,
     });
-    if (pick === 1) break;
-    if (pick === 2) {
+    if (pick === (diskFull ? 0 : 1)) break;
+    if (pick === (diskFull ? 1 : 2)) {
       ui.close();
       return;
     }

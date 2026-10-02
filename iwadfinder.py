@@ -132,6 +132,108 @@ def scan():
     return found, searched
 
 
+def resolve_wad_path(wad, path):
+    """Resolve a selected IWAD file or install folder to the expected WAD."""
+    if wad not in WANTED or not isinstance(path, str) or not path.strip():
+        return None
+    candidate = os.path.abspath(os.path.expanduser(path.strip()))
+    if os.path.isdir(candidate):
+        try:
+            match = next(
+                name for name in os.listdir(candidate)
+                if name.casefold() == wad.casefold()
+            )
+        except (OSError, StopIteration):
+            return None
+        candidate = os.path.join(candidate, match)
+    if (os.path.isfile(candidate)
+            and os.path.basename(candidate).casefold() == wad.casefold()
+            and _wad_score(candidate)):
+        return candidate
+    return None
+
+
+def install(rel_name, src):
+    """Make src available to the launchers as pack\\iwads\\<name>.
+
+    The generated .bat files are %~dp0-relative and hardcode
+    -iwad "%~dp0..\\iwads\\DOOM2.WAD", so the pack's own iwads\\ folder is the
+    ONLY location a launch can read from. Recording a path in config.json is
+    not enough: build.py copies IWADs in at build time, so a pack built before
+    the player pointed at their Steam copy never gets one, and every Doom II
+    launcher then fails on a file that is not there.
+
+    A copy, deliberately, matching what build.py already does -- not a
+    hardlink. A hardlink makes pack\\iwads\\DOOM2.WAD and the player's retail
+    copy the SAME file, so anything that writes to one corrupts the other, and
+    "is the pack copy still valid?" becomes unanswerable: they are always
+    identical. Three IWADs is under 50 MB; correctness is worth more than
+    that. The copy is staged as .tmp and moved into place, so an interrupted
+    install never leaves a half WAD where a launch expects a whole one.
+    """
+    dest = os.path.join(PACK, "iwads", rel_name)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    src = os.path.abspath(src)
+    if os.path.abspath(dest) == src:
+        return dest
+    if not _wad_score(src):
+        raise OSError(f"{os.path.basename(src)} is not a usable IWAD")
+    try:
+        if (os.path.isfile(dest) and os.path.getsize(dest) == os.path.getsize(src)
+                and sha256(dest) == sha256(src)):
+            return dest
+    except OSError:
+        pass
+    tmp = dest + ".tmp"
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    try:
+        import shutil
+        shutil.copy2(src, tmp)
+        os.replace(tmp, dest)
+    except OSError as e:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise OSError(f"could not place {rel_name} in the pack: {e}")
+    # The launcher will read whatever landed here, so confirm it rather than
+    # reporting success on a file that cannot boot.
+    if not _wad_score(dest):
+        raise OSError(f"the copy of {rel_name} in the pack is not a usable IWAD")
+    return dest
+
+
+def sha256(path, chunk=1024 * 256):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            b = f.read(chunk)
+            if not b:
+                break
+            h.update(b)
+    return h.hexdigest()
+
+
+def resolved(w):
+    """The configured path for `w` only if it is still a real IWAD on disk.
+
+    config.json is a record of a past decision, not a fact about the machine:
+    the WAD can be moved, renamed, or deleted after it was written, and the
+    launcher would then fail on a file that is not there. needs_setup() reads
+    through this, so a stale entry re-opens setup instead of reporting
+    "All set" over a WAD that does not exist.
+    """
+    p = iwads().get(w)
+    if not p:
+        return None
+    r = resolve_wad_path(w, p)
+    return r or None
+
+
 def load_config():
     if not os.path.isfile(CONFIG):
         return {}
@@ -160,17 +262,48 @@ def iwads():
     return load_config().get("iwads", {})
 
 
+def available(w):
+    """Is `w` launchable right now, from either the recorded path or the pack?
+
+    Both are checked because either one alone lies. config.json alone ignores
+    a WAD that was moved or deleted after it was recorded; the pack folder
+    alone ignores a pack that was built before the player ever pointed the
+    finder at their own copy. A launch reads pack\\iwads\\<name> and nothing
+    else, so that file being a valid IWAD is the condition that matters.
+    """
+    p = resolved(w)
+    if p:
+        return p
+    return resolve_wad_path(w, os.path.join(PACK, "iwads", w))
+
+
 def needs_setup():
     """True when the required WADs are not all accounted for."""
-    have = iwads()
-    return [w for w in ("DOOM.WAD", "DOOM2.WAD") if not have.get(w)]
+    return [w for w in ("DOOM.WAD", "DOOM2.WAD") if not available(w)]
 
 
 def record(found):
-    """Persist a scan result or a manual choice into config.json."""
+    """Persist a scan result or a manual choice into config.json.
+
+    Also installs each WAD into the pack's iwads\\ folder, because that is the
+    only path the generated launchers use. Recording without installing left
+    every Doom II entry reporting "missing content" forever: the finder said
+    All set, config.json was correct, and the game still had nothing to boot.
+    """
     cfg = load_config()
     cur = cfg.setdefault("iwads", {})
+    problems = []
     for w, p in found.items():
-        cur[w] = os.path.abspath(p)
+        ap = os.path.abspath(p)
+        cur[w] = ap
+        try:
+            install(w, ap)
+        except OSError as e:
+            # Kept in config.json either way: it is still the player's stated
+            # preference, and needs_setup() reads through to what is on disk,
+            # so setup stays open rather than reporting a WAD that cannot boot.
+            problems.append(f"{w}: {e}")
     save_config(cfg)
+    if problems:
+        raise OSError("; ".join(problems))
     return cur
