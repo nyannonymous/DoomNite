@@ -40,7 +40,7 @@ import webbrowser
 
 PACK = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(PACK, "pack-manifest.json")
-INDEX = os.path.join(PACK, "dist", "index.html")
+INDEX = os.path.join(PACK, "dist", "app", "index.html")
 
 # Resolved once at startup: a flat, ordered list of runnable entries. The UI and
 # the launch endpoint both work off this, so a number always means the same game.
@@ -439,11 +439,11 @@ def handler_factory():
                         "text/html; charset=utf-8",
                     )
                 return self._send(200, page(), "text/html; charset=utf-8")
-            # Vite emits content-hashed files into dist/assets/. Serving them is
+            # Vite emits content-hashed files into dist/app/assets/. Serving them is
             # what lets the built UI run without a bundler in the request path.
             if path.startswith("/assets/"):
                 fn = os.path.basename(path)
-                target = os.path.join(PACK, "dist", "assets", fn)
+                target = os.path.join(PACK, "dist", "app", "assets", fn)
                 if not os.path.isfile(target):
                     return self._send(404, "", "text/plain")
                 ctype = "text/css" if fn.endswith(".css") else (

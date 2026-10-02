@@ -4,17 +4,217 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>DoomNite</title>
+    <title>DoomNite — download</title>
+    <meta
+      name="description"
+      content="DoomNite is a portable Doom mod launcher: 16 games, 31 launch configurations, one folder that runs from anywhere."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="./assets/index-jYdKuJc8.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-C_KIOAff.css">
+    <style>
+      :root {
+        --bg: #0b0b0f;
+        --panel: #14141b;
+        --line: #26262f;
+        --text: #e8e8ef;
+        --dim: #9a9aab;
+        --accent: #ff6b1a;
+        --accent-dim: #b8480f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, sans-serif;
+        line-height: 1.6;
+      }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 96px; }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        padding: 64px 0 48px;
+        /* faint scanline grid, same industrial feel as the launcher */
+        background-image:
+          linear-gradient(rgba(255, 107, 26, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 107, 26, 0.035) 1px, transparent 1px);
+        background-size: 44px 44px;
+      }
+      .kicker {
+        font-family: "Chakra Petch", monospace;
+        font-size: 12px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 16px;
+      }
+      h1 {
+        font-family: "Chakra Petch", monospace;
+        font-size: clamp(44px, 9vw, 82px);
+        line-height: 0.95;
+        margin: 0 0 20px;
+        letter-spacing: -0.02em;
+      }
+      h1 em { color: var(--accent); font-style: normal; }
+      .tagline { font-size: 18px; color: var(--dim); max-width: 60ch; margin: 0; }
+
+      h2 {
+        font-family: "Chakra Petch", monospace;
+        font-size: 13px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--dim);
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 12px;
+        margin: 56px 0 24px;
+      }
+
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 22px 26px;
+        margin-bottom: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--accent);
+        border-radius: 4px;
+        text-decoration: none;
+        color: var(--text);
+        transition: background 0.15s, border-color 0.15s, transform 0.15s;
+      }
+      .btn:hover {
+        background: #1b1b24;
+        border-color: var(--accent-dim);
+        transform: translateX(2px);
+      }
+      .btn-main { border-left-width: 5px; padding: 28px 26px; }
+      .btn-main .name { font-size: 22px; }
+      .name { font-family: "Chakra Petch", monospace; font-size: 18px; font-weight: 600; }
+      .meta { color: var(--dim); font-size: 14px; margin-top: 4px; }
+      .pill {
+        flex-shrink: 0;
+        font-family: "Chakra Petch", monospace;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        border: 1px solid var(--accent-dim);
+        border-radius: 3px;
+        padding: 7px 12px;
+      }
+
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      td { padding: 11px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+      td:first-child { font-family: "Chakra Petch", monospace; white-space: nowrap; padding-right: 20px; }
+      code {
+        font-family: ui-monospace, monospace;
+        background: #1b1b24;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 14px;
+        color: var(--accent);
+      }
+      ul { color: var(--dim); padding-left: 20px; }
+      li { margin-bottom: 8px; }
+      strong { color: var(--text); font-weight: 600; }
+      .note {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--accent);
+        border-radius: 4px;
+        padding: 20px 24px;
+        color: var(--dim);
+        font-size: 15px;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        margin-top: 64px;
+        padding-top: 28px;
+        color: #6b6b7b;
+        font-size: 14px;
+      }
+      a { color: var(--accent); }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <header>
+      <div class="wrap">
+        <p class="kicker">Portable Doom launcher</p>
+        <h1>DOOM<em>NITE</em></h1>
+        <p class="tagline">
+          Sixteen games. Thirty-one launch configurations. One folder with the
+          engine, the IWADs and every mod — and not one absolute path inside it.
+          Copy it to a USB stick, plug it in anywhere, play.
+        </p>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <h2>Download</h2>
+
+      <a class="btn btn-main" href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite.Setup.1.0.0.exe" rel="noopener">
+        <span>
+          <span class="name">DoomNite for Windows</span>
+          <span class="meta">Installer · x64 · no prerequisites</span>
+        </span>
+        <span class="pill">Download</span>
+      </a>
+
+      <a class="btn" href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite-1.0.0-win.zip" rel="noopener">
+        <span>
+          <span class="name">Portable zip</span>
+          <span class="meta">No installer · unpack anywhere and run</span>
+        </span>
+        <span class="pill">Download</span>
+      </a>
+
+      <div class="note" style="margin-top: 20px">
+        <strong>Nothing to install first.</strong> The app ships with its own
+        Python runtime, so Windows is the only requirement. It does still need the
+        pack — the 3.4 GB of engine, IWADs and mods — which it fetches on first
+        run.
+      </div>
+
+      <h2>What's in the box</h2>
+      <table>
+        <tbody>
+          <tr><td>Games</td><td>Brutal Doom v22, Aliens: Eradication TC, Adventures of Square, DukeBoomem, Shadow Warrior, MoonMan, Hocus Pocus 3D, DN3DooM and more</td></tr>
+          <tr><td>Engine</td><td>GZDoom with its full DLL set, path-portable</td></tr>
+          <tr><td>IWADs</td><td>Shareware <code>DOOM.WAD</code> included</td></tr>
+          <tr><td>Assets</td><td>3.4 GB, fetched on first run with per-file sha256 verification</td></tr>
+        </tbody>
+      </table>
+
+      <h2>First run</h2>
+      <ul>
+        <li>Unpack or install, then open the app.</li>
+        <li>It fetches 3.4 GB from the project's own storage and verifies every file against its hash. Already-correct files are skipped, so re-running is cheap.</li>
+        <li>Pick a game and hit launch.</li>
+      </ul>
+
+      <div class="note">
+        <strong>Commercial IWADs are not included.</strong> <code>DOOM2.WAD</code> and
+        <code>Hexen.wad</code> are id Software releases, so the pack refuses them
+        rather than hosting them. Entries that need one will ask you to supply it.
+      </div>
+
+      <h2>Also works without the app</h2>
+      <p style="color: var(--dim)">
+        If you would rather not install anything, the launcher is just a local web
+        server. Clone the repo and run <code>python serve.py</code> — it opens the
+        same interface in your browser and launches games exactly the same way.
+      </p>
+
+      <footer>
+        Mods are by their respective authors. Doom and GZDoom are by id Software and
+        contributors. Nothing on this page is mine to license.
+      </footer>
+    </div>
   </body>
 </html>

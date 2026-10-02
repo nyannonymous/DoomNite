@@ -1,0 +1,16 @@
+{
+  // Cloudflare Pages configuration.
+  //
+  // Publishes site/ rather than dist/. site/ is the download page; dist/ is the
+  // launcher UI, which is useless on a static host because every /api/ endpoint
+  // it calls needs the Python server running on the user's own machine. So the
+  // public URL is the download page and nothing else.
+  //
+  // The build command still runs (dashboard setting) and still writes dist/ --
+  // that output is simply not what gets published. Harmless, and it keeps
+  // serve.py's bundle building in CI where it is checked on every push.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "doomnite",
+  "compatibility_date": "2026-10-02",
+  "pages_build_output_dir": "site"
+}
