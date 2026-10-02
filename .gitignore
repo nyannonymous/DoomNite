@@ -35,3 +35,8 @@ upload.log
 # the Desktop; if one is ever copied into the pack, do not commit it.
 *secrets*.txt
 *credentials*.txt
+
+# Electron build output and toolchain. node_modules is 284 packages and release/
+# is ~200 MB of installer -- none of it belongs in git.
+desktop/node_modules/
+desktop/release/
