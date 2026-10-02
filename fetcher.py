@@ -22,6 +22,15 @@ trustworthy:
   an older bad download gets repaired instead of trusted.
 * No URLs is not an error state -- it means the operator has not published
   hosting yet, so every such file is reported as unavailable and skipped.
+* Paths are percent-encoded when they become URLs. Names in a pack are the
+  authors' file names, spaces and commas included, and a URL built from one is
+  not valid until it is encoded.
+* A certificate this machine cannot verify is retried without verification
+  rather than failed. See the note on unverified_ctx: the sha256 above is what
+  provides integrity, and a machine whose root store is stale would otherwise
+  be unable to obtain a pack at all.
+* One file's failure is never allowed to abort the run. Anything a download can
+  raise is caught per file and reported as that file's result.
 
 Downloading is concurrent but writes are not: each file has its own .part and
 its own final path, so nothing needs a lock.
@@ -29,6 +38,7 @@ its own final path, so nothing needs a lock.
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import ssl
@@ -37,6 +47,7 @@ import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import quote
 
 PACK = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(PACK, "sources.json")
@@ -97,6 +108,37 @@ def load():
 BASE_URL = {}
 
 
+# Built once, and only ever used after CTX has already failed on the same URL.
+# A machine whose root store is out of date cannot validate the chain at all, and
+# Windows makes that state easy to reach: the store keeps expired cross-signed
+# roots (ISRG Root X1 via DST Root CA X3 is the usual one), and OpenSSL will
+# happily build a path through one, so a browser opens a URL that Python refuses.
+# Falls back to this rather than making the pack unobtainable, on the same
+# reasoning installer.py already documents: the sha256 is what provides
+# integrity here, and it is checked before anything is renamed into place. A
+# wrong or tampered payload still fails the hash -- this can only turn a hard
+# failure into a slower one.
+_CTX_UNVERIFIED = None
+
+
+def unverified_ctx():
+    global _CTX_UNVERIFIED
+    if _CTX_UNVERIFIED is None:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        _CTX_UNVERIFIED = ctx
+    return _CTX_UNVERIFIED
+
+
+def is_cert_failure(err):
+    """Did this failure come from being unable to verify the certificate?"""
+    reason = getattr(err, "reason", None)
+    return isinstance(reason, ssl.SSLCertVerificationError) or isinstance(
+        err, ssl.SSLCertVerificationError
+    )
+
+
 def urls_for(rel, rec):
     """Every place this file can be fetched from, most-preferred first.
 
@@ -116,7 +158,20 @@ def urls_for(rel, rec):
     out = [u for u in (rec.get("urls") or []) if u]
     base = (BASE_URL.get("url") or "").strip()
     if base:
-        guess = base + rel.replace(os.sep, "/").lstrip("/")
+        # Percent-encode the relative path before it becomes a URL.
+        #
+        # Without this, a pack file whose name contains a space -- and one does,
+        # "The Bikini Bottom Massacre 1,3.wad" -- is not a valid URL. urlopen
+        # raises http.client.InvalidURL before it even opens a socket, and
+        # because that is not an OSError or a URLError it escaped fetch_one's
+        # error handling, propagated out of the future, and killed the whole
+        # run with a traceback on the first such file. One awkward filename
+        # took 67 good ones with it.
+        #
+        # Only the constructed URL is encoded. A per-file "urls" entry is
+        # written by hand and is already a URL; quoting it again would encode
+        # its own %20 into %2520.
+        guess = base + quote(rel.replace(os.sep, "/").lstrip("/"))
         if guess not in out:
             out.append(guess)
     return out
@@ -138,13 +193,13 @@ def file_state(rel, rec):
         return "absent", path
 
 
-def _download(url, dest, expect_size=None, progress=None):
+def _download(url, dest, expect_size=None, progress=None, ctx=CTX):
     """Stream url to dest. Returns sha256. Raises on any failure."""
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     h = hashlib.sha256()
     got = 0
     tmp = dest + ".part"
-    with urllib.request.urlopen(req, timeout=TIMEOUT, context=CTX) as resp:
+    with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:
         total = int(resp.headers.get("Content-Length") or 0)
         with open(tmp, "wb") as f:
             while True:
@@ -188,11 +243,15 @@ def fetch_one(rel, rec, force=False, verbose=True):
 
     for url in urls:
         host = url.split("/")[2] if "://" in url else url[:40]
+        # Per URL, not per file: a mirror that fails to verify says nothing about
+        # whether the next one will, and the failure is usually the machine's
+        # trust store rather than the mirror.
+        ctx = CTX
         for attempt in range(1, RETRIES + 1):
             last = (attempt == RETRIES)
             try:
                 cb = _progress_printer(host) if verbose else None
-                digest, tmp = _download(url, path, progress=cb)
+                digest, tmp = _download(url, path, progress=cb, ctx=ctx)
                 if verbose:
                     print("\r" + " " * 62 + "\r", end="", flush=True)
 
@@ -207,10 +266,21 @@ def fetch_one(rel, rec, force=False, verbose=True):
                 os.replace(tmp, path)   # atomic, same volume
                 return rel, "fetched", human(rec.get("size") or os.path.getsize(path))
 
-            except (urllib.error.URLError, OSError, IOError) as e:
+            # http.client.HTTPException covers a malformed URL (InvalidURL). It
+            # is not covered by OSError or URLError, and letting one escape here
+            # is what used to abort the run instead of reporting one bad file.
+            except (urllib.error.URLError, OSError, IOError,
+                    http.client.HTTPException) as e:
                 if verbose:
                     print("\r" + " " * 62 + "\r", end="", flush=True)
                 errors.append(f"{host}: {type(e).__name__} {e}")
+                if is_cert_failure(e) and ctx is CTX:
+                    ctx = unverified_ctx()
+                    if verbose:
+                        print(f"    {host}: certificate cannot be verified on "
+                              f"this machine; retrying without verification "
+                              f"(every file is checked against its sha256)")
+                    continue
                 if last:
                     break
                 time.sleep(1.5 * attempt)

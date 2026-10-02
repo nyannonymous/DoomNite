@@ -101,26 +101,68 @@ function findPython(packRoot) {
 // Wait for the port rather than sleeping a fixed amount. serve.py is fast but
 // disk-bound on a cold start reading pack-manifest.json, and a fixed sleep is
 // either flaky or needlessly slow.
-function waitForPort(port, timeoutMs = 30000) {
+function waitForPort(port, timeoutMs = 30000, child = null) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let retry = null;
+    let timeout = null;
+    let sock = null;
+
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      if (retry) clearTimeout(retry);
+      if (timeout) clearTimeout(timeout);
+      if (sock) sock.destroy();
+      if (child) {
+        child.removeListener("error", onChildError);
+        child.removeListener("exit", onChildExit);
+      }
+      if (error) reject(error);
+      else resolve();
+    };
+    const onChildError = (error) =>
+      finish(new Error(spawnFailure("serve.py", child.spawnfile, error)));
+    const onChildExit = (code, signal) =>
+      finish(
+        new Error(
+          `serve.py exited before opening port ${port} (code ${code}, signal ${signal || "none"})`
+        )
+      );
+
+    if (child) {
+      child.once("error", onChildError);
+      child.once("exit", onChildExit);
+    }
+    timeout = setTimeout(
+      () => finish(new Error(`serve.py did not open port ${port} in time`)),
+      timeoutMs
+    );
+
     const attempt = () => {
-      const sock = net.connect(port, "127.0.0.1");
-      sock.once("connect", () => {
-        sock.destroy();
-        resolve();
-      });
-      sock.once("error", () => {
-        sock.destroy();
-        if (Date.now() > deadline) {
-          reject(new Error(`serve.py did not open port ${port} in time`));
-        } else {
-          setTimeout(attempt, 120);
+      if (settled) return;
+      const attemptSocket = net.connect(port, "127.0.0.1");
+      sock = attemptSocket;
+      attemptSocket.once("connect", () => finish());
+      attemptSocket.once("error", () => {
+        attemptSocket.destroy();
+        if (sock === attemptSocket) sock = null;
+        if (!settled && Date.now() >= deadline) {
+          finish(new Error(`serve.py did not open port ${port} in time`));
+        } else if (!settled) {
+          retry = setTimeout(attempt, 120);
         }
       });
     };
     attempt();
   });
+}
+
+function spawnFailure(label, command, error) {
+  const code = error && error.code ? ` (${error.code})` : "";
+  const message = error && error.message ? error.message : String(error);
+  return `${label} could not start${command ? `: ${command}` : ""}${code}. ${message}`;
 }
 
 // Where the pack root is, and whether it is ours to write to.
@@ -160,14 +202,14 @@ function resolvePackRoot() {
 // art, and the only reason to overwrite anything is that a newer build shipped
 // a newer copy -- a rebuilt UI, a regenerated manifest. A size-identical file
 // is the same file.
-function copyTree(src, dest) {
+function copyTree(src, dest, onFile) {
   fs.mkdirSync(dest, { recursive: true });
   let copied = 0;
   for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
     const s = path.join(src, ent.name);
     const d = path.join(dest, ent.name);
     if (ent.isDirectory()) {
-      copied += copyTree(s, d);
+      copied += copyTree(s, d, onFile);
       continue;
     }
     let same = false;
@@ -179,14 +221,30 @@ function copyTree(src, dest) {
     if (same) continue;
     fs.copyFileSync(s, d);
     copied++;
+    if (onFile) onFile(copied);
   }
   return copied;
+}
+
+function countFiles(dir) {
+  let n = 0;
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    n += ent.isDirectory()
+      ? countFiles(path.join(dir, ent.name))
+      : 1;
+  }
+  return n;
 }
 
 // Materialise the pack root. Runs on every launch of a managed pack, not just
 // the first, so that upgrading the app replaces the UI and the manifest instead
 // of leaving last version's copies in place forever.
-function seedPack(root) {
+//
+// Reported through the first-run window rather than done silently: it is ~115
+// small files, and on a machine whose antivirus rescans each write that is a
+// minute of a black screen before anything appears -- indistinguishable from
+// the app failing to start, which is the bug this whole path exists to fix.
+function seedPack(root, ui) {
   if (!fs.existsSync(SEED)) {
     fail(
       "This build is missing its bundled pack.",
@@ -195,8 +253,25 @@ function seedPack(root) {
     );
     return false;
   }
-  const n = copyTree(SEED, root);
-  console.log(`seedPack: ${n} file(s) -> ${root}`);
+  const total = countFiles(SEED);
+  let copied = 0;
+  let announced = false;
+  copyTree(SEED, root, () => {
+    // Only on the first real file: a launch with nothing to copy must not open
+    // a window just to say it did nothing.
+    if (!announced) {
+      announced = true;
+      ui.phase(
+        "Unpacking the launcher",
+        "The pack's own files, kept beside your save data so the install stays " +
+          "read-only."
+      );
+    }
+    ui.state.done = ++copied;
+    ui.state.total = total;
+    ui.push();
+  });
+  if (copied) console.log(`seedPack: ${copied} file(s) -> ${root}`);
   return true;
 }
 
@@ -237,27 +312,96 @@ function summarise(text) {
   return { fetched: +m[1], no_url: +m[2], failed: +m[3] };
 }
 
-// The window that is on screen while 3.4 GB arrives. Without it the app looks
-// hung for several minutes -- the server has not started, so there is nothing
-// else to show -- and a user reasonably kills it halfway through.
-function progressWindow() {
-  const w = new BrowserWindow({
-    width: 720,
-    height: 470,
-    resizable: false,
-    maximizable: false,
-    backgroundColor: "#0b0b0f",
-    title: "DoomNite - first run",
-    show: false,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
+// The window that covers a first run: unpacking, then 3.4 GB of downloading.
+// Without it the app looks hung for several minutes -- the server has not
+// started, so there is nothing else to show -- and a user reasonably kills it.
+//
+// The window is created on the first thing there is to report, not up front, so
+// a launch of an already-set-up pack never flashes one. Everything the two
+// phases share lives here: the state object the page renders, the throttled
+// push, and the fact that closing the window means stop.
+function firstRunWindow() {
+  const state = {
+    head: "Getting ready",
+    note: "",
+    done: 0,
+    total: 0,
+    current: "",
+    bytes: "",
+    log: [],
+  };
+  const cancels = [];
+  let w = null;
+  let pending = null;
+  let cancelled = false;
+
+  const flush = () => {
+    pending = null;
+    if (!w || w.isDestroyed()) return;
+    w.webContents
+      .executeJavaScript(`window.dnUpdate(${JSON.stringify(state)})`)
+      .catch(() => {});
+  };
+  // Coalesced rather than sent per file: several hundred updates a second would
+  // spend more time in the renderer than in the copy or the download.
+  const push = () => {
+    if (pending) return;
+    pending = setTimeout(flush, 200);
+  };
+
+  const open = () => {
+    if (w) return w;
+    w = new BrowserWindow({
+      width: 720,
+      height: 470,
+      resizable: false,
+      maximizable: false,
+      backgroundColor: "#0b0b0f",
+      title: "DoomNite - first run",
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: true,
+      },
+    });
+    w.once("ready-to-show", () => w.show());
+    // The page has to have run its script before an update means anything, and
+    // work can start before it has. Re-send once the document is there.
+    w.webContents.once("did-finish-load", flush);
+    w.on("closed", () => {
+      cancelled = true;
+      for (const fn of cancels) fn();
+    });
+    w.loadFile(path.join(__dirname, "first-run.html"));
+    return w;
+  };
+
+  return {
+    state,
+    push,
+    open,
+    get cancelled() {
+      return cancelled;
     },
-  });
-  w.once("ready-to-show", () => w.show());
-  w.loadFile(path.join(__dirname, "first-run.html"));
-  return w;
+    onCancel(fn) {
+      cancels.push(fn);
+    },
+    phase(head, note) {
+      state.head = head;
+      state.note = note;
+      state.done = 0;
+      state.total = 0;
+      state.current = "";
+      state.bytes = "";
+      open();
+      push();
+    },
+    close() {
+      if (pending) clearTimeout(pending);
+      if (w && !w.isDestroyed()) w.destroy();
+    },
+  };
 }
 
 // Download the payload, reporting progress as it goes.
@@ -269,38 +413,30 @@ function progressWindow() {
 // retry. Failing the app outright here would make a flaky network -- or a
 // machine whose certificate store is out of date -- indistinguishable from a
 // broken install.
-async function fetchPack(root, py) {
-  const w = progressWindow();
-  const state = { done: 0, total: 0, current: "", bytes: "", log: [] };
-  let pending = null;
-
-  const flush = () => {
-    pending = null;
-    if (w.isDestroyed()) return;
-    w.webContents
-      .executeJavaScript(`window.dnUpdate(${JSON.stringify(state)})`)
-      .catch(() => {});
-  };
-  // Coalesced rather than sent per line: the fetcher rewrites its progress line
-  // many times a second, and one executeJavaScript per rewrite would spend more
-  // time in the renderer than in the download.
-  const push = () => {
-    if (!pending) pending = setTimeout(flush, 200);
-  };
-  // The page has to have run its script before an update means anything, and
-  // the first bytes of a download can land before it has. Re-send once the
-  // document is definitely there.
-  w.webContents.once("did-finish-load", flush);
-  push();
+async function fetchPack(root, py, ui) {
+  ui.phase(
+    "Fetching the pack",
+    "The engine, the IWADs and every mod, each file verified against its own " +
+      "sha256 as it lands. It happens once."
+  );
+  const state = ui.state;
 
   // -u because stdout is a pipe here, not a console, and Python block-buffers
   // a pipe: without it the whole first run would show nothing until the buffer
   // filled, which is the opposite of progress.
-  const child = spawn(py.cmd, [...py.args, "-u", path.join(root, "fetcher.py")], {
-    cwd: root,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  let child;
+  try {
+    child = spawn(py.cmd, [...py.args, "-u", path.join(root, "fetcher.py")], {
+      cwd: root,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: spawnFailure("Python fetcher", py.cmd, error),
+    };
+  }
   fetcher = child;
 
   const lines = [];
@@ -318,50 +454,58 @@ async function fetchPack(root, py) {
         state.done = +m[1];
         state.total = +m[2];
         state.current = "";
-        push();
+        ui.push();
         continue;
       }
       m = /^to fetch: (\d+) files, (.+)$/.exec(line);
       if (m) {
         state.total = +m[1];
         state.bytes = m[2];
-        push();
+        ui.push();
         continue;
       }
       m = /^(\S+): ([\d.]+ [A-Z]+) (\d+)%$/.exec(line);
       if (m) {
         state.current = `${m[1]} · ${m[2]} · ${m[3]}%`;
-        push();
+        ui.push();
         continue;
       }
       state.log.push(line);
       if (state.log.length > 24) state.log.shift();
-      push();
+      ui.push();
     }
   };
   for (const stream of [child.stdout, child.stderr]) {
+    if (!stream) continue;
     stream.setEncoding("utf8");
     stream.on("data", onData);
   }
 
-  // Closing the window means stop, not "carry on invisibly". The fetch is
-  // resumable, so throwing away partial progress costs only what was already
-  // downloaded and not yet kept.
-  let cancelled = false;
-  let settled = false;
-  w.on("closed", () => {
-    if (settled) return;
-    cancelled = true;
-    kill(child);
+  ui.onCancel(() => kill(child));
+
+  const result = await new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    child.once("error", (error) => finish({ error }));
+    // `close` follows stdio closure, so all buffered fetcher output is included
+    // in the summary before it is parsed.
+    child.once("close", (code, signal) => finish({ code, signal }));
   });
-
-  const code = await new Promise((res) => child.once("exit", (c) => res(c)));
   fetcher = null;
-  settled = true;
-  if (pending) clearTimeout(pending);
-  flush();
+  ui.push();
 
-  if (cancelled) return { ok: false, cancelled: true };
+  if (ui.cancelled) return { ok: false, cancelled: true };
+  if (result.error) {
+    return {
+      ok: false,
+      reason: spawnFailure("Python fetcher", py.cmd, result.error),
+    };
+  }
+  const { code } = result;
 
   const text = lines.join("\n");
   const summary = summarise(text);
@@ -380,14 +524,12 @@ async function fetchPack(root, py) {
       ),
       "utf8"
     );
-    if (!w.isDestroyed()) w.destroy();
     return { ok: true };
   }
 
   const why = summary
     ? `${summary.failed} file(s) could not be downloaded.`
     : `The fetcher exited with code ${code}.`;
-  if (!w.isDestroyed()) w.destroy();
   return { ok: false, reason: `${why}\n\n${text.slice(-700)}` };
 }
 
@@ -431,39 +573,66 @@ async function startServer(packRoot, py) {
     }
   }
 
-  server = spawn(py.cmd, [...py.args, servePy, "--no-open", "--port", String(PORT)], {
-    cwd: packRoot,
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  try {
+    server = spawn(py.cmd, [...py.args, servePy, "--no-open", "--port", String(PORT)], {
+      cwd: packRoot,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    fail("The launcher server did not start.", spawnFailure("Python server", py.cmd, error));
+    return false;
+  }
 
   const log = [];
   for (const stream of [server.stdout, server.stderr]) {
+    if (!stream) continue;
     stream.setEncoding("utf8");
     stream.on("data", (d) => log.push(d.trim()));
   }
 
-  let exited = null;
-  server.on("exit", (code) => {
-    exited = code;
-    // A crash while quitting is expected and must not raise a dialog.
-    if (!quitting) {
+  let ready = false;
+  let earlyExit = null;
+  server.on("error", (error) => {
+    log.push(spawnFailure("Python server", py.cmd, error));
+    // waitForPort reports startup errors once; only a later error is a runtime
+    // failure that needs a dialog here.
+    if (ready && !quitting) {
+      fail("The launcher server stopped unexpectedly.", log.join("\n").slice(0, 900));
+    }
+  });
+  server.on("exit", (code, signal) => {
+    earlyExit = { code, signal };
+    // A crash while quitting is expected, and startup exits are reported by
+    // waitForPort so the user gets one dialog rather than two.
+    if (ready && !quitting) {
       fail(
         "The launcher server stopped unexpectedly.",
-        (log.join("\n") || `serve.py exited with code ${code}`).slice(0, 900)
+        (log.join("\n") || `serve.py exited with code ${code}, signal ${signal || "none"}`).slice(0, 900)
       );
     }
   });
 
   try {
-    await waitForPort(PORT);
-  } catch (e) {
+    await waitForPort(PORT, 30000, server);
+  } catch (error) {
     fail(
       "The launcher server did not start.",
-      (log.join("\n") || e.message).slice(0, 900)
+      (log.join("\n") || error.message).slice(0, 900)
     );
     return false;
   }
+  // The server can exit immediately after opening the port but before this
+  // continuation runs. Do not report startup success in that race.
+  if (earlyExit || server.exitCode !== null) {
+    const ended = earlyExit || { code: server.exitCode, signal: server.signalCode };
+    fail(
+      "The launcher server stopped unexpectedly.",
+      (log.join("\n") || `serve.py exited with code ${ended.code}, signal ${ended.signal || "none"}`).slice(0, 900)
+    );
+    return false;
+  }
+  ready = true;
   return true;
 }
 
@@ -510,9 +679,27 @@ function createWindow() {
 function kill(child) {
   if (!child || child.killed || child.exitCode !== null) return;
   if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(child.pid), "/f", "/t"], { windowsHide: true });
+    if (!child.pid) return;
+    try {
+      const killer = spawn(
+        "taskkill",
+        ["/pid", String(child.pid), "/f", "/t"],
+        { windowsHide: true, stdio: "ignore" }
+      );
+      // Cleanup is best-effort: taskkill may be unavailable or denied, but its
+      // spawn error must never become an unhandled ChildProcess 'error' event.
+      killer.on("error", (error) => {
+        console.warn(`could not stop child ${child.pid}: ${error.message}`);
+      });
+    } catch (error) {
+      console.warn(`could not stop child ${child.pid}: ${error.message}`);
+    }
   } else {
-    child.kill("SIGTERM");
+    try {
+      child.kill("SIGTERM");
+    } catch (error) {
+      console.warn(`could not stop child ${child.pid || "process"}: ${error.message}`);
+    }
   }
 }
 
@@ -520,10 +707,11 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
 
   const { root: packRoot, managed } = resolvePackRoot();
+  const ui = firstRunWindow();
 
   // The bootstrap first: it contains the fetcher, so it has to be on disk
   // before anything can be downloaded, and serve.py cannot start without it.
-  if (managed && !seedPack(packRoot)) return;
+  if (managed && !seedPack(packRoot, ui)) return;
 
   // Resolved once, here, rather than inside startServer: the fetch needs the
   // same interpreter, and a missing runtime has to be reported before a
@@ -543,10 +731,10 @@ app.whenReady().then(async () => {
   // network, which is worth a second try, and the fetch is resumable -- nothing
   // already verified is downloaded again.
   let whyNoPack = "";
-  while (needsFetch(packRoot, managed)) {
-    const got = await fetchPack(packRoot, py);
+  while (!ui.cancelled && needsFetch(packRoot, managed)) {
+    const got = await fetchPack(packRoot, py, ui);
     if (got.ok) break;
-    if (got.cancelled) return;
+    if (got.cancelled) break;
 
     whyNoPack = got.reason;
     const pick = dialog.showMessageBoxSync({
@@ -563,8 +751,16 @@ app.whenReady().then(async () => {
       noLink: true,
     });
     if (pick === 1) break;
-    if (pick === 2) return;
+    if (pick === 2) {
+      ui.close();
+      return;
+    }
   }
+
+  // Read before closing: closing destroys the window, which is the same event
+  // as the user closing it, and the two mean opposite things here.
+  if (ui.cancelled) return;
+  ui.close();
 
   if (!(await startServer(packRoot, py))) return;
   // The launcher opens with entries missing rather than not opening at all:

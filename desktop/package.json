@@ -4,5 +4,55 @@
   "version": "1.0.0",
   "private": true,
   "description": "DoomNite desktop shell. Runs the pack's own Python server and shows the launcher in a real window.",
-  "main": "main.js"
+  "main": "main.js",
+  "scripts": {
+    "preflight": "node preflight.js",
+    "prestart": "node preflight.js",
+    "start": "electron .",
+    "prepack": "node preflight.js",
+    "pack": "npm run prepare-python && electron-builder --dir",
+    "predist": "node preflight.js",
+    "dist": "npm run prepare-python && electron-builder",
+    "prepare-python": "node build/prepare-python.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "dev.doomnite.app",
+    "productName": "DoomNite",
+    "files": [
+      "main.js",
+      "preflight.js",
+      "first-run.html",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "beforePack": "./build/stage-pack.js",
+    "extraResources": [
+      {
+        "from": "build/python",
+        "to": "python"
+      },
+      {
+        "from": "build/pack",
+        "to": "pack"
+      }
+    ]
+  }
 }

@@ -81,19 +81,19 @@
   </head>
   <body>
     <p class="kicker">First run</p>
-    <h1>Fetching the pack</h1>
-    <p class="lede">
-      The engine, the IWADs and every mod — verified against its own sha256 as it
-      lands. It happens once; later launches start immediately.
-    </p>
+    <!-- The two phases of a first run -- unpacking the bootstrap, then
+         downloading the payload -- are one window with one state object, so the
+         text is filled in from the main process rather than fixed here. -->
+    <h1 id="head">Getting ready</h1>
+    <p class="lede" id="note"></p>
 
     <div class="bar"><span id="fill"></span></div>
     <p class="status">
-      <span id="count">starting…</span>
+      <span id="count">working…</span>
       <span id="current"></span>
     </p>
     <pre id="log"></pre>
-    <p class="foot">Closing this window cancels the download. Launching again resumes where it stopped.</p>
+    <p class="foot">Closing this window cancels. Launching again picks up where it stopped.</p>
 
     <script>
       // Called from the main process with the whole progress state, rather than
@@ -107,10 +107,13 @@
         const total = state.total || 0;
         const pct = total ? Math.min(100, (done / total) * 100) : 0;
 
+        if (state.head) $("head").textContent = state.head;
+        if (state.note) $("note").textContent = state.note;
+
         $("fill").style.width = pct + "%";
         $("count").textContent = total
           ? `${done} of ${total} files` + (state.bytes ? ` · ${state.bytes}` : "")
-          : "starting…";
+          : "working…";
         $("current").textContent = state.current || "";
 
         const box = $("log");

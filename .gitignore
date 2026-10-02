@@ -45,3 +45,4 @@ desktop/release/
 # mean shipping an unreviewed binary and ~11 MB for nothing.
 desktop/build/python/
 desktop/build/python-embed.zip
+desktop/build/pack/
