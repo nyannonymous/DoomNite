@@ -22,3 +22,16 @@ __pycache__/
 # R2 upload transcript: machine-specific paths, and nothing here
 # belongs in the repo. The manifests it is derived from are committed.
 upload.log
+
+# Secrets. Nothing in this repo needs one -- the R2 credentials live outside it,
+# on the Desktop -- but a stray .env committed by habit would leak a live API
+# key, and git history keeps it forever after a delete. Ignore the whole
+# family so a .env.local or .env.production cannot slip through either.
+.env
+.env.*
+!.env.example
+
+# Credential files, same reasoning. The R2 secrets file is "R2 secrets.txt" on
+# the Desktop; if one is ever copied into the pack, do not commit it.
+*secrets*.txt
+*credentials*.txt
