@@ -227,6 +227,37 @@ deploy is a read-only catalogue view, nothing more.
 
 ---
 
+## The desktop app
+
+`desktop/` is an Electron shell around the same server. It resolves the pack,
+spawns `serve.py --no-open`, waits for the port, and shows the launcher in a
+real window.
+
+```bash
+cd desktop
+npm ci
+npm start              # run from source
+npm run dist           # build an installer into release/
+```
+
+Produces `DoomNite Setup 1.0.0.exe` (NSIS) and a portable zip. Installers are
+published to [GitHub Releases](https://github.com/nyannonymous/DoomNite/releases/latest);
+the 3.4 GB pack stays on R2.
+
+**It needs Python 3.11+ on the machine**, and the pack fetched. Electron is the
+window; the Python server is what starts the games. Bundling a frozen runtime
+would remove the Python requirement at the cost of ~100 MB more.
+
+Two environment variables override the defaults:
+
+- `DOOMNITE_PACK` — where the pack lives, if not beside the executable
+- `DOOMNITE_PYTHON` — which interpreter to use
+
+The shell adds no launch capability of its own. `/api/launch` still takes an
+integer index and resolves it server-side, so the security model is unchanged.
+
+---
+
 ## Credits
 
 Mods are by their respective authors. Doom and GZDoom are by id Software and
