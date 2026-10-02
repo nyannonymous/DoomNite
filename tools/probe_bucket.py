@@ -7,39 +7,17 @@ refused, probe plausible names with head_bucket until one answers.
 Prints only bucket names and result codes. Never a key or secret.
 """
 import os
-import re
 import sys
 
-SEC = os.path.join(os.path.expanduser("~"), "Desktop", "R2 secrets.txt")
-
-
-def load():
-    vals = {}
-    for line in open(SEC, encoding="utf-8", errors="replace"):
-        s = line.strip()
-        if not s or s.startswith("#"):
-            continue
-        if "=" in s:
-            k, v = s.split("=", 1)
-        elif ":" in s:
-            k, v = s.split(":", 1)
-        else:
-            continue
-        vals[k.strip().strip('"').strip("'").lower()] = v.strip().strip('"').strip("'")
-    raw = open(SEC, encoding="utf-8", errors="replace").read()
-    key = next((v for k, v in vals.items() if "access key id" in k), None)
-    sec = next((v for k, v in vals.items() if k.startswith("secret")), None)
-    acct = next((v for k, v in vals.items() if "account" in k), None)
-    if not acct:
-        m = re.search(r"dash\.cloudflare\.com/([0-9a-f]{32})", raw)
-        acct = m.group(1) if m else None
-    return key, sec, acct
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from r2creds import load  # noqa: E402
 
 
 def main():
-    key, sec, acct = load()
-    if not (key and sec and acct):
-        sys.exit("missing credentials or account id")
+    try:
+        key, sec, acct = load()
+    except RuntimeError as e:
+        sys.exit(str(e))
     import boto3
     from botocore.config import Config
     from botocore.exceptions import ClientError

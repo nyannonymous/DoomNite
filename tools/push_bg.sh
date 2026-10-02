@@ -12,20 +12,26 @@
 set -euo pipefail
 
 PACK="$(cd "$(dirname "$0")/.." && pwd)"
-SEC="$HOME/Desktop/R2 secrets.txt"
+ENV="$PACK/.env"
 LOG="$PACK/upload.log"
 
-[ -f "$SEC" ] || { echo "no secrets file at $SEC" >&2; exit 1; }
+[ -f "$ENV" ] || { echo "no .env in $PACK" >&2; exit 1; }
 
-export AWS_ACCESS_KEY_ID="$(sed -n 's/^Access Key ID=//p' "$SEC" | head -1 | tr -d '\r')"
-export AWS_SECRET_ACCESS_KEY="$(sed -n 's/^Secret Access Key=//p' "$SEC" | head -1 | tr -d '\r')"
-export R2_ACCOUNT_ID="$(sed -n 's#.*dash\.cloudflare\.com/\([0-9a-f]\{32\}\).*#\1#p' "$SEC" | head -1 | tr -d '\r')"
+# Parsed, not sourced -- a .env is not required to be shell-safe.
+r2_get() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV" \
+    | head -1 | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//"
+}
 
-for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID; do
-  [ -n "${!v}" ] || { echo "could not read $v from the secrets file" >&2; exit 1; }
+export R2_ACCOUNT_ID="$(r2_get R2_ACCOUNT_ID)"
+export AWS_ACCESS_KEY_ID="$(r2_get AWS_ACCESS_KEY_ID)"
+export AWS_SECRET_ACCESS_KEY="$(r2_get AWS_SECRET_ACCESS_KEY)"
+
+for v in R2_ACCOUNT_ID AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+  [ -n "${!v}" ] || { echo "$v missing from .env" >&2; exit 1; }
 done
 
-PY="/c/Users/Serge/AppData/Local/Programs/Python/Python311/python.exe"
+PY="${R2_PYTHON:-/c/Users/Serge/AppData/Local/Programs/Python/Python311/python.exe}"
 cd "$PACK"
 
 echo "creds loaded (lengths only): key=${#AWS_ACCESS_KEY_ID} secret=${#AWS_SECRET_ACCESS_KEY} account=${#R2_ACCOUNT_ID}"

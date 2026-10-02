@@ -10,13 +10,21 @@
 # Prints only names, sizes, and counts. Never a credential.
 set -euo pipefail
 BUCKET="${1:-doomnite}"
-SEC="$HOME/Desktop/R2 secrets.txt"
+PACK="$(cd "$(dirname "$0")/.." && pwd)"
+ENV="$PACK/.env"
+[ -f "$ENV" ] || { echo "no .env in $PACK" >&2; exit 1; }
 
-export AWS_ACCESS_KEY_ID="$(sed -n 's/^Access Key ID=//p' "$SEC" | head -1 | tr -d '\r')"
-export AWS_SECRET_ACCESS_KEY="$(sed -n 's/^Secret Access Key=//p' "$SEC" | head -1 | tr -d '\r')"
-export R2_ACCOUNT_ID="$(sed -n 's#.*dash\.cloudflare\.com/\([0-9a-f]\{32\}\).*#\1#p' "$SEC" | head -1 | tr -d '\r')"
+# Parsed, not sourced -- a .env is not required to be shell-safe.
+r2_get() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV" \
+    | head -1 | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//"
+}
+
+export R2_ACCOUNT_ID="$(r2_get R2_ACCOUNT_ID)"
+export AWS_ACCESS_KEY_ID="$(r2_get AWS_ACCESS_KEY_ID)"
+export AWS_SECRET_ACCESS_KEY="$(r2_get AWS_SECRET_ACCESS_KEY)"
 export R2_BUCKET="$BUCKET"
 
-PY="/c/Users/Serge/AppData/Local/Programs/Python/Python311/python.exe"
-cd "$(dirname "$0")/.."
+PY="${R2_PYTHON:-/c/Users/Serge/AppData/Local/Programs/Python/Python311/python.exe}"
+cd "$PACK"
 exec "$PY" tools/remote_status.py
