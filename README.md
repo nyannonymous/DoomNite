@@ -187,6 +187,24 @@ changes.
 you to run `npm ci` if it's missing, rather than failing with npm's
 `'vite' is not recognized`.
 
+### Building from the repository root
+
+There is a root `package.json` that forwards to `ui/`, so tooling which runs
+`npm run build` in the repo root works:
+
+```
+npm run build     # -> npm --prefix ui ci && npm --prefix ui run build
+npm run dev
+npm run preview
+```
+
+This is what a CI or Pages-style build expects. Set the **build command** to
+`npm run build` and the **output directory** to `dist` — the root manifest
+builds into the root `dist/`, not `ui/dist`.
+
+Verified from a fresh clone: the root build succeeds and emits byte-identical
+assets to the committed `dist/`.
+
 ---
 
 ## Credits

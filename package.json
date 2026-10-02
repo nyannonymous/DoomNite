@@ -1,0 +1,11 @@
+{
+  "name": "doomnite",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root manifest so build tooling that runs `npm run build` at the repository root works. The real UI project lives in ui/.",
+  "scripts": {
+    "build": "npm --prefix ui ci && npm --prefix ui run build",
+    "dev": "npm --prefix ui run dev",
+    "preview": "npm --prefix ui run preview"
+  }
+}
