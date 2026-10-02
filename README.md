@@ -231,7 +231,11 @@ deploy is a read-only catalogue view, nothing more.
 
 `desktop/` is an Electron shell around the same server. It resolves the pack,
 spawns `serve.py --no-open`, waits for the port, and shows the launcher in a
-real window.
+real window. On a machine with no pack it sets one up first: the installer ships
+`serve.py`, `fetcher.py`, the manifest, the launchers and the built UI, copies
+them to `%APPDATA%\DoomNite\pack`, and fetches the 3.4 GB payload into it while a
+progress window shows what is arriving. Every launch after that goes straight to
+the launcher.
 
 ```bash
 cd desktop
@@ -245,13 +249,15 @@ published to [GitHub Releases](https://github.com/nyannonymous/DoomNite/releases
 the 3.4 GB pack stays on R2.
 
 **No prerequisites.** The installer bundles the official embeddable Python
-runtime, so there is nothing to install first — Windows and the pack are enough.
-`npm run dist` fetches and hash-checks it automatically; the staged copy is
-gitignored rather than committed.
+runtime and the pack's own fetcher, so Windows is all that is needed up front —
+the 3.4 GB arrives on first run.
+`npm run dist` fetches and hash-checks the runtime automatically; the staged copy
+is gitignored rather than committed.
 
-`DOOMNITE_PACK` overrides pack discovery, for when the pack is not beside the
-executable. `DOOMNITE_PYTHON` overrides interpreter discovery, which you rarely
-need now.
+`DOOMNITE_PACK` overrides pack discovery, for when the pack is already on disk
+and you would rather use it than download one. `DOOMNITE_PYTHON` overrides
+interpreter discovery, which you rarely need now. `DOOMNITE_FETCH=1` re-runs the
+fetch, which repairs a managed pack after a mod is deleted out of it.
 
 The shell adds no launch capability of its own. `/api/launch` still takes an
 integer index and resolves it server-side, so the security model is unchanged.

@@ -260,8 +260,15 @@ function progressWindow() {
   return w;
 }
 
-// Download the payload, reporting progress as it goes. Returns true when the
-// pack is complete enough to serve.
+// Download the payload, reporting progress as it goes.
+//
+// Returns { ok: true } when the pack is complete enough to serve,
+// { ok: false, cancelled: true } when the user closed the progress window, and
+// { ok: false, reason } when the download ran and failed. The three are kept
+// apart because they want different things afterwards: quit, or an offer to
+// retry. Failing the app outright here would make a flaky network -- or a
+// machine whose certificate store is out of date -- indistinguishable from a
+// broken install.
 async function fetchPack(root, py) {
   const w = progressWindow();
   const state = { done: 0, total: 0, current: "", bytes: "", log: [] };
@@ -354,7 +361,7 @@ async function fetchPack(root, py) {
   if (pending) clearTimeout(pending);
   flush();
 
-  if (cancelled) return false;
+  if (cancelled) return { ok: false, cancelled: true };
 
   const text = lines.join("\n");
   const summary = summarise(text);
@@ -374,20 +381,14 @@ async function fetchPack(root, py) {
       "utf8"
     );
     if (!w.isDestroyed()) w.destroy();
-    return true;
+    return { ok: true };
   }
 
   const why = summary
     ? `${summary.failed} file(s) could not be downloaded.`
     : `The fetcher exited with code ${code}.`;
-  fail(
-    "The DoomNite pack did not finish downloading.",
-    `${why}\n\n` +
-      "Files already fetched are kept and re-checked against their hashes, so " +
-      `launching again resumes instead of starting over.\n\n${text.slice(-700)}`
-  );
   if (!w.isDestroyed()) w.destroy();
-  return false;
+  return { ok: false, reason: `${why}\n\n${text.slice(-700)}` };
 }
 
 function fail(message, detail) {
@@ -538,9 +539,38 @@ app.whenReady().then(async () => {
     return;
   }
 
-  if (needsFetch(packRoot, managed) && !(await fetchPack(packRoot, py))) return;
+  // Retry loop rather than a single attempt. Whatever went wrong is usually the
+  // network, which is worth a second try, and the fetch is resumable -- nothing
+  // already verified is downloaded again.
+  let whyNoPack = "";
+  while (needsFetch(packRoot, managed)) {
+    const got = await fetchPack(packRoot, py);
+    if (got.ok) break;
+    if (got.cancelled) return;
+
+    whyNoPack = got.reason;
+    const pick = dialog.showMessageBoxSync({
+      type: "warning",
+      title: "DoomNite",
+      message: "The pack did not finish downloading.",
+      detail:
+        `${got.reason}\n\n` +
+        "Files already downloaded are kept and re-verified, so trying again " +
+        "resumes rather than starting over.",
+      buttons: ["Try again", "Open the launcher anyway", "Quit"],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+    if (pick === 1) break;
+    if (pick === 2) return;
+  }
 
   if (!(await startServer(packRoot, py))) return;
+  // The launcher opens with entries missing rather than not opening at all:
+  // serve.py reports exactly which ones, and the pack can be completed from
+  // here by launching again. Written to the console so a bug report has it.
+  if (whyNoPack) console.warn(`pack incomplete:\n${whyNoPack}`);
   createWindow();
 
   app.on("activate", () => {
