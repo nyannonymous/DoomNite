@@ -244,14 +244,14 @@ Produces `DoomNite Setup 1.0.0.exe` (NSIS) and a portable zip. Installers are
 published to [GitHub Releases](https://github.com/nyannonymous/DoomNite/releases/latest);
 the 3.4 GB pack stays on R2.
 
-**It needs Python 3.11+ on the machine**, and the pack fetched. Electron is the
-window; the Python server is what starts the games. Bundling a frozen runtime
-would remove the Python requirement at the cost of ~100 MB more.
+**No prerequisites.** The installer bundles the official embeddable Python
+runtime, so there is nothing to install first — Windows and the pack are enough.
+`npm run dist` fetches and hash-checks it automatically; the staged copy is
+gitignored rather than committed.
 
-Two environment variables override the defaults:
-
-- `DOOMNITE_PACK` — where the pack lives, if not beside the executable
-- `DOOMNITE_PYTHON` — which interpreter to use
+`DOOMNITE_PACK` overrides pack discovery, for when the pack is not beside the
+executable. `DOOMNITE_PYTHON` overrides interpreter discovery, which you rarely
+need now.
 
 The shell adds no launch capability of its own. `/api/launch` still takes an
 integer index and resolves it server-side, so the security model is unchanged.
