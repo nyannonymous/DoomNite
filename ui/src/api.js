@@ -1,9 +1,35 @@
 // Talking to the Python server. Every call here is the same API the old
 // single-file UI used, so nothing about the server had to change.
 
+// A static host (Cloudflare Pages, GitHub Pages, netlify) answers an unknown
+// path with index.html and a 200, because that is what single-page-app
+// fallback means. So a missing /api/entries comes back as a 200 full of HTML,
+// r.json() throws "Unexpected token '<'", and the failure looks like a bundler
+// bug instead of "there is no backend here". Detect it and say so.
+const NOT_JSON =
+  "This is the launcher UI talking to a static host, which has no backend.\n\n" +
+  "serve.py is the actual server -- it serves this same UI plus /api/entries,\n" +
+  "/api/launch and /art. Run it from the pack root:\n\n" +
+  "    python serve.py\n\n" +
+  "If you deployed to Cloudflare Pages, the deploy can only host the static\n" +
+  "shell. Launching games needs the Python process on your own machine.";
+
 const j = async (r) => {
-  if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
-  return r.json();
+  const type = r.headers.get("Content-Type") || "";
+  const text = await r.text();
+  if (!r.ok) throw new Error(text || `HTTP ${r.status}`);
+  if (!type.includes("json")) {
+    // HTML where JSON was expected: almost certainly SPA fallback.
+    throw new Error(
+      `Expected JSON from ${r.url} but got ${type || "an unknown type"}.\n\n` +
+        NOT_JSON
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Response from ${r.url} was not valid JSON.`);
+  }
 };
 
 export async function fetchEntries() {

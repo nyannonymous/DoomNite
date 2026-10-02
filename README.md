@@ -205,6 +205,26 @@ builds into the root `dist/`, not `ui/dist`.
 Verified from a fresh clone: the root build succeeds and emits byte-identical
 assets to the committed `dist/`.
 
+### Deploying the UI to a static host
+
+You can host the interface on Cloudflare Pages or similar, but only the
+interface: **there is no backend there.** `serve.py` is the actual server, and
+it provides `/api/entries`, `/api/launch` and `/art/`. A static host answers
+those paths with `index.html`, so the page loads and then fails.
+
+The UI detects this and says so, rather than reporting a JSON parse error:
+
+```
+Expected JSON from .../api/entries but got text/html.
+
+This is the launcher UI talking to a static host, which has no backend.
+serve.py is the actual server -- run it from the pack root:
+    python serve.py
+```
+
+**Launching games needs the Python process on your own machine.** A Pages
+deploy is a read-only catalogue view, nothing more.
+
 ---
 
 ## Credits
