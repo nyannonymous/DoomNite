@@ -1,420 +1,163 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <title>DoomNite — download</title>
-    <meta
-      name="description"
-      content="DoomNite is a portable Doom mod launcher: 16 games, 31 launch configurations, one folder that runs from anywhere."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --bg: #07070a;
-        --panel: #121216;
-        --panel2: #1a1a20;
-        --line: #2a2a32;
-        --text: #e8e8ef;
-        --dim: #9a9aab;
-        --accent: #ff6b1a;
-        --accent-dim: #b8480f;
-        --blood: #c91f1f;
-        --blood-dim: #6e1313;
-        --toxic: #8fe34a;
-      }
-      * { box-sizing: border-box; }
-      html { background: var(--bg); }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--text);
-        font-family: "JetBrains Mono", ui-monospace, monospace;
-        font-size: 15px;
-        line-height: 1.65;
-        position: relative;
-        overflow-x: hidden;
-      }
-      ::selection { background: var(--blood); color: #fff; }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080000">
+  <title>DOOMNITE — Rip and Tear Anywhere</title>
+  <meta name="description" content="Portable Doom mod launcher. One folder. Sixteen games. No install.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root{--red:#c00;--blood:#8a0000;--bright:#ff2020;--orange:#f60;--amber:#ffb000}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{min-height:100%;background:#000}
+    body{min-height:100vh;background:#000;color:#c8c8c8;font-family:'Press Start 2P',monospace;line-height:1.9;cursor:crosshair;overflow-x:hidden}
+    body::before{content:'';position:fixed;inset:0;z-index:-2;background:radial-gradient(ellipse 80% 60% at 50% 110%,#6a0000 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 50% -10%,#3a0000 0%,#0a0000 80%),linear-gradient(180deg,#1a0000,#050000)}
+    a,button{cursor:crosshair}
+    #intro{position:fixed;inset:0;z-index:100000;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;transition:opacity 1.2s ease;overflow:hidden}
+    #intro.fade-out{opacity:0;pointer-events:none}#intro.hidden{display:none}
+    #intro::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(180,0,0,.28),rgba(60,0,0,.08) 40%,transparent 70%);animation:intro-pulse 3s ease-in-out infinite;pointer-events:none}
+    @keyframes intro-pulse{0%,100%{opacity:.6;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+    #intro::after{content:'';position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(255,40,40,.9),transparent);box-shadow:0 0 20px rgba(255,40,40,.8);animation:intro-scan 2.6s linear infinite;pointer-events:none}
+    @keyframes intro-scan{0%{top:-2px;opacity:0}10%,90%{opacity:1}100%{top:100%;opacity:0}}
+    .boot{position:absolute;top:24px;left:24px;font-size:.45rem;color:#3f3;letter-spacing:.2em;text-shadow:0 0 8px #3f3;text-align:left;line-height:2.2}.boot .dim{color:#0a5a0a;text-shadow:none}
+    .incantation{position:relative;z-index:2;font-size:clamp(.7rem,2.8vw,1.1rem);color:#ff3520;letter-spacing:.2em;text-transform:uppercase;line-height:2.6;max-width:820px;min-height:8em;text-shadow:0 0 10px #ff2020,0 0 30px #c00,0 0 60px #8a0000;transition:opacity .4s}
+    .incantation .final{color:#fc3;text-shadow:0 0 12px #fc3,0 0 40px #f60,0 0 90px #c00}
+    .incantation .cursor{display:inline-block;width:.55em;height:1em;background:#ff3520;vertical-align:-2px;margin-left:4px;box-shadow:0 0 10px #ff2020;animation:cursor-blink .55s step-end infinite}
+    @keyframes cursor-blink{50%{opacity:0}}
+    .flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at center,#ff2020,#8a0000 45%,transparent 75%);transition:opacity .1s;z-index:3}.flash.on{opacity:1}
+    .slam{position:absolute;z-index:4;max-width:min(80%,560px);width:100%;height:auto;opacity:0;transform:scale(2.6);filter:brightness(3.5) drop-shadow(0 0 80px #ff2020);transition:opacity .1s,transform .6s cubic-bezier(.15,.9,.3,1),filter .6s}
+    .slam.on{opacity:1;transform:scale(1);filter:brightness(1) drop-shadow(0 0 20px #ff2020) drop-shadow(0 0 60px rgba(200,0,0,.55)) drop-shadow(6px 6px 0 #000)}
+    .skip{position:absolute;bottom:28px;right:28px;z-index:5;font-family:inherit;font-size:.42rem;letter-spacing:.25em;color:#888;background:rgba(0,0,0,.7);border:1px solid #444;padding:10px 16px;transition:.15s}.skip:hover{color:var(--orange);border-color:var(--red);background:#000}
+    .wrap{max-width:760px;margin:0 auto;padding:42px 24px 32px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;text-align:center;position:relative;z-index:1}
+    .logo{display:block;margin:0 auto 28px;max-width:min(92%,620px);width:100%;height:auto;filter:drop-shadow(0 0 14px rgba(255,32,32,.65)) drop-shadow(0 0 50px rgba(200,0,0,.45)) drop-shadow(5px 5px 0 #000);animation:breathe 4s ease-in-out infinite}
+    @keyframes breathe{0%,100%{filter:drop-shadow(0 0 14px rgba(255,32,32,.65)) drop-shadow(0 0 50px rgba(200,0,0,.45)) drop-shadow(5px 5px 0 #000)}50%{filter:drop-shadow(0 0 22px rgba(255,32,32,.95)) drop-shadow(0 0 70px rgba(200,0,0,.7)) drop-shadow(5px 5px 0 #000)}}
+    .tagline{font-size:.6rem;color:var(--orange);letter-spacing:.35em;text-transform:uppercase;margin-bottom:14px;text-shadow:0 0 12px var(--orange)}
+    .blurb{font-size:.5rem;color:#aaa;max-width:540px;margin:0 auto 38px;line-height:2.4}.blurb b{color:var(--amber)}
+    .downloads{display:grid;gap:14px;justify-items:center}
+    .dl-btn{display:inline-block;width:min(100%,600px);padding:22px 28px;font-family:inherit;font-size:clamp(.55rem,2.2vw,.8rem);color:#fff;text-decoration:none;letter-spacing:.14em;text-transform:uppercase;background:linear-gradient(180deg,#e01010,#8a0000 45%,#3a0000);border:4px solid;border-color:#ff8080 #2a0000 #2a0000 #ff8080;box-shadow:0 0 30px var(--red),0 0 80px rgba(200,0,0,.55),0 8px 0 #1a0000,0 10px 20px rgba(0,0,0,.9),inset 0 2px 0 rgba(255,255,255,.25),inset 0 -4px 12px rgba(0,0,0,.6);text-shadow:2px 2px 0 #000,0 0 12px #fff;transition:transform .12s,filter .12s}
+    .dl-btn.primary{animation:download-glow 3s ease-in-out infinite}
+    @keyframes download-glow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.14)}}
+    .dl-btn:hover{background:linear-gradient(180deg,#ff3030,#b00000 45%,#5a0000);transform:translateY(-3px);filter:brightness(1.12);box-shadow:0 0 45px #ff2020,0 0 110px rgba(255,32,32,.75),0 11px 0 #1a0000,0 13px 26px rgba(0,0,0,.9),inset 0 2px 0 rgba(255,255,255,.35),inset 0 -4px 12px rgba(0,0,0,.6)}
+    .dl-btn:active{transform:translateY(4px)}.dl-btn .sub{display:block;font-size:.39rem;color:#ffb8b8;margin-top:10px;letter-spacing:.1em;text-shadow:1px 1px 0 #000}
+    .alt{display:block;margin-top:26px;font-size:.43rem;color:#888;letter-spacing:.12em}.alt a{color:var(--amber);text-decoration:none;border-bottom:1px dashed var(--red)}.alt a:hover{color:var(--bright);text-shadow:0 0 10px var(--red)}
+    .meta{margin-top:38px;font-size:.39rem;color:#777;letter-spacing:.12em;line-height:2.4}.meta a{color:#888;text-decoration:none;border-bottom:1px dashed #444}.meta a:hover{color:var(--orange)}
+    @media(max-width:640px){.wrap{padding-top:28px}.dl-btn{padding:18px 16px}.boot{font-size:.38rem;top:14px;left:14px}.skip{bottom:16px;right:16px}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}#intro{display:none!important}}
+  </style>
+</head>
+<body>
+  <div id="intro" aria-label="DoomNite cinematic intro">
+    <div class="boot">&gt; UAC SECURE LINK ESTABLISHED<br><span class="dim">&gt; TRANSMISSION INCOMING...</span></div>
+    <div class="flash" id="flash"></div>
+    <div class="incantation" id="incantation" aria-live="polite"></div>
+    <img src="https://i.ibb.co/4wNpRt8G/DOOMNITE.png" alt="DOOMNITE" class="slam">
+    <button class="skip" id="skip" type="button">SKIP ▸</button>
+  </div>
 
-      /* ---------------------------------------------------- ember backdrop */
-      canvas#embers {
-        position: fixed; inset: 0; width: 100%; height: 100%;
-        z-index: 0; pointer-events: none;
-      }
+  <main class="wrap">
+    <img src="https://i.ibb.co/4wNpRt8G/DOOMNITE.png" alt="DOOMNITE" class="logo" width="620">
+    <div class="tagline">RIP AND TEAR // ANYWHERE</div>
+    <p class="blurb">
+      One folder. Sixteen games. Thirty-one launchers.<br>
+      GZDoom, IWADs and mods — self-contained.<br>
+      <b>No install. No build step. Just Doom.</b>
+    </p>
 
-      /* ----------------------------------------------------- CRT / vignette */
-      body::before {
-        /* scanlines */
-        content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none;
-        background: repeating-linear-gradient(
-          0deg, rgba(0,0,0,0.0) 0px, rgba(0,0,0,0.0) 2px,
-          rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.0) 4px
-        );
-        mix-blend-mode: multiply;
-        opacity: .55;
-      }
-      body::after {
-        /* vignette */
-        content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none;
-        background: radial-gradient(ellipse 75% 65% at 50% 15%, transparent 45%, rgba(0,0,0,.55) 100%);
-      }
-
-      .wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 96px; position: relative; z-index: 1; }
-
-      /* --------------------------------------------------------- hazard bar */
-      .hazard {
-        height: 7px;
-        background: repeating-linear-gradient(
-          -45deg, var(--accent) 0 14px, #0a0a0c 14px 28px
-        );
-      }
-
-      header {
-        border-bottom: 1px solid var(--line);
-        padding: 60px 0 48px;
-        background-image:
-          linear-gradient(rgba(255, 107, 26, 0.045) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 107, 26, 0.045) 1px, transparent 1px),
-          radial-gradient(ellipse 60% 100% at 50% 0%, rgba(201, 31, 31, 0.16), transparent 70%);
-        background-size: 44px 44px, 44px 44px, 100% 100%;
-        position: relative;
-      }
-      .kicker {
-        font-family: "Oswald", sans-serif;
-        font-weight: 600;
-        font-size: 12px;
-        letter-spacing: 0.32em;
-        text-transform: uppercase;
-        color: var(--accent);
-        margin: 0 0 18px;
-        display: flex; align-items: center; gap: 10px;
-      }
-      .kicker::before {
-        content: ""; width: 8px; height: 8px; background: var(--blood);
-        box-shadow: 0 0 8px 2px rgba(201,31,31,.8);
-        display: inline-block; border-radius: 1px;
-        animation: blink 1.6s steps(1) infinite;
-      }
-      @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .25; } }
-
-      h1 {
-        font-family: "Black Ops One", "Oswald", sans-serif;
-        font-weight: 400;
-        font-size: clamp(46px, 10vw, 92px);
-        line-height: 0.92;
-        margin: 0 0 20px;
-        letter-spacing: 0.01em;
-        position: relative;
-        width: fit-content;
-        text-shadow:
-          0 0 10px rgba(255, 107, 26, .35),
-          0 0 34px rgba(201, 31, 31, .25);
-      }
-      h1 em {
-        color: var(--accent);
-        font-style: normal;
-        text-shadow:
-          0 0 12px rgba(255, 107, 26, .7),
-          0 0 40px rgba(255, 107, 26, .35);
-      }
-      /* glitch duplicate layers -- quiet almost all the time, snaps briefly */
-      h1::before, h1::after {
-        content: "DOOMNITE";
-        position: absolute; left: 0; top: 0; width: 100%;
-        overflow: hidden; color: var(--text);
-        background: var(--bg);
-        clip-path: inset(0 0 0 0);
-      }
-      h1::before {
-        color: #00e5ff;
-        animation: glitch-1 7s infinite linear;
-        opacity: 0;
-      }
-      h1::after {
-        color: var(--blood);
-        animation: glitch-2 7s infinite linear;
-        opacity: 0;
-      }
-      @keyframes glitch-1 {
-        0%, 91%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 0 0); }
-        92% { opacity: .7; transform: translate(-3px, 1px); clip-path: inset(10% 0 60% 0); }
-        93% { opacity: .5; transform: translate(2px, -2px); clip-path: inset(55% 0 10% 0); }
-        94% { opacity: .6; transform: translate(-2px, 0); clip-path: inset(30% 0 40% 0); }
-        95% { opacity: 0; transform: translate(0, 0); }
-      }
-      @keyframes glitch-2 {
-        0%, 90%, 100% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 0 0 0); }
-        91% { opacity: .55; transform: translate(3px, -1px); clip-path: inset(70% 0 5% 0); }
-        92.5% { opacity: .65; transform: translate(-2px, 2px); clip-path: inset(5% 0 75% 0); }
-        94% { opacity: .4; transform: translate(2px, 1px); clip-path: inset(40% 0 30% 0); }
-        95.5% { opacity: 0; transform: translate(0, 0); }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        h1::before, h1::after { animation: none; display: none; }
-        .kicker::before { animation: none; }
-      }
-
-      .tagline { font-size: 16.5px; color: var(--dim); max-width: 62ch; margin: 0; }
-      .tagline strong { color: var(--text); font-weight: 500; }
-
-      h2 {
-        font-family: "Oswald", sans-serif;
-        font-weight: 600;
-        font-size: 13px;
-        letter-spacing: 0.24em;
-        text-transform: uppercase;
-        color: var(--dim);
-        border-bottom: 1px solid var(--line);
-        padding-bottom: 12px;
-        margin: 56px 0 24px;
-        display: flex; align-items: baseline; gap: 10px;
-      }
-      h2::before { content: "//"; color: var(--accent); }
-
-      .btn {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        padding: 22px 26px;
-        margin-bottom: 12px;
-        background: linear-gradient(180deg, var(--panel2), var(--panel));
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--accent);
-        border-radius: 4px;
-        text-decoration: none;
-        color: var(--text);
-        position: relative;
-        transition: background .15s, border-color .15s, transform .15s, box-shadow .15s;
-      }
-      .btn:hover {
-        background: linear-gradient(180deg, #212129, #17171d);
-        border-color: var(--accent-dim);
-        transform: translateX(3px);
-        box-shadow: 0 0 0 1px rgba(255,107,26,.15), 0 10px 28px -8px rgba(255, 107, 26, .35);
-      }
-      .btn-main {
-        border-left-width: 6px;
-        padding: 28px 26px;
-        box-shadow: 0 0 0 1px rgba(255,107,26,.08), 0 0 32px -10px rgba(255, 107, 26, .4);
-        animation: pulse-glow 3.4s ease-in-out infinite;
-      }
-      @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 0 1px rgba(255,107,26,.08), 0 0 28px -10px rgba(255,107,26,.35); }
-        50% { box-shadow: 0 0 0 1px rgba(255,107,26,.18), 0 0 46px -8px rgba(255,107,26,.6); }
-      }
-      .btn-main .name { font-size: 22px; }
-      .name { font-family: "Oswald", sans-serif; font-size: 17px; font-weight: 600; letter-spacing: .01em; }
-      .meta { color: var(--dim); font-size: 13px; margin-top: 4px; }
-      .pill {
-        flex-shrink: 0;
-        font-family: "Oswald", sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #0b0a08;
-        background: var(--accent);
-        border: 1px solid var(--accent);
-        border-radius: 3px;
-        padding: 8px 14px;
-      }
-      .btn:not(.btn-main) .pill {
-        color: var(--accent); background: transparent; border-color: var(--accent-dim);
-      }
-
-      table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-      td { padding: 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-      td:first-child {
-        font-family: "Oswald", sans-serif; font-weight: 600;
-        color: var(--accent); white-space: nowrap; padding-right: 20px;
-        text-transform: uppercase; font-size: 12.5px; letter-spacing: .06em;
-      }
-      code {
-        font-family: "JetBrains Mono", ui-monospace, monospace;
-        background: #000;
-        border: 1px solid var(--line);
-        padding: 2px 7px;
-        border-radius: 3px;
-        font-size: 13.5px;
-        color: var(--toxic);
-      }
-      ul { color: var(--dim); padding-left: 20px; }
-      li { margin-bottom: 8px; }
-      li::marker { color: var(--accent); }
-      strong { color: var(--text); font-weight: 600; }
-      .note {
-        background: linear-gradient(180deg, var(--panel2), var(--panel));
-        border: 1px solid var(--line);
-        border-left: 3px solid var(--blood);
-        border-radius: 4px;
-        padding: 20px 24px;
-        color: var(--dim);
-        font-size: 14.5px;
-      }
-      .note strong { color: var(--blood); }
-      footer {
-        border-top: 1px solid var(--line);
-        margin-top: 64px;
-        padding-top: 28px;
-        color: #5c5c6b;
-        font-size: 13px;
-      }
-      a { color: var(--accent); }
-    </style>
-  </head>
-  <body>
-    <canvas id="embers" aria-hidden="true"></canvas>
-    <div class="hazard"></div>
-
-    <header>
-      <div class="wrap">
-        <p class="kicker">UAC Portable Doom launcher</p>
-        <h1 data-text="DOOMNITE">DOOM<em>NITE</em></h1>
-        <p class="tagline">
-          <strong>Sixteen games. Thirty-one launch configurations.</strong> One folder with
-          the engine, the IWADs and every mod — and not one absolute path inside it.
-          Copy it to a USB stick, plug it in anywhere, play.
-        </p>
-      </div>
-    </header>
-
-    <div class="wrap">
-      <h2>Download</h2>
-
-      <a class="btn btn-main" href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite.Setup.1.0.0.exe" rel="noopener">
-        <span>
-          <span class="name">DoomNite for Windows</span>
-          <span class="meta">Installer · x64 · no prerequisites</span>
-        </span>
-        <span class="pill">Download</span>
+    <nav class="downloads" aria-label="Downloads">
+      <a href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite.Setup.1.0.0.exe" class="dl-btn primary" aria-label="Download DoomNite Windows installer, version 1.0.0">
+        DOWNLOAD INSTALLER
+        <span class="sub">WINDOWS 64-BIT // 131 MiB // v1.0.0</span>
       </a>
-
-      <a class="btn" href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite-1.0.0-win.zip" rel="noopener">
-        <span>
-          <span class="name">Portable zip</span>
-          <span class="meta">No installer · unpack anywhere and run</span>
-        </span>
-        <span class="pill">Download</span>
+      <a href="https://github.com/nyannonymous/DoomNite/releases/download/v1.0.0/DoomNite-1.0.0-win.zip" class="dl-btn" aria-label="Download DoomNite portable zip, version 1.0.0">
+        DOWNLOAD PORTABLE ZIP
+        <span class="sub">WINDOWS 64-BIT // 172 MiB // NO INSTALLER</span>
       </a>
+    </nav>
 
-      <div class="note" style="margin-top: 20px">
-        <strong>Nothing to install first.</strong> The app ships with its own
-        Python runtime, so Windows is the only requirement. It does still need the
-        pack — the 3.4 GB of engine, IWADs and mods — which it fetches on first
-        run.
-      </div>
-
-      <h2>What's in the box</h2>
-      <table>
-        <tbody>
-          <tr><td>Games</td><td>Brutal Doom v22, Aliens: Eradication TC, Adventures of Square, DukeBoomem, Shadow Warrior, MoonMan, Hocus Pocus 3D, DN3DooM and more</td></tr>
-          <tr><td>Engine</td><td>GZDoom with its full DLL set, path-portable</td></tr>
-          <tr><td>IWADs</td><td>Shareware <code>DOOM.WAD</code> included</td></tr>
-          <tr><td>Assets</td><td>3.4 GB, fetched on first run with per-file sha256 verification</td></tr>
-        </tbody>
-      </table>
-
-      <h2>First run</h2>
-      <ul>
-        <li>Unpack or install, then open the app.</li>
-        <li>It fetches 3.4 GB from the project's own storage and verifies every file against its hash. Already-correct files are skipped, so re-running is cheap.</li>
-        <li>Pick a game and hit launch.</li>
-      </ul>
-
-      <div class="note">
-        <strong>Commercial IWADs are not included.</strong> <code>DOOM2.WAD</code> and
-        <code>Hexen.wad</code> are id Software releases, so the pack refuses them
-        rather than hosting them. Entries that need one will ask you to supply it.
-      </div>
-
-      <h2>Also works without the app</h2>
-      <p style="color: var(--dim)">
-        If you would rather not install anything, the launcher is just a local web
-        server. Clone the repo and run <code>python serve.py</code> — it opens the
-        same interface in your browser and launches games exactly the same way.
-      </p>
-
-      <footer>
-        Mods are by their respective authors. Doom and GZDoom are by id Software and
-        contributors. Nothing on this page is mine to license.
-      </footer>
+    <div class="alt">
+      OR VIEW THE <a href="https://github.com/nyannonymous/DoomNite">SOURCE REPOSITORY</a>
     </div>
+    <div class="meta">
+      <a href="https://github.com/nyannonymous/DoomNite/blob/main/README.md">FIELD MANUAL</a> &nbsp;//&nbsp;
+      <a href="https://github.com/nyannonymous/DoomNite/releases/tag/v1.0.0">RELEASE NOTES</a>
+      <br><br>
+      UNOFFICIAL FAN PROJECT. NO COMMERCIAL IWADS DISTRIBUTED.
+    </div>
+  </main>
 
-    <script>
-      (function () {
-        var cv = document.getElementById("embers");
-        var ctx = cv.getContext("2d", { alpha: true });
-        if (!ctx) return;
-        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-        var w = 0, h = 0, dpr = 1, raf = 0, running = false;
-        var N = reduce ? 18 : 46;
-        var p = [];
-
-        function seed() {
-          p.length = 0;
-          for (var i = 0; i < N; i++) {
-            p.push({
-              x: Math.random(), y: Math.random(),
-              z: 0.35 + Math.random() * 0.65,
-              r: Math.random() * Math.PI * 2,
-              s: 0.25 + Math.random() * 0.9,
-            });
+  <script>
+    (() => {
+      const intro = document.getElementById('intro');
+      const text = document.getElementById('incantation');
+      const flash = document.getElementById('flash');
+      const slam = intro.querySelector('.slam');
+      const skip = document.getElementById('skip');
+      const lines = [
+        'THEY ARE RAGE. BRUTAL. WITHOUT MERCY.',
+        'BUT YOU... YOU WILL BE WORSE.',
+        'RIP AND TEAR UNTIL IT IS DONE.'
+      ];
+      let finished = false;
+      let timer;
+      const finish = (instant = false) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        if (instant) intro.classList.add('hidden');
+        else {
+          intro.classList.add('fade-out');
+          setTimeout(() => intro.classList.add('hidden'), 1300);
+        }
+      };
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        finish(true);
+      } else {
+        timer = setTimeout(() => finish(), 15000);
+        let line = 0;
+        let char = 0;
+        const type = () => {
+          if (finished) return;
+          if (line >= lines.length) { timer = setTimeout(slamLogo, 600); return; }
+          let row = text.querySelector(`[data-line="${line}"]`);
+          text.querySelector('.cursor')?.remove();
+          if (!row) {
+            row = document.createElement('div');
+            row.dataset.line = line;
+            if (line === lines.length - 1) row.className = 'final';
+            text.appendChild(row);
           }
-        }
-        function resize() {
-          dpr = Math.min(2, window.devicePixelRatio || 1);
-          w = cv.clientWidth; h = cv.clientHeight;
-          cv.width = Math.max(1, Math.floor(w * dpr));
-          cv.height = Math.max(1, Math.floor(h * dpr));
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-        function frame(t) {
-          ctx.clearRect(0, 0, w, h);
-          var tsec = t / 1000;
-          for (var i = 0; i < p.length; i++) {
-            var q = p[i];
-            q.y -= 0.0014 * q.z * q.s;
-            if (q.y < -0.05) { q.y = 1.05; q.x = Math.random(); }
-            var px = q.x * w, py = q.y * h;
-            var wob = Math.sin(tsec * 0.8 + q.r) * 9 * q.z;
-            var flick = 0.55 + 0.45 * Math.sin(tsec * 3.1 * q.s + q.r * 2);
-            var rad = (0.7 + q.z * 1.6) * flick;
-            var hot = q.s > 1.05;
-            var g = ctx.createRadialGradient(px + wob, py, 0, px + wob, py, rad * 5);
-            if (hot) {
-              g.addColorStop(0, "rgba(255,214,150,0.8)");
-              g.addColorStop(0.35, "rgba(255,120,50,0.3)");
-            } else {
-              g.addColorStop(0, "rgba(255,90,50,0.55)");
-              g.addColorStop(0.35, "rgba(190,30,20,0.18)");
-            }
-            g.addColorStop(1, "rgba(0,0,0,0)");
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(px + wob, py, rad * 5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          raf = requestAnimationFrame(frame);
-        }
-        function start() { if (running) return; running = true; raf = requestAnimationFrame(frame); }
-        function stop() { running = false; cancelAnimationFrame(raf); }
-
-        window.addEventListener("resize", resize);
-        document.addEventListener("visibilitychange", function () {
-          if (document.hidden) stop(); else start();
+          row.querySelector('.cursor')?.remove();
+          row.appendChild(document.createTextNode(lines[line][char++]));
+          const cursor = document.createElement('span');
+          cursor.className = 'cursor';
+          row.appendChild(cursor);
+          if (char >= lines[line].length) {
+            char = 0;
+            line++;
+            timer = setTimeout(type, 950);
+          } else timer = setTimeout(type, 60 + Math.random() * 45);
+        };
+        const slamLogo = () => {
+          if (finished) return;
+          text.querySelector('.cursor')?.remove();
+          text.style.opacity = '0';
+          flash.classList.add('on');
+          setTimeout(() => {
+            flash.classList.remove('on');
+            slam.classList.add('on');
+            timer = setTimeout(() => finish(), 1700);
+          }, 140);
+        };
+        timer = setTimeout(type, 700);
+        skip.addEventListener('click', () => finish());
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') finish();
         });
-
-        resize(); seed(); start();
-      })();
-    </script>
-  </body>
+      }
+    })();
+  </script>
+</body>
 </html>
