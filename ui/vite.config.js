@@ -1,24 +1,25 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Built assets go to ../dist/app so serve.py can serve them from the pack root.
+// Built assets go to ../app, NOT ../dist.
 //
-// Why a subdirectory: ../dist is what Cloudflare Pages publishes, and its
-// index.html is the download page. The launcher UI cannot be the root of that
-// deploy -- it calls /api/entries and /api/launch, which only exist when the
-// user's own Python server is running. Serving it at the public root just
-// produces a browser console full of failed fetches and an empty launcher.
+// dist/ is what Cloudflare Pages publishes, and it should be nothing but the
+// download page. Two earlier layouts put the launcher in dist/ and both were
+// wrong: publishing the launcher at the public root just gives a browser full of
+// failed /api/entries fetches and an empty page, and nesting it at dist/app/ was
+// no better because Pages rewrites *every* unmatched path -- including .js and
+// .css -- to index.html. Requests for /app/assets/*.js came back as HTML.
 //
-// So: dist/index.html is the download page, dist/app/index.html is the launcher.
-// One tree satisfies both -- Pages gets the page at the root with no dashboard
-// configuration change, and serve.py serves the launcher from the subpath.
+// Keeping the launcher out of the published tree removes the problem instead of
+// working around it: dist/ holds one file, there is nothing for a rewrite rule
+// to catch, and serve.py still finds everything under the pack root.
 //
 // base is relative so the bundle works from /app without rewriting asset URLs.
 export default defineConfig({
   plugins: [react()],
   base: "./",
   build: {
-    outDir: "../dist/app",
+    outDir: "../app",
     emptyOutDir: true,
     assetsDir: "assets",
     sourcemap: false,

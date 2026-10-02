@@ -8,14 +8,19 @@
 //
 // Layout after a build:
 //
-//   dist/index.html       download page  -> published at /
-//   dist/app/index.html   launcher UI    -> served by serve.py, never public
+//   dist/index.html   download page -> published at /
+//   app/index.html    launcher UI   -> served by serve.py, never published
+//
+// The launcher deliberately lives outside dist/. It needs /api/entries and
+// /api/launch, which only exist when the user's own Python server is running,
+// so there is no correct way to serve it from a static host. Keeping it out of
+// the published tree also avoids Pages rewriting asset requests to index.html.
 //
 // Fixing it here rather than in the Cloudflare dashboard means a fresh clone
 // deploys correctly with no configuration, and the check below fails the build
 // if the release link is ever missing from the page that ships.
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,7 +29,7 @@ const root = resolve(here, "..");
 
 const src = resolve(root, "site", "index.html");
 const dest = resolve(root, "dist", "index.html");
-const launcher = resolve(root, "dist", "app", "index.html");
+const launcher = resolve(root, "app", "index.html");
 
 function fail(msg) {
   console.error(`\ncopy-download-page: ${msg}\n`);
@@ -47,13 +52,17 @@ if (!/releases\/download|releases\/latest/.test(page)) {
   );
 }
 
+// vite's outDir is now ../app, so it never creates dist/ -- and its
+// emptyOutDir deletes dist/ on a clean build. Create it rather than assuming.
+mkdirSync(dirname(dest), { recursive: true });
+
 writeFileSync(dest, page, "utf8");
 console.log(`copy-download-page: dist/index.html <- site/index.html (${page.length} bytes)`);
 
-// Cheap guard against the layout silently regressing: dist/app/index.html is the
+// Cheap guard against the layout silently regressing: app/index.html is the
 // launcher and must NOT be the same file as the download page.
 const l = readFileSync(launcher, "utf8");
 if (l === page) {
-  fail("dist/app/index.html is the download page -- the launcher was not built.");
+  fail("app/index.html is the download page -- the launcher was not built.");
 }
-console.log("copy-download-page: launcher intact at dist/app/index.html");
+console.log("copy-download-page: launcher intact at app/index.html");

@@ -30,8 +30,11 @@ OUT = os.path.join(PACK, "sources.json")
 ROOTS = ("runtime", "iwads", "mods")
 
 # Downloads/ is a cache the on-demand installer owns, not part of the pack.
+# `app` is the built launcher UI. It is served from the local install, never
+# downloaded, and dist/ is the Cloudflare Pages download page -- neither belongs
+# in the R2 object store.
 SKIP_DIRS = {".git", "__pycache__", "downloads", ".staging", "node_modules",
-             "dist", "ui", "playnite-data", "art"}
+              "dist", "app", "ui", "playnite-data", "art"}
 
 # Never publish these, whatever else is true of them. DOOM2.WAD and Hexen.wad
 # are commercial retail IWADs: freely redistributing them is not ours to

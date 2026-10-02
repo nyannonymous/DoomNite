@@ -40,7 +40,7 @@ import webbrowser
 
 PACK = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(PACK, "pack-manifest.json")
-INDEX = os.path.join(PACK, "dist", "app", "index.html")
+INDEX = os.path.join(PACK, "app", "index.html")
 
 # Resolved once at startup: a flat, ordered list of runnable entries. The UI and
 # the launch endpoint both work off this, so a number always means the same game.
@@ -394,7 +394,7 @@ def page():
     more often than the server does, and a cached copy means every rebuild
     silently does nothing until you restart. One small file, one disk read.
 
-    The UI is a Vite/React bundle ENTRIES to dist/ by `npm run build` in ui/. The
+    The UI is a Vite/React bundle ENTRIES to app/ by `npm run build` in ui/. The
     old hand-written index.html is kept as index.html.vanilla so it can be
     compared against or restored without a git checkout.
     """
@@ -439,11 +439,11 @@ def handler_factory():
                         "text/html; charset=utf-8",
                     )
                 return self._send(200, page(), "text/html; charset=utf-8")
-            # Vite emits content-hashed files into dist/app/assets/. Serving them is
+            # Vite emits content-hashed files into app/assets/. Serving them is
             # what lets the built UI run without a bundler in the request path.
             if path.startswith("/assets/"):
                 fn = os.path.basename(path)
-                target = os.path.join(PACK, "dist", "app", "assets", fn)
+                target = os.path.join(PACK, "app", "assets", fn)
                 if not os.path.isfile(target):
                     return self._send(404, "", "text/plain")
                 ctype = "text/css" if fn.endswith(".css") else (
