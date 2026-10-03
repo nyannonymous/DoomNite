@@ -82,7 +82,12 @@ BD="$ROOT/desktop"
 rm -rf "$ROOT"; mkdir -p "$BD"
 
 cd desktop
-cp main.js preflight.js package.json package-lock.json "$BD/"
+# preload.js and first-run.html MUST be copied too. electron-builder ships them
+# via build.files, and main.js loads preload.js with path.join(__dirname,
+# "preload.js") -- omit either and the installer builds clean, then the app dies
+# at runtime with no preload bridge. stage-pack.js now fails the build if they
+# are absent, rather than letting that through.
+cp main.js preload.js preflight.js first-run.html package.json package-lock.json "$BD/"
 cp -r build "$BD/"
 cp -r node_modules "$BD/"
 
@@ -91,7 +96,7 @@ cp -r node_modules "$BD/"
 # tooling; it does not need manual copies of serve.py, launchers, app or art.
 cd "$BD" && DOOMNITE_SOURCE_ROOT="Z:/DOOM_PACK" npm run dist
 
-cp release/"DoomNite Setup 1.0.0.exe" release/DoomNite-1.0.0-win.zip \
+cp release/"DoomNite Setup 2.0.0.exe" release/DoomNite-2.0.0-win.zip \
    "Z:/DOOM_PACK/desktop/release/"
 ```
 
@@ -103,9 +108,9 @@ no need to re-download the runtime.
 ```bash
 cd "Z:/DOOM_PACK/desktop/release"
 export GH_TOKEN=$(cat ~/Desktop/ghp_* | tr -d '\r\n')
-gh release upload v1.0.0 "DoomNite Setup 1.0.0.exe" DoomNite-1.0.0-win.zip \
+gh release upload v2.0.0 "DoomNite Setup 2.0.0.exe" DoomNite-2.0.0-win.zip \
   --repo nyannonymous/DoomNite --clobber
-gh release edit v1.0.0 --repo nyannonymous/DoomNite --notes-file NOTES.md
+gh release edit v2.0.0 --repo nyannonymous/DoomNite --notes-file NOTES.md
 ```
 
 Roughly 270 MB, so budget a few minutes. `--clobber` is needed when replacing
@@ -135,7 +140,7 @@ is exactly what a user does:
 ```bash
 D=/c/Users/me/Desktop/emptytest
 rm -rf "$D" && mkdir -p "$D" && cd "$D"
-unzip -q 'Z:/DOOM_PACK/desktop/release/DoomNite-1.0.0-win.zip'
+unzip -q 'Z:/DOOM_PACK/desktop/release/DoomNite-2.0.0-win.zip'
 PATH="/c/Windows/system32:/c/Windows" ./DoomNite.exe
 ```
 
