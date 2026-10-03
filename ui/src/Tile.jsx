@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Play, Swords, Skull, Radio, Download, Check, Trash2 } from "lucide-react";
+import { Play, Download, Check } from "lucide-react";
 import { artUrl, startInstall, removeInstall } from "./api";
 import ConfirmDownload from "./ConfirmDownload";
 import { posterFor } from "./poster";
@@ -100,9 +100,10 @@ export default function Tile({
   onLaunch,
   onOpenVariants,
   onInstalled,
-  inst,
-  index,
-}) {
+    inst,
+    pm,
+    index,
+  }) {
   const ref = useRef(null);
   // One flag for every motion decision below. Framer's own hook, so it also
   // respects the OS setting without me re-reading matchMedia.
@@ -189,6 +190,18 @@ export default function Tile({
     }
     setDl(null);
   }
+
+  /* ---------------------------------------------------- baked-in state only */
+    // Removal moved to the sidebar (Panel.jsx), which already owned the on-demand
+        // UNINSTALL. What is left here is the corner LABEL -- "IN PACK" / "REMOVED"
+        // -- so the card still reports what is on disk without offering a second,
+        // more prominent destructive control.
+        //
+        // pm is null for a group with nothing on disk to remove (no mods
+        // reference any mods\\<slug> folder -- e.g. a pure-IWAD entry) and for the
+        // two on-demand entries, which use `inst`/`uninstall` above instead.
+        const pmInstalled = !!pm?.installed;
+        const pmPartial = !!pm?.partial;
 
 
   /**
@@ -328,34 +341,20 @@ export default function Tile({
       <span className="tile-jag" aria-hidden="true" />
 
       <span className="tile-body">
-        {/* data-text is what .d-glitch's pseudo-elements copy. Without it the
-            chromatic aberration has nothing to render. */}
-        <span className="tile-name d-glitch" data-text={group.label}>
-          {group.label}
-        </span>
-        <span className="tile-sub">
-          {iwadShort(cfg.iwad) || "Standalone"}
-          {multi ? ` · ${group.cfgs.length} builds` : ""}
-        </span>
-        {/* Icons carry state the text does not, so state is not colour-only. */}
-        <span className="tile-tags">
-          {cfg.hd && (
-            <span className="tile-tag is-hd" title="High definition build">
-              <Radio size={10} aria-hidden="true" /> HD
+              {/* data-text is what .d-glitch's pseudo-elements copy. Without it the
+                  chromatic aberration has nothing to render. */}
+              <span className="tile-name d-glitch" data-text={group.label}>
+                {group.label}
+              </span>
+              {/* The sub-line (IWAD + build count) and the HD/PINNED/MISSING tag row
+                  used to sit here. The card is now artwork plus its name and nothing
+                  else, so the grid reads as covers rather than as a table. Build
+                  count, IWAD, HD and the missing-files warning all still reach the
+                  user: the hover title names the build count, PINNED is the pin
+                  marker below, MISSING is the .is-missing treatment on the card, and
+                  every one of them is in the sidebar Details readout for the
+                  selected game. */}
             </span>
-          )}
-          {pinned && (
-            <span className="tile-tag is-pin" title="Pinned">
-              <Swords size={10} aria-hidden="true" /> PINNED
-            </span>
-          )}
-          {group.missing && (
-            <span className="tile-tag is-bad" title="Files are missing">
-              <Skull size={10} aria-hidden="true" /> MISSING
-            </span>
-          )}
-        </span>
-      </span>
       {/* Hover play button. Always in the DOM and only revealed by CSS, so it
           costs no layout thrash and cannot pop in late. A real <button> inside
           a <button> is invalid, which is why the card is a div. */}
@@ -417,37 +416,37 @@ export default function Tile({
           serve.py flips these cards to fetchable and this corner changes with
           it -- no edit here. */}
       {!group.needsInstall && (
-        <span className="tile-uninstall">
-          <span
-            className="tile-inpack"
-            title={
-              group.fetchable
-                ? "Can be re-fetched from hosted URLs"
-                : "Ships inside the pack - nothing to download or remove"
-            }
-          >
-            {group.fetchable ? "ON DEMAND" : "IN PACK"}
-          </span>
-        </span>
-      )}
-      {group.needsInstall && installed && !busy && (
-        <span className="tile-uninstall">
-          <button
-            type="button"
-            className="tile-uninst"
-            onClick={(e) => {
-              e.stopPropagation();
-              uninstall();
-            }}
-            disabled={busy}
-            title={`Uninstall ${group.label} and free its files`}
-            aria-label={`Uninstall ${group.label}`}
-          >
-            <Trash2 size={13} strokeWidth={2.2} aria-hidden="true" />
-          </button>
-        </span>
-      )}
-      {group.needsInstall && busy && (
+              <span className="tile-uninstall">
+                {/* The remove BUTTON used to live here, top-left of every card. It is
+                    now in the sidebar (Panel.jsx), which already owned the on-demand
+                    UNINSTALL -- so this corner is state only, never an action. Two
+                    trash affordances for one job put the pack's most destructive
+                    action in the most repeated position on screen, reachable by a
+                    stray click while scanning the grid. Removal is deliberate or it
+                    does not happen; the label still reports what is on disk.
+
+                    REMOVING... is gone with the button: progress now shows in the
+                    sidebar, which is where the action was started, and duplicating it
+                    here needed state this component no longer owns. */}
+                <span
+                  className="tile-inpack"
+                  title={
+                    group.fetchable
+                      ? "Can be re-fetched from hosted URLs"
+                      : pm && !pmInstalled && !pmPartial
+                        ? "Already removed -- run tools\\build.py to restore"
+                        : "Ships inside the pack - nothing to download or remove"
+                  }
+                >
+                  {pm && !pmInstalled && !pmPartial
+                    ? "REMOVED"
+                    : group.fetchable
+                      ? "ON DEMAND"
+                      : "IN PACK"}
+                </span>
+              </span>
+            )}
+            {group.needsInstall && busy && (
         <span className="tile-install" role="status" aria-live="polite">
           <span className="tile-installbar">
             <span className="tile-installfill" style={{ width: `${pct}%` }} />

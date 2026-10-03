@@ -537,42 +537,37 @@
   .tile .tile-playwrap { z-index: 3; }
 
   /* Chrome Petch is already the display face; the glitch offsets assume a
-     tight line box, so give the title one. */
-  .tile-name { position: relative; }
+       tight line box, so give the title one. */
+    .tile-name { position: relative; }
 
-  .tile-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    margin-top: 3px;
-  }
-
-  .tile-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font: 700 0.55rem/1 var(--d-mono);
-    letter-spacing: 0.1em;
-    padding: 3px 5px;
-    border-radius: 2px;
-    color: var(--d-void);
-  }
-  .tile-tag.is-hd  { background: var(--d-toxic-400); }
-  .tile-tag.is-pin { background: var(--d-rust-400); }
-  .tile-tag.is-bad { background: var(--d-blood-400); }
+    /* The HD / PINNED / MISSING tag row used to live under the title. It is
+       gone with the rest of the card meta -- see .tile-body. State now rides on
+       the pin marker, the .is-missing dashed name, and the sidebar readout. */
 
   /* Framer Motion writes transform on the tile for the spring. The tilt also
-     wants a transform, so the tilt moves to an inner wrapper-free property:
-     rotate is applied via the custom props on a child, keeping the two from
-     fighting over the same declaration. */
-  .tile { --tilt-x: 0deg; --tilt-y: 0deg; }
-  .tile .cover,
-  .tile .tile-body {
-    transform: rotateX(calc(var(--my) * -5deg)) rotateY(calc(var(--mx) * 7deg));
-    transform-style: preserve-3d;
-  }
+       wants a transform, so the tilt moves to a child, keeping the two from
+       fighting over the same declaration.
 
-  /* ---------- terminal pane internals ---------- */
+       The tilt stays 2D on purpose. These children used to say
+       `transform-style: preserve-3d` while `.tile` said `flat` -- incoherent,
+       since a child cannot hold a 3D rendering context inside a flattened
+       parent. The tilt was computed in 3D and then flattened, while `.tile`'s
+       clip-path was applied in 2D *afterwards*, so the notches were cut against
+       untransformed geometry and the edge glow drifted out of register with the
+       clip. On hover (which adds scale) that read as chewed, misaligned corners.
+
+       `preserve-3d` on `.tile` instead is NOT the fix: clip-path forces an
+       element to flatten, so it would be ignored anyway. Keep the whole card in
+       2D and let the clip-path and the glow agree about the geometry. rotateX /
+       rotateY still read as depth once flattened; only the translateZ pops are
+       given up, which is what `.tile-body`'s hover lift used to be. */
+    .tile { --tilt-x: 0deg; --tilt-y: 0deg; }
+      .tile .cover,
+      .tile .tile-body {
+        transform: rotateX(calc(var(--my) * -5deg)) rotateY(calc(var(--mx) * 7deg));
+      }
+
+      /* ---------- terminal pane internals ---------- */
 
   .d-termpane {
     position: relative;
@@ -1535,14 +1530,21 @@ kbd {
   opacity: 0.82;
 }
 
-.tile.is-missing .tile-sub {
-  color: var(--blood-hot);
-}
+/* Missing cards used to be explained by a red-tinted .tile-sub and a MISSING
+   tag that was exempt from the dimming. Both are gone with the card's meta
+   row, which left this state as nothing but a 0.44 opacity dip and a border
+   tint -- i.e. conveyed by colour alone, which is not accessible and reads as
+   "greyed out / disabled" rather than "these files are gone".
 
-/* The MISSING tag is the one thing that must stay fully opaque -- it is the
-   explanation, and dimming it along with the card defeats the purpose. */
-.tile.is-missing .tile-tag.is-bad {
-  opacity: 1;
+   So the explanation is carried on the NAME itself: a dashed edge and the
+   blood colour, both at full opacity regardless of the card's dimming. Dashes
+   are the load-bearing part -- they survive greyscale and colour-blindness,
+   which a tint does not. The sidebar Details readout also states it in words
+   for the selected game. */
+.tile.is-missing .tile-name {
+  color: var(--blood-hot);
+  text-decoration: underline dashed var(--blood);
+  text-underline-offset: 3px;
 }
 
 /* ----------------------------------------------------------------- cover */
@@ -1671,23 +1673,43 @@ kbd {
 
 /* -------------------------------------------------------------- tile body */
 
+/* Card body is now ONLY the game name, sitting tight under the artwork.
+   The sub-line and tag row that used to be here are gone, so the old
+   "9px 11px 11px" padding left a visibly empty band beneath the name --
+   11px of bottom padding with nothing in it, on every card in the grid.
+   Now: no side padding (the name is flush left with the art edge, as a
+   caption rather than a panel) and no bottom padding at all, so the text
+   line is the last thing in the card and the grid has no dead row under
+   it. Line-height is explicit because the name is a 1-2 line clamp and
+   the default would leave a few px of leading below the second line. */
 .tile-body {
-  padding: 9px 11px 11px;
+  /* Horizontal padding is NOT cosmetic -- it keeps the name clear of the
+     card's notched corners. The .d-jagged clip-path (styles.css ~231) cuts
+     10px off the bottom-left and 10px off the bottom-right; .d-jagged-lg cuts
+     18px when the card is selected. A flush-left name therefore started
+     *inside* the notch and got its first and last characters sliced off on
+     hover, worst on the selected card. 20px clears the deeper selected cut
+     with a couple of px to spare.
+
+     This was a regression from dropping the old 11px side padding when the
+     meta strip was removed: 11px cleared the 10px notch but only just, and
+     only for the unselected profile. */
+  padding: 6px 20px 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  transform: translateZ(0);
-  transition: transform var(--med) var(--ease);
 }
 
-.tile:hover .tile-body {
-  transform: translateZ(26px);
-}
+/* The title no longer lifts toward the viewer on hover. It used to
+   translateZ(26px), which only had any visible effect because .tile-body
+   claimed preserve-3d inside a flattened parent -- an incoherent combination
+   that also fought .tile's clip-path (see the tilt block above). With the card
+   kept flat, the lift did nothing but add the misalignment, so it is gone.
+   The cover still brightens and the card still scales via the spring. */
 
 .tile-name {
   font-weight: 600;
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--fg);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1695,11 +1717,9 @@ kbd {
   overflow: hidden;
 }
 
-.tile-sub {
-  font-size: 11px;
-  color: var(--fg-faint);
-  font-variant-numeric: tabular-nums;
-}
+/* .tile-sub and .tile-tags are intentionally left unstyled-but-unused: the
+   markup is gone, and the only rule that still referenced them was the
+   missing-files tint below, which now hangs off the card itself. */
 
 /* ----------------------------------------------------------------- panel */
 
@@ -2138,6 +2158,15 @@ kbd {
   text-shadow: 0 0 12px rgba(255, 154, 60, 0.5);
 }
 
+/* Zoom readout from the desktop shell. Tabular figures so the number does not
+   jitter as it counts, and the same ember as the pin marker because both are
+   "this is a live value", not chrome. */
+.statusbar .status-zoom {
+  color: var(--ember);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(255, 154, 60, 0.5);
+}
+
 .statusbar .keys {
   display: flex;
   align-items: center;
@@ -2339,35 +2368,14 @@ kbd {
 
 /* ---------- on-demand install: card + sidebar ---------- */
 
-/* Card-level uninstall. Sits top-left of the cover so it cannot collide with
-   the play button (bottom-centre) or the ON DEMAND badge (top-right). */
+/* Card-level state label (IN PACK / REMOVED / ON DEMAND), top-left of the
+   cover. It was originally the wrapper for a trash button; that button moved
+   to the sidebar, so only the label is styled here. */
 .tile-uninstall {
   position: absolute;
   top: 6px;
   left: 6px;
   z-index: 5;
-}
-
-.tile-uninst {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  color: var(--fg-dim);
-  background: rgba(10, 6, 9, 0.82);
-  border: 1px solid var(--line-2);
-  border-radius: 3px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.tile-uninst:hover {
-  color: #ff5c5c;
-  border-color: var(--blood);
-  background: rgba(43, 6, 8, 0.9);
-}
-.tile-uninst:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* Sidebar install block, below Details. */
@@ -2924,6 +2932,42 @@ kbd {
 }
 
 @keyframes vrow-spin { to { transform: rotate(360deg); } }
+
+.vmenu-foot {
+  border-top: 1px solid color-mix(in srgb, var(--fg-faint) 20%, transparent);
+  padding: 0.25rem;
+}
+
+.vrow-reveal {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: none;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--fg-faint);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.vrow-reveal svg { width: 0.85rem; height: 0.85rem; fill: currentColor; flex: none; }
+
+.vrow-reveal:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  color: var(--fg);
+}
+
+.vrow-reveal:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: -2px;
+}
+
+.vrow-reveal:disabled { cursor: not-allowed; opacity: 0.6; }
 
 
 /* ------------------------------------------------------- launch target */

@@ -9,7 +9,7 @@ import {
   HardDrive,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { dryrun, launchIndex, startInstall, removeInstall } from "./api";
+import { dryrun, launchIndex, startInstall, removeInstall, removePackMod as apiRemovePackMod } from "./api";
 import { Cover } from "./Tile";
 import ConfirmDownload from "./ConfirmDownload";
 import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
@@ -19,7 +19,15 @@ function bytes(n) {
   return n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`;
 }
 
-export default function Panel({ group, onPick, toast, inst, onInstalled }) {
+export default function Panel({
+  group,
+  onPick,
+  toast,
+  inst,
+  pm,
+  onInstalled,
+  onPackModRemoved,
+}) {
   const reduced = useReducedMotion();
   const [busy, setBusy] = useState(false);
   // Brief boot readout on every game switch. Purely presentational: the details
@@ -63,6 +71,34 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
       onInstalled?.();
     } catch (e) {
       setInstError(String(e.message || e));
+    }
+  }
+
+  /* ------------------------------------------------ baked-in mod removal */
+  // The card used to own this (a trash icon in its top-left corner). Both
+  // kinds of removal now live in this sidebar, side by side: one place to
+  // look for "remove this", and the destructive action is never sitting under
+  // a scanning cursor.
+  const [pmBusy, setPmBusy] = useState(false);
+  const [pmError, setPmError] = useState(null);
+  // pm is null for a group with no mods\ folders at all (a pure-IWAD entry)
+  // and for the two on-demand entries, which use `inst` above instead.
+  const pmInstalled = !!pm?.installed;
+  const pmPartial = !!pm?.partial;
+  const pmRemovable = !!pm && (pmInstalled || pmPartial) && pm.exclusive.length > 0;
+
+  async function removePackMod() {
+    if (!pmRemovable || pmBusy) return;
+    setPmBusy(true);
+    setPmError(null);
+    try {
+      await apiRemovePackMod(group.key);
+      onPackModRemoved?.();
+      onInstalled?.(); // the tile's `exists` must flip too
+    } catch (e) {
+      setPmError(String(e.message || e));
+    } finally {
+      setPmBusy(false);
     }
   }
 
@@ -309,15 +345,67 @@ export default function Panel({ group, onPick, toast, inst, onInstalled }) {
             game said two different things in two places. It now says the same
             thing here too. */}
         {!group.needsInstall && (
-          <div className="panel-install">
-            <p className="panel-inpack">
-              <HardDrive size={13} aria-hidden="true" />
-              {group.fetchable
-                ? "Can be re-fetched from hosted URLs"
-                : "Ships inside the pack"}
-            </p>
-          </div>
-        )}
+                  <div className="panel-install">
+                    {pmError && (
+                      <p className="warn" role="alert">
+                        {pmError}
+                      </p>
+                    )}
+                    {/* Baked-in mods get their removal HERE, not on the card. Every
+                        tile used to carry a trash icon in its top-left corner, which
+                        put the pack's most destructive action in the most repeated
+                        position on screen -- reachable by a stray click while scanning
+                        the grid, with no confirmation step between the click and
+                        deleting a folder. One place, beside the on-demand UNINSTALL
+                        above, means both kinds of removal read the same way and both
+                        are deliberate.
+
+                        Only offered when there is something exclusive to delete. A
+                        game whose every file is shared with another (BDBE "HontE
+                        Remastered" shares all four of its slugs with "Enhanced
+                        Episode 1") would reclaim nothing, and a button that always
+                        silently does nothing is worse than no button -- so the
+                        explanation is shown instead. */}
+                    <p className="panel-inpack">
+                      <HardDrive size={13} aria-hidden="true" />
+                      {group.fetchable
+                        ? "Can be re-fetched from hosted URLs"
+                        : "Ships inside the pack"}
+                      {pm?.size_h ? ` · ${pm.size_h}` : ""}
+                    </p>
+                    {pmRemovable ? (
+                      <button
+                        type="button"
+                        className="btn-ghost is-danger"
+                        onClick={removePackMod}
+                        disabled={pmBusy}
+                      >
+                        <Trash2 size={13} aria-hidden="true" />
+                        {pmBusy ? "Removing..." : "REMOVE FROM PACK"}
+                      </button>
+                    ) : (
+                      pm &&
+                      !pmInstalled &&
+                      !pmPartial && (
+                        <p className="panel-dlhint">
+                          <Trash2 size={13} aria-hidden="true" />
+                          Already removed. Restore with{" "}
+                          <code>python tools\build.py</code>
+                        </p>
+                      )
+                    )}
+                    {/* A shared-slug game is still installed and still has nothing
+                        removable. Say why, rather than leaving the user wondering
+                        where the button went. */}
+                    {pm && pmInstalled && !pmRemovable && pm.shared.length > 0 && (
+                      <p className="panel-dlhint">
+                        <HardDrive size={13} aria-hidden="true" />
+                        All {pm.folders.length} file(s) are shared with another game, so
+                        removing this entry would free nothing.
+                      </p>
+                    )}
+                  </div>
+                )}
         {group.needsInstall && (
           <div className="panel-install">
             {instError && (

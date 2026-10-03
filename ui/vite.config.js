@@ -26,6 +26,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Bind IPv4 as well as IPv6. Without this Vite listens on [::1] only, so
+    // http://localhost:5173/ works but http://127.0.0.1:5173/ gets connection
+    // refused -- and the IP form is the one the rest of this project uses
+    // (serve.py on 127.0.0.1:8765, the Electron window, the download page).
+    // `host: true` would also expose it on the LAN, which is not wanted.
+    host: "127.0.0.1",
     // During `npm run dev`, proxy to the Python server so the UI talks to the
     // real /api/entries, /api/launch and /art/ instead of dying on CORS.
     proxy: {

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { launchIndex } from "./api";
+import { launchIndex, revealFolder } from "./api";
 
 /**
  * The per-game build menu, opened by right-clicking a card.
@@ -82,6 +82,27 @@ export default function VariantMenu({ group, at, onClose, onLaunched, onError })
     }
   }
 
+  // Reveal the DEFAULT build's folder (cfgs are sorted base-first, same build
+  // a plain click launches). Every variant in a group shares the same mod
+  // folders in practice -- that is what makes them one card -- so picking the
+  // default rather than whichever row the pointer is over keeps this one
+  // action instead of one per row. The server resolves the actual path from
+  // that index's own launcher .bat; this never sends a path, only the index
+  // /api/launch already trusts.
+  const [revealing, setRevealing] = useState(false);
+  async function reveal() {
+    if (revealing) return;
+    setRevealing(true);
+    try {
+      await revealFolder(group.cfgs[0].index);
+    } catch (e) {
+      onError?.(e.message || String(e));
+    } finally {
+      setRevealing(false);
+      onClose();
+    }
+  }
+
   return (
     <div
       ref={ref}
@@ -143,6 +164,25 @@ export default function VariantMenu({ group, at, onClose, onLaunched, onError })
           );
         })}
       </ul>
+      {/* Folder-level action, one per card regardless of how many builds it
+          has -- see reveal() above for why it always targets the default
+          build's index. A separate <footer>, not another <li>, so it reads
+          as a distinct kind of action rather than one more build row. */}
+      <footer className="vmenu-foot">
+        <button
+          type="button"
+          role="menuitem"
+          className="vrow-reveal"
+          onClick={reveal}
+          disabled={revealing}
+          title="Open this game's install folder in Explorer"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+          </svg>
+          {revealing ? "Opening..." : "Reveal install folder"}
+        </button>
+      </footer>
     </div>
   );
 }

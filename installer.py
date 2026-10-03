@@ -94,6 +94,146 @@ DEST = {
 _lock = threading.Lock()
 _jobs = {}   # name -> job dict
 
+# --------------------------------------------------------------- pack mods
+#
+# Everything above is for the two on-demand total conversions, which were the
+# only mods with a tracked install location before this. Every OTHER mod is
+# baked into mods/<slug>/ at build time by tools/build.py, straight from
+# pack-manifest.json -- there was no uninstall path for those at all. Rather
+# than inventing a second SPECS/DEST table that build.py would then have to be
+# kept in sync with by hand, the registry below is DERIVED from
+# pack-manifest.json itself, the same document serve.py's load_entries()
+# already treats as the source of truth. A rebuild changes the manifest; this
+# registry changes with it automatically, nothing here goes stale.
+MANIFEST = os.path.join(PACK, "pack-manifest.json")
+
+
+def _load_manifest():
+    try:
+        return json.load(open(MANIFEST, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"games": []}
+
+
+def pack_mod_registry():
+    """Map every baked-in game's name to the mods/<slug> folders it loads.
+
+    Returns (per_game, owners):
+      per_game: game name -> set of mod slugs that game's actions reference.
+      owners:   mod slug -> set of game names that reference it.
+
+    On-demand total conversions (needs_install actions -- Adventures of
+    Square, Requiem) are skipped here; those are tracked by name directly via
+    SPECS/DEST above and have their own install()/remove().
+
+    A slug can appear under more than one game: Brutal Doom Black Edition's
+    BDBE_v3.38.pk3 is shared between the "Enhanced Episode 1" and "HontE
+    Remastered" entries. owners is what lets remove_pack_mod() tell a folder
+    this game alone uses from one it shares, so uninstalling one game can
+    never silently break another that still needs the same file.
+    """
+    man = _load_manifest()
+    owners, per_game = {}, {}
+    for g in man.get("games", []):
+        name = g.get("name")
+        folders = set()
+        for a in g.get("actions", []):
+            if a.get("needs_install"):
+                continue
+            for m in a.get("mods", []):
+                # Stored as "mods\\<slug>\\<file>" or "mods/<slug>/<file>" --
+                # the slug is always the second-to-last path component.
+                parts = [p for p in m.replace("\\", "/").split("/") if p]
+                if len(parts) >= 2:
+                    folders.add(parts[-2])
+        if folders:
+            per_game[name] = folders
+            for f in folders:
+                owners.setdefault(f, set()).add(name)
+    return per_game, owners
+
+
+def pack_mod_status(name):
+    """Install status for one baked-in game, or None if it has no mods/ at
+    all (an on-demand entry, or a standalone exe outside the pack)."""
+    per_game, owners = pack_mod_registry()
+    folders = per_game.get(name)
+    if folders is None:
+        return None
+    present = [f for f in folders
+               if os.path.isdir(os.path.join(PACK, "mods", f))]
+    shared = sorted(f for f in folders if len(owners.get(f, ())) > 1)
+    exclusive = sorted(f for f in folders if f not in shared)
+    freed = 0
+    for f in folders:
+        d = os.path.join(PACK, "mods", f)
+        if os.path.isdir(d):
+            for root, _dirs, files in os.walk(d):
+                for fn in files:
+                    try:
+                        freed += os.path.getsize(os.path.join(root, fn))
+                    except OSError:
+                        pass
+    return {
+        "name": name,
+        "folders": sorted(folders),
+        "exclusive": exclusive,
+        "shared": shared,
+        "installed": bool(folders) and len(present) == len(folders),
+        "partial": 0 < len(present) < len(folders),
+        "size_h": _human(freed) if freed else None,
+    }
+
+
+def remove_pack_mod(name):
+    """Delete the mods/<slug> folders a baked-in game owns EXCLUSIVELY.
+
+    Mirrors remove() above: the only paths ever touched are
+    PACK/mods/<slug>, and <slug> only ever comes from pack_mod_registry(),
+    which is built from pack-manifest.json on the server -- never from
+    anything a request supplied. An unknown game name is rejected exactly
+    like an unknown SPECS name is.
+
+    A slug shared with another game is skipped, not deleted, and reported
+    back in "skipped" so the UI can say why nothing (or only part) of it was
+    removed. There is no reinstall button for these: the pack's own copy was
+    a build-time copy from the operator's source drive, so getting it back
+    is `python tools\\build.py` -- the files are not re-fetched from a URL
+    the way the two on-demand total conversions are. serve.py's load_entries()
+    re-checks the filesystem on every /api/entries request, so the tile
+    immediately reflects the removal as "missing" with no rebuild needed for
+    that part.
+    """
+    per_game, owners = pack_mod_registry()
+    folders = per_game.get(name)
+    if folders is None:
+        raise KeyError(name)
+    mods_root = os.path.join(PACK, "mods")
+    removed, skipped, freed = [], [], 0
+    for f in sorted(folders):
+        if len(owners.get(f, ())) > 1:
+            skipped.append(f)
+            continue
+        dest = os.path.join(mods_root, f)
+        # Defence in depth even though f is never client-supplied: refuse
+        # anything that is not a direct child of mods\, and never follow a
+        # symlink -- same two guards remove() uses for the on-demand case.
+        if os.path.dirname(os.path.abspath(dest)) != os.path.abspath(mods_root):
+            continue
+        if os.path.islink(dest):
+            continue
+        if not os.path.isdir(dest):
+            continue
+        for root, _dirs, files in os.walk(dest):
+            for fn in files:
+                try:
+                    freed += os.path.getsize(os.path.join(root, fn))
+                except OSError:
+                    pass
+        shutil.rmtree(dest)
+        removed.append(f)
+    return {"name": name, "removed": removed, "skipped": skipped, "freed": freed}
+
 
 def _human(n):
     for unit in ("B", "KB", "MB", "GB"):

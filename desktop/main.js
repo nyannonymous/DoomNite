@@ -693,6 +693,101 @@ function createWindow() {
       if (/^https?:/.test(url)) shell.openExternal(url);
     }
   });
+
+  attachZoom(win);
+}
+
+// Zoom bounds, stated as the percentages a person would recognise and converted
+// to Chromium zoom LEVELS here.
+//
+// The conversion is the trap: Chromium's zoom factor is 1.2^level, so a level
+// of 2.0 is 144%, not 200% -- and level 0 is 100%, not 0%. Naming raw levels as
+// if they were percentages is how "max 300%" ended up quietly meaning 144%.
+// log(1.2) is the scale factor that makes level = log(pct)/log(1.2).
+const ZOOM_MIN_PCT = 0.8; //  80%
+const ZOOM_MAX_PCT = 3.0; // 300%
+const zoomLevelFor = (pct) => Math.log(pct) / Math.log(1.2);
+const ZOOM_MIN = zoomLevelFor(ZOOM_MIN_PCT);
+const ZOOM_MAX = zoomLevelFor(ZOOM_MAX_PCT);
+
+/**
+ * Ctrl/Cmd + wheel zoom, and the keyboard equivalents.
+ *
+ * A browser gives you this for free. Electron does not, because the app has no
+ * menu bar (Menu.setApplicationMenu(null)) and the zoom accelerators normally
+ * live there -- so the browser build could be ctrl+scrolled and the desktop
+ * app could not, which is the inconsistency worth fixing.
+ *
+ * Done on the webContents zoom factor rather than a CSS transform on the page:
+ * a transform would scale the layout without re-laying it out, leaving the
+ * ember canvas and the pointer-tracked tilt maths working off stale
+ * coordinates. setZoomLevel re-flows properly.
+ *
+ * Zoom is per-window and persists across game launches because the same
+ * BrowserWindow is reused; a reload or a relaunch of the engine does not touch
+ * the zoom factor.
+ */
+function attachZoom(win) {
+  const wc = win.webContents;
+  const MIN = ZOOM_MIN;
+  const MAX = ZOOM_MAX;
+  // Chromium zoom is 1.2^level, so the step is chosen as a LEVEL that lands on
+  // a percentage a person would expect from a browser. 1.2^0.5 is ~109%, i.e.
+  // about +9% per notch. The first attempt used STEP=0.1, which is only +2% --
+  // technically working, practically indistinguishable from no zoom at all,
+  // which is exactly how the missing feature went unnoticed in the first
+  // place. log(1.1)/log(1.2) ~= 0.486, so 0.5 is the nearest clean level.
+  const STEP = 0.5;
+
+  const apply = (delta) => {
+    const next = Math.min(MAX, Math.max(MIN, wc.getZoomLevel() + delta));
+    wc.setZoomLevel(next);
+    // wc.zoomFactor is the real multiplier, so report that rather than
+    // re-deriving it from the level -- one conversion, no chance of the two
+    // disagreeing. Native zoom surfaces no value, and the status bar is the
+    // only place the user can confirm what happened.
+    const pct = Math.round(wc.zoomFactor * 100);
+    wc.executeJavaScript(
+      `window.dispatchEvent(new CustomEvent("doomnite:zoom", {detail: ${pct}}))`
+    ).catch(() => {});
+  };
+
+  // Ctrl+wheel on Windows/Linux, Cmd+wheel on macOS -- the platform modifier,
+  // not the literal Control key, so macOS gets the gesture it expects.
+  win.webContents.on(
+    "before-input-event",
+    (event, input) => {
+      if (input.type !== "mouseWheel") return;
+      if (!input.isAutoScroll) {
+        const zoomModifier = process.platform === "darwin" ? input.meta : input.control;
+        if (!zoomModifier) return;
+      }
+      // DeltaY is +/- per notch and can be fractional on a trackpad. Any
+      // non-zero scroll means "zoom", not "pan" -- there is nothing to pan.
+      event.preventDefault();
+      apply(input.deltaY < 0 ? STEP : -STEP);
+    }
+  );
+
+  // Ctrl/Cmd + plus/minus/0, the keyboard route to the same thing.
+  wc.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return;
+    const accel = process.platform === "darwin" ? input.meta : input.control;
+    if (!accel) return;
+    if (input.key === "+" || input.key === "=") {
+      event.preventDefault();
+      apply(STEP);
+    } else if (input.key === "-" || input.key === "_") {
+      event.preventDefault();
+      apply(-STEP);
+    } else if (input.key === "0") {
+      event.preventDefault();
+      wc.setZoomLevel(0);
+      wc.executeJavaScript(
+        `window.dispatchEvent(new CustomEvent("doomnite:zoom", {detail: 100}))`
+      ).catch(() => {});
+    }
+  });
 }
 
 // Kill a child and everything it started. taskkill /t because spawn gives us
@@ -725,7 +820,19 @@ function kill(child) {
   }
 }
 
-app.whenReady().then(async () => {
+// main.js is normally the Electron entry point and self-starts. Exporting
+// attachZoom lets build/check-zoom.js drive the REAL handler in a real
+// BrowserWindow instead of a copy of it -- a test that re-implements the
+// behaviour it is testing proves only that the copy works. Requiring this
+// module still boots the app (that is what an entry point must do), so the
+// checker guards on ZOOM_CHECK_MODE and returns before the boot sequence.
+module.exports = { attachZoom, ZOOM_MIN, ZOOM_MAX };
+
+if (process.env.ZOOM_CHECK_MODE) {
+  // Imported for its attachZoom export only; the real boot is the checker's
+  // job, driven from build/check-zoom.js.
+} else {
+  app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
 
   const { root: packRoot, managed } = resolvePackRoot();
@@ -822,3 +929,4 @@ app.on("window-all-closed", () => {
   // gap would kill the app at the exact moment it finished working.
   if (!starting) app.quit();
 });
+} // end of the non-check boot branch

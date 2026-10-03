@@ -53,8 +53,21 @@ export default function App() {
   const [flashing, setFlashing] = useState(false);
   const [toastMsg, setToastMsg] = useState(null);
   const [toastBad, setToastBad] = useState(false);
+  // Zoom percentage, reported by the Electron shell after a ctrl+wheel zoom.
+  // Defaults to 100 and is simply never updated in a browser, where the
+  // status-bar readout stays hidden.
+  const [zoom, setZoom] = useState(100);
   const [count, setCount] = useState(0); // entrance animation trigger
   const toastTimer = useRef(null);
+
+  // Zoom events from the desktop shell. Custom event rather than a preload
+  // bridge because this only ever needs to carry a number one way, and the
+  // page has to keep working when there is no shell to send it (browser).
+  useEffect(() => {
+    const onZoom = (e) => setZoom(Number(e.detail) || 100);
+    window.addEventListener("doomnite:zoom", onZoom);
+    return () => window.removeEventListener("doomnite:zoom", onZoom);
+  }, []);
 
   const toast = useCallback((msg, bad = false) => {
     setToastMsg(msg);
@@ -122,6 +135,31 @@ export default function App() {
   useEffect(() => {
     loadInst();
   }, [loadInst]);
+
+  // Same shape as inst above, but for the ~30 BAKED-IN games rather than the
+  // two on-demand downloads -- see installer.pack_mod_registry() /
+  // pack_mod_status(). Keyed by game name, which is also group.key for every
+  // pack entry (group.key = e.group || e.label, and e.group is g["name"]),
+  // so Tile can look itself up the same way it does for `inst`.
+  const [packMods, setPackMods] = useState({});
+
+  const loadPackMods = useCallback(
+    () =>
+      fetch("/api/packmods", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          const m = {};
+          for (const e of d.entries || []) m[e.name] = e;
+          setPackMods(m);
+          return m;
+        })
+        .catch(() => {}),
+    []
+  );
+
+  useEffect(() => {
+    loadPackMods();
+  }, [loadPackMods]);
 
   // While anything is downloading, keep the status fresh so progress moves and
   // a finished install flips the card without a reload.
@@ -448,6 +486,8 @@ export default function App() {
                   onOpenVariants={openVariants}
                   onInstalled={reloadEntries}
                   inst={g.needsInstall ? inst[g.needsInstall] : null}
+                  pm={!g.needsInstall ? packMods[g.key] : null}
+                  onPackModRemoved={loadPackMods}
                 />
               ))}
             </div>
@@ -461,10 +501,12 @@ export default function App() {
           }
           toast={toast}
           inst={current?.needsInstall ? inst[current.needsInstall] : null}
-          onInstalled={() => {
-            loadInst();
-            reloadEntries();
-          }}
+                    pm={current && !current.needsInstall ? packMods[current.key] : null}
+                    onPackModRemoved={loadPackMods}
+                    onInstalled={() => {
+                      loadInst();
+                      reloadEntries();
+                    }}
         />
       </main>
 
@@ -489,7 +531,20 @@ export default function App() {
           </>
         )}
         <span className="grow" />
-        <span className="keys">
+                {/* Zoom readout. Only the desktop shell sends this (it has no menu bar,
+                    so ctrl+wheel zoom has no other affordance and no visible
+                    confirmation); in a browser the page is already at whatever zoom
+                    the user set, so there is nothing to report. Hidden at 100% so it
+                    does not sit there permanently. */}
+                {zoom !== 100 && (
+                  <>
+                    <span className="status-zoom" title="Ctrl+wheel to zoom, Ctrl+0 to reset">
+                      zoom {zoom}%
+                    </span>
+                    <span className="dot" aria-hidden="true" />
+                  </>
+                )}
+                <span className="keys">
           <kbd>↑</kbd>
           <kbd>↓</kbd> move · <kbd>Tab</kbd> config · <kbd>↵</kbd> play
         </span>

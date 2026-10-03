@@ -152,6 +152,42 @@ export async function removeInstall(name) {
   );
 }
 
+/* ------------------------------------------------------------- pack mods */
+// Every BAKED-IN game -- the ~30 mods shipped at build time, not just the
+// two on-demand downloads above. Status is derived live from
+// pack-manifest.json plus what is actually on disk (installer.py's
+// pack_mod_registry/pack_mod_status), so this is just as cheap and
+// pollable as fetchInstallStatus.
+export async function fetchPackModStatus() {
+  const d = await j(await fetch("/api/packmods", { cache: "no-store" }));
+  return d.entries || [];
+}
+
+// Delete a baked-in game's mod folder(s). There is no reinstall button for
+// these -- getting the files back means `python tools\build.py` against the
+// operator's own source drive, not a re-download -- so the UI should treat
+// this as closer to "remove from this pack" than "uninstall and reinstall
+// later". Folders shared with another game (e.g. BDBE_v3.38.pk3) are kept;
+// the server reports them back under "skipped".
+export async function removePackMod(name) {
+  return j(
+    await fetch(`/api/packmods/${encodeURIComponent(name)}`, { method: "DELETE" })
+  );
+}
+
+// Reveal one entry's install folder in Explorer. Takes the same integer
+// INDEX /api/launch takes -- never a path -- and the server resolves it
+// itself from the entry's own launcher .bat.
+export async function revealFolder(index) {
+  return j(
+    await fetch("/api/reveal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ index }),
+    })
+  );
+}
+
 export const FILTERS = [
   { id: "all", label: "All" },
   { id: "doom1", label: "Doom 1" },

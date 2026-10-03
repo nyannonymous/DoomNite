@@ -354,6 +354,65 @@ def resolve(idx):
     return ENTRIES[idx]
 
 
+def reveal_folder_for(idx):
+    """The real on-disk folder an entry's content lives in, or None.
+
+    Takes only a validated integer index -- the same guard /api/launch uses
+    -- and resolves it entirely server-side. Never builds a path out of
+    anything a request supplied.
+
+    A standalone game's "install folder" is its working directory, which is
+    whatever STANDALONE in tools/build.py recorded (outside the pack, next
+    to its own exe).
+
+    A pack entry's folder is read out of its OWN launcher .bat -- the same
+    file _content_present() already parses -- rather than out of the mods
+    list on the entry, because that list only carries basenames (see
+    load_entries(): "mods": [os.path.basename(m) ...]), with the mods\\<slug>\\
+    folder component stripped off. The .bat is the one place that still has
+    the real path, and it is a file this server wrote at build time, not
+    something a client can influence.
+    """
+    entry = resolve(idx)
+    if entry is None:
+        return None
+    if entry["kind"] == "standalone":
+        wdir = entry.get("wdir") or ""
+        return wdir if os.path.isdir(wdir) else None
+    bat = entry.get("bat")
+    if not bat:
+        return None
+    bp = os.path.join(PACK, "launchers", bat)
+    try:
+        txt = open(bp, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return None
+    base = os.path.dirname(bp)
+    txt = txt.replace("%~dp0..\\", PACK + "\\").replace("%~dp0", base + "\\")
+    refs = re.findall(r'"([^"]+\.(?:pk3|pk7|wad|WAD))"', txt)
+    mods_prefix = os.path.join(PACK, "mods") + os.sep
+    # Prefer a reference that actually lives under mods\ -- for an on-demand
+    # total conversion that is the installer.py destination; for a regular
+    # pack entry it is the copied mod. Falls back to the IWAD's own folder
+    # (iwads\) only if somehow nothing under mods\ was found.
+    mod_refs = [r for r in refs if os.path.normcase(r).startswith(os.path.normcase(mods_prefix))]
+    pick = mod_refs[0] if mod_refs else (refs[0] if refs else None)
+    if not pick:
+        return None
+    folder = os.path.dirname(os.path.abspath(pick))
+    # Must resolve inside the pack. Every input above came from a file this
+    # server itself wrote, but checking costs nothing and the launch/-iwad
+    # resolution logic this mirrors is exactly the kind of thing a future
+    # edit could get subtly wrong.
+    if not folder.lower().startswith(PACK.lower()):
+        return None
+    if os.path.isdir(folder):
+        return folder
+    # Not installed (an on-demand entry before its first download): nothing
+    # to reveal rather than pointing Explorer at a folder that is not there.
+    return None
+
+
 def command_for(entry):
     """The command that entry runs, as a string, for display."""
     if entry["kind"] == "pack":
@@ -500,6 +559,16 @@ def handler_factory():
                 # Status for every installable entry. The UI polls this while a
                 # download runs, so it must be cheap and never block.
                 return self._send(200, _json.dumps({"entries": _inst.status()}))
+            if path == "/api/packmods":
+                # Install status for every BAKED-IN game, derived live from
+                # pack-manifest.json + what is actually on disk -- see
+                # installer.pack_mod_registry(). Cheap: no hashing, just
+                # os.path.isdir on each mod folder, so this is as pollable as
+                # /api/install.
+                per_game, _owners = _inst.pack_mod_registry()
+                return self._send(200, _json.dumps({
+                    "entries": [_inst.pack_mod_status(n) for n in per_game]
+                }))
             if path == "/api/dryrun":
                 q = _up.parse_qs(_up.urlparse(self.path).query)
                 try:
@@ -587,6 +656,19 @@ def handler_factory():
                 except RuntimeError as e:
                     return self._send(409, _json.dumps({"error": str(e)}))
                 return self._send(200, _json.dumps(r))
+            if path.startswith("/api/packmods/") and self.command == "DELETE":
+                # Uninstall of a BAKED-IN game -- every mod the pack ships
+                # with, not just the two on-demand downloads. The name is
+                # decoded then looked up in installer.pack_mod_registry(),
+                # which is built straight from pack-manifest.json: there is
+                # no path here that a request body or query string could
+                # redirect, same discipline as the /api/install/ route above.
+                name = _up.unquote(path[len("/api/packmods/"):])
+                try:
+                    r = _inst.remove_pack_mod(name)
+                except KeyError:
+                    return self._send(404, _json.dumps({"error": "unknown"}))
+                return self._send(200, _json.dumps(r))
             if path.startswith("/api/install/"):
                 # Only a known installer name from the POST body, and the name
                 # is looked up in installer.SPECS -- never used to build a path
@@ -607,6 +689,38 @@ def handler_factory():
                 # Runs in a worker thread: these are 4 MB and 44 MB downloads
                 # and must not hold the request open.
                 return self._send(202, _json.dumps(_inst.start(name, force=force)))
+            if path == "/api/reveal" and self.command == "POST":
+                # Open Explorer on an entry's own install folder. The body
+                # carries only an integer INDEX -- the same shape and the same
+                # guard as /api/launch -- and reveal_folder_for() resolves it
+                # entirely server-side, exactly mirroring remove()'s "look it
+                # up by a known key, never build a path from user input".
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 4096:
+                    return self._send(413, _json.dumps({"error": "body too large"}))
+                try:
+                    raw = json.loads(self.rfile.read(n) or b"{}")
+                except ValueError:
+                    return self._send(400, _json.dumps({"error": "bad json"}))
+                idx = raw.get("index")
+                if isinstance(idx, bool) or not isinstance(idx, int):
+                    return self._send(400, _json.dumps({
+                        "error": "index must be an integer"}))
+                folder = reveal_folder_for(idx)
+                if folder is None:
+                    return self._send(404, _json.dumps({
+                        "error": "no install folder for that entry"}))
+                # explorer.exe on a path WE resolved -- never one from the
+                # request. Popen, not run(): explorer can legitimately outlive
+                # the request (it is a user-facing window, not a worker job),
+                # and a non-zero exit from explorer.exe is normal (it returns
+                # 1 fairly often even on success) so the exit code is not
+                # checked the way a real failure elsewhere would be.
+                try:
+                    subprocess.Popen(["explorer.exe", folder])
+                except OSError as e:
+                    return self._send(500, _json.dumps({"error": str(e)}))
+                return self._send(200, _json.dumps({"ok": True, "folder": folder}))
             if path != "/api/launch":
                 return self._send(404, _json.dumps({"error": "not found"}))
             n = int(self.headers.get("Content-Length") or 0)
