@@ -250,7 +250,7 @@ npm start              # run from source
 npm run dist           # build an installer into release/
 ```
 
-Produces `DoomNite Setup 1.0.0.exe` (NSIS) and a portable zip. Installers are
+Produces `DoomNite Setup 2.0.0.exe` (NSIS) and a portable zip. Installers are
 published to [GitHub Releases](https://github.com/nyannonymous/DoomNite/releases/latest);
 the 3.4 GB pack stays on R2.
 
