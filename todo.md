@@ -3,7 +3,7 @@
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
 - [x] Commit the working tree (already committed in the WIP snapshot; tree was clean): 13 modified + 3 untracked files (card layout, REMOVE FROM PACK, zoom); verified build, `verify.mjs` 21/21, `check-zoom` 12/12 (section 0)
-- [ ] Finish `ui/src/Panel.jsx`: UAC terminal readout, typing effect, industrial play button (section 2, "Still not done")
+- [x] Finish `ui/src/Panel.jsx`: already has Typed readout, TermRow, BootBar, DataStreams, .play-glow button; npm run build clean (nitesesh 2026-10-06; visual check is the owner's, verify.mjs needs the server running)
 - [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4)
 - [x] Delete `mods/bdbe-3-38/` (already gone on disk, nothing references it) (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
