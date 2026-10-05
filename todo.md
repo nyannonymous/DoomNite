@@ -2,10 +2,10 @@
 
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
-- [ ] Commit the working tree: 13 modified + 3 untracked files (card layout, REMOVE FROM PACK, zoom); verified build, `verify.mjs` 21/21, `check-zoom` 12/12 (section 0)
+- [x] Commit the working tree (already committed in the WIP snapshot; tree was clean): 13 modified + 3 untracked files (card layout, REMOVE FROM PACK, zoom); verified build, `verify.mjs` 21/21, `check-zoom` 12/12 (section 0)
 - [ ] Finish `ui/src/Panel.jsx`: UAC terminal readout, typing effect, industrial play button (section 2, "Still not done")
-- [ ] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4)
-- [ ] Delete `mods/bdbe-3-38/` (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
+- [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4)
+- [x] Delete `mods/bdbe-3-38/` (already gone on disk, nothing references it) (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3) needs scoping first, because IWAD/launcher config is hand-authored in `tools/build.py` `GAMES` (section 5)

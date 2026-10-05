@@ -93,8 +93,10 @@ def main():
 
     # Absent file is normal on a fresh clone: everything is treated as new.
     existing = {}
+    old_doc = {}
     if os.path.exists(OUT):
-        existing = json.load(open(OUT, encoding="utf-8"))["files"]
+        old_doc = json.load(open(OUT, encoding="utf-8"))
+        existing = old_doc["files"]
     else:
         print(f"no {OUT} yet -- creating from the pack on disk")
 
@@ -102,6 +104,14 @@ def main():
     if not files:
         print("nothing to hash -- are runtime/ iwads/ mods/ present?")
         return 1
+
+    # IWADs are operator-supplied, so one being absent from this machine says
+    # nothing about whether the pack ships it. Keep its recorded entry rather
+    # than silently dropping it from the manifest.
+    for rel, rec in existing.items():
+        if rel.startswith("iwads/") and rel not in files:
+            print(f"  note: {rel} not on disk; keeping its existing entry")
+            files[rel] = dict(rec)
 
     # Carry forward the per-file settings this generator must not invent.
     # "no_host" is a legal decision, not a measurement: it marks the commercial
@@ -131,6 +141,8 @@ def main():
     drift = []
     for rel, rec in sorted(files.items()):
         old = existing.get(rel)
+        if rec.get("sha256"):  # carried forward, not on disk
+            continue
         if verify_only and old and old.get("sha256"):
             rec["sha256"] = old["sha256"]
             continue
@@ -157,6 +169,9 @@ def main():
         "version": 1,
         "files": files,
     }
+    # base_url is the operator's hosting choice, not something we measure.
+    if old_doc.get("base_url"):
+        doc["base_url"] = old_doc["base_url"]
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=1, sort_keys=True)
     print(f"\nwrote {OUT} ({human(os.path.getsize(OUT))})")
