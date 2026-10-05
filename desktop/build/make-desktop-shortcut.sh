@@ -7,9 +7,9 @@
 # be reinstalled just to launch the new UI.
 set -euo pipefail
 
-ROOT="Z:/DOOM_PACK/desktop/release/win-unpacked-v2"
+ROOT="Z:/github/APP · DOOMNITE-PACK/desktop/release/win-unpacked-v2"
 EXE="$ROOT/DoomNite.exe"
-ICON="Z:/DOOM_PACK/desktop/build/icon.ico"
+ICON="Z:/github/APP · DOOMNITE-PACK/desktop/build/icon.ico"
 DESKTOP="$USERPROFILE/Desktop"
 LINK="$DESKTOP/DoomNite.lnk"
 

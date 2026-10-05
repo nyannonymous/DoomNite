@@ -94,10 +94,10 @@ cp -r node_modules "$BD/"
 # The builder hook stages the bootstrap automatically from the real pack root.
 # This is needed because the temporary build directory contains only Electron
 # tooling; it does not need manual copies of serve.py, launchers, app or art.
-cd "$BD" && DOOMNITE_SOURCE_ROOT="Z:/DOOM_PACK" npm run dist
+cd "$BD" && DOOMNITE_SOURCE_ROOT="Z:/github/APP · DOOMNITE-PACK" npm run dist
 
 cp release/"DoomNite Setup 2.0.0.exe" release/DoomNite-2.0.0-win.zip \
-   "Z:/DOOM_PACK/desktop/release/"
+   "Z:/github/APP · DOOMNITE-PACK/desktop/release/"
 ```
 
 `build/python` is staged by `prepare-python.js`, so copying `build/` is enough —
@@ -106,7 +106,7 @@ no need to re-download the runtime.
 ## Uploading
 
 ```bash
-cd "Z:/DOOM_PACK/desktop/release"
+cd "Z:/github/APP · DOOMNITE-PACK/desktop/release"
 export GH_TOKEN=$(cat ~/Desktop/ghp_* | tr -d '\r\n')
 gh release upload v2.0.0 "DoomNite Setup 2.0.0.exe" DoomNite-2.0.0-win.zip \
   --repo nyannonymous/DoomNite --clobber
@@ -127,7 +127,7 @@ cannot mask a missing bundled one:
 
 ```bash
 cd release/win-unpacked
-DOOMNITE_PACK='Z:/DOOM_PACK' PATH="/c/Windows/system32:/c/Windows" ./DoomNite.exe
+DOOMNITE_PACK='Z:/github/APP · DOOMNITE-PACK' PATH="/c/Windows/system32:/c/Windows" ./DoomNite.exe
 ```
 
 Then confirm entries are served and that `resources/python/python311._pth` was
@@ -140,7 +140,7 @@ is exactly what a user does:
 ```bash
 D=/c/Users/me/Desktop/emptytest
 rm -rf "$D" && mkdir -p "$D" && cd "$D"
-unzip -q 'Z:/DOOM_PACK/desktop/release/DoomNite-2.0.0-win.zip'
+unzip -q 'Z:/github/APP · DOOMNITE-PACK/desktop/release/DoomNite-2.0.0-win.zip'
 PATH="/c/Windows/system32:/c/Windows" ./DoomNite.exe
 ```
 
