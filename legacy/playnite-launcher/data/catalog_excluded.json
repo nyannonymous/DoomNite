@@ -1,0 +1,13 @@
+[
+ {
+  "title": "Project Brutality",
+  "repo": "pa1nki113r/Project_Brutality",
+  "stars": 1346,
+  "reason": "repo has 3 GitHub releases (0.4.1/0.2.0/0.1.0A) but ZERO release assets - binaries are not published to GitHub, so there is nothing to auto-install from"
+ },
+ {
+  "title": "ALIENS: Eradication TC",
+  "repo": "mbugni/AliensEradicationTC",
+  "reason": "already installed locally, so it is a real Play card not a ghost"
+ }
+]

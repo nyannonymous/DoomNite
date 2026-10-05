@@ -1,0 +1,165 @@
+[
+ {
+  "id": "brutal_community",
+  "title": "Brutal Doom Community Expansion",
+  "kind": "total conversion",
+  "engine": "GZDoom / Zandronum",
+  "summary": "Combined community expansion for Brutal Doom v21 - all the latest fixes and features in one file.",
+  "blurb": "Brutal Doom 21 with every community patch folded into a single PK3. The polished, stable pick if you want Brutal Doom without hunting separate addons.",
+  "art": "art/brutal_community.png",
+  "source": "direct",
+  "repo": "BLOODWOLF333/Brutal-Doom-Community-Expansion",
+  "stars": 193,
+  "license": null,
+  "url": "https://github.com/BLOODWOLF333/Brutal-Doom-Community-Expansion",
+  "release_tag": "v21.50.1",
+  "asset": {
+   "name": "brutalv21.50.1.pk3",
+   "url": "https://github.com/BLOODWOLF333/Brutal-Doom-Community-Expansion/releases/download/v21.50.1/brutalv21.50.1.pk3",
+   "bytes": 120656821
+  },
+  "install": {
+   "filename": "brutalv21.50.1.pk3",
+   "subdir": null,
+   "args": "-file \"brutalv21.50.1.pk3\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": false
+ },
+ {
+  "id": "brutal_platinum",
+  "title": "Brutal Doom Platinum",
+  "kind": "total conversion",
+  "engine": "GZDoom / Zandronum",
+  "summary": "EmeraldCoasttt's heavily reworked Brutal Doom fork.",
+  "blurb": "A Brutal Doom fork that rebuilds the whole kit - new sprites, sound, rebalanced weapons and a far more modern look. Single self-contained PK3.",
+  "art": "art/brutal_platinum.png",
+  "source": "direct",
+  "repo": "EmeraldCoasttt/BrutalDoomPlatinum",
+  "stars": 96,
+  "license": "NOASSERTION",
+  "url": "https://github.com/EmeraldCoasttt/BrutalDoomPlatinum",
+  "release_tag": "v4.0",
+  "asset": {
+   "name": "BrutalDoomPlatinumv4.0.pk3",
+   "url": "https://github.com/EmeraldCoasttt/BrutalDoomPlatinum/releases/download/v4.0/BrutalDoomPlatinumv4.0.pk3",
+   "bytes": 204657410
+  },
+  "install": {
+   "filename": "BrutalDoomPlatinumv4.0.pk3",
+   "subdir": null,
+   "args": "-file \"BrutalDoomPlatinumv4.0.pk3\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": false
+ },
+ {
+  "id": "doom64ex_plus",
+  "title": "DOOM 64 EX-Plus",
+  "kind": "total conversion",
+  "engine": "standalone port (not Zandronum)",
+  "summary": "Modernised DOOM 64 source port with fixes, modern video and new features.",
+  "blurb": "DOOM 64 rebuilt to run properly on modern Windows - widescreen, higher resolutions, remappable controls and long-pince-dead SDK brought back.",
+  "art": "art/doom64ex_plus.png",
+  "source": "direct",
+  "repo": "atsb/Doom64EX-Plus",
+  "stars": 231,
+  "license": "NOASSERTION",
+  "url": "https://github.com/atsb/Doom64EX-Plus",
+  "release_tag": "5.2.0.0",
+  "asset": {
+   "name": "doom64ex-plus-5.2.0.0-win64.zip",
+   "url": "https://github.com/atsb/Doom64EX-Plus/releases/download/5.2.0.0/doom64ex-plus-5.2.0.0-win64.zip",
+   "bytes": 4107000
+  },
+  "install": {
+   "filename": "doom64ex-plus-5.2.0.0-win64.zip",
+   "subdir": null,
+   "args": "-file \"doom64ex-plus-5.2.0.0-win64.zip\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": false
+ },
+ {
+  "id": "doom64ex_enhanced",
+  "title": "DOOM 64 EX-Plus Enhanced",
+  "kind": "total conversion",
+  "engine": "standalone port (not Zandronum)",
+  "summary": "Community fork of EX+ with new content, options and features.",
+  "blurb": "A fork of DOOM 64 EX-Plus adding its own custom content and options on top of the modernised EX+ build.",
+  "art": "art/doom64ex_enhanced.png",
+  "source": "direct",
+  "repo": "Styd051/DOOM64-EX-Plus-Enhanced",
+  "stars": 42,
+  "license": "NOASSERTION",
+  "url": "https://github.com/Styd051/DOOM64-EX-Plus-Enhanced",
+  "release_tag": "V1.0.0.2.Developement",
+  "asset": {
+   "name": "doom64ex-plus-enhanced-1.0.0.2-development-win64.zip",
+   "url": "https://github.com/Styd051/DOOM64-EX-Plus-Enhanced/releases/download/V1.0.0.2.Developement/doom64ex-plus-enhanced-1.0.0.2-development-win64.zip",
+   "bytes": 17973404
+  },
+  "install": {
+   "filename": "doom64ex-plus-enhanced-1.0.0.2-development-win64.zip",
+   "subdir": null,
+   "args": "-file \"doom64ex-plus-enhanced-1.0.0.2-development-win64.zip\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": false
+ },
+ {
+  "id": "drrp",
+  "title": "Doom RPG Remake Project",
+  "kind": "total conversion",
+  "engine": "GZDoom / Zandronum",
+  "summary": "Total conversion remake of Doom RPG on GZDoom, MIT licensed.",
+  "blurb": "Doom RPG rebuilt properly as a GZDoom total conversion - the isometric RPG classic with real sprites, NPCs, shops and questing.",
+  "art": "art/drrp.png",
+  "source": "direct",
+  "repo": "DRRP-Team/DRRP",
+  "stars": 58,
+  "license": "MIT",
+  "url": "https://github.com/DRRP-Team/DRRP",
+  "release_tag": "v0.5.0",
+  "asset": {
+   "name": "DRRPv0.5.0.pk3",
+   "url": "https://github.com/DRRP-Team/DRRP/releases/download/v0.5.0/DRRPv0.5.0.pk3",
+   "bytes": 70644745
+  },
+  "install": {
+   "filename": "DRRPv0.5.0.pk3",
+   "subdir": null,
+   "args": "-file \"DRRPv0.5.0.pk3\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": false
+ },
+ {
+  "id": "aliens_eradication",
+  "title": "ALIENS: Eradication TC",
+  "kind": "total conversion",
+  "engine": "GZDoom / Zandronum",
+  "summary": "Full 8-level Aliens campaign TC built on the Aliens Trilogy / Ultimate Doom mod.",
+  "blurb": "Play as four unique classes - marine, synth, predator and alien - through a full 8-level campaign. One of the most acclaimed modern Doom TCs. NOTE: already installed locally.",
+  "art": "art/aliens_eradication.png",
+  "source": "direct",
+  "repo": "mbugni/AliensEradicationTC",
+  "stars": 1,
+  "license": null,
+  "url": "https://github.com/mbugni/AliensEradicationTC",
+  "release_tag": "2026.07.21",
+  "asset": {
+   "name": "ALIENS_ERADICATION_TC_2_0.zip",
+   "url": "https://github.com/mbugni/AliensEradicationTC/releases/download/2026.07.21/ALIENS_ERADICATION_TC_2_0.zip",
+   "bytes": 184818943
+  },
+  "install": {
+   "filename": "ALIENS_ERADICATION_TC_2_0.zip",
+   "subdir": null,
+   "args": "-file \"ALIENS_ERADICATION_TC_2_0.zip\""
+  },
+  "iwad": "DOOM2.WAD",
+  "installed_locally": true,
+  "note": "Already installed at Z:\\GAMES\\BRUTAL_DOOM (uwu)\\ALIENS_ERADICATION_TC_2_0.pk3"
+ }
+]
