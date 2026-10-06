@@ -8,7 +8,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [x] Delete `mods/bdbe-3-38/` (already gone on disk, nothing references it) (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
-- [!] "Add a mod" flow (paste URL / upload pk3) needs scoping first, because IWAD/launcher config is hand-authored in `tools/build.py` `GAMES` (section 5)
+- [!] "Add a mod" flow (paste URL / upload pk3): **scoped and step 1 built 2026-10-07** — `tools/add_mod.py` reads a candidate file and derives the IWAD from its map lumps, flags an IWAD-instead-of-a-mod, and detects a duplicate the pack already has (28 checks). Still to build: the UI surface and the copy+manifest step (section 5)
 - [!] (writes the user's NukemNet config outside the repo) Multiplayer via NukemNet: write NN's `LaunchDefaults.json` from the chosen mod (back it up first) (section 6, carried over from the old launcher's todo)
 - [x] `browser`-source mods: the folder watch is built — the server says where a missing file belongs and the UI flips the card the moment it appears, with no reload (`selftest_watch.py` 17 checks, `ui/verify-watch.mjs` 11 checks) (section 6)
 - [x] (writes outside the repo, into %LOCALAPPDATA%\Zandronum; **done 2026-10-07**) Multiplayer: give NN's folder the mod files via a junction (decided 2026-10-06; section 6) — the pre-existing `mods` link was verified and left alone; two additive links (`doomnite-mods`, `doomnite-iwads`) were added, taking NN from 20/32 to 32/32 files visible
@@ -231,10 +231,28 @@ config variants.
 
 ## 5. Considered, not built
 
-- **"Add a mod" flow** (paste a URL / upload a local pk3). Blocked on a real
-  design question, not effort: IWAD and launcher config for a freshly added mod
-  is currently hand-authored in `tools/build.py`'s `GAMES` table, not derived
-  from any file metadata. Needs scoping first.
+- **"Add a mod" flow — SCOPED and step 1 BUILT (2026-10-07).**
+  The design question was "how much of a new mod's launcher config can be read
+  off the file, and how much has to be asked?" That is now measured rather than
+  assumed, by `tools/add_mod.py <file>` (read-only; it downloads nothing, so a
+  ModDB-only mod stays a `source: "browser"` entry).
+  - **Derivable: the IWAD**, from the map lumps. `E1M1`..`E4M9` is Doom 1,
+    `MAP01`..`MAP32` is Doom 2 — that is the format of the maps themselves, not a
+    guess about the mod. Measured on the pack: `DBP37_AUGZEN.wad` has 22 `MAPxx`
+    and derives DOOM2.WAD, which is what the manifest says by hand today.
+  - **Not derivable: the IWAD of a mod that ships no maps.** `brutal22test6.pk3`
+    is 159 MB with zero map lumps; it plays on whichever IWAD it is handed, so
+    that IWAD is a *content* choice (which music/sprites the mod targets) and the
+    flow has to ask. The tool says exactly that instead of inventing an answer.
+  - Also derivable and checked: whether the file is an IWAD rather than a mod
+    (WAD header magic), and whether the pack already has it — by name, and by
+    sha256 against `sources.json`, because a silent 200 MB duplicate is the
+    expensive mistake in this flow.
+  - So the flow is **inspect → ask only for what the file cannot answer → emit
+    the `GAMES` entry**, which the tool prints ready to paste.
+  - **Still to build:** the paste-a-URL / upload surface in the UI, and the
+    copy-into-`mods\<slug>\` + manifest step. The inspection half was the stated
+    blocker and it is done; `tools/selftest_add_mod.py` is 28 checks.
 - **Reinstall for baked-in mods** — see §1. Needs the build-time sources to
   become re-fetchable first.
 - **Right-click "show install folder"** — SHIPPED as the `/api/reveal` button in
@@ -282,3 +300,7 @@ Made by a worker on 2026-10-07 with nobody awake. Each is reversible; the undo i
   Question: should a mod the pack *can* host also get the hand-place hint?
   Options: (a) only unhosted ("browser") mods; (b) every missing entry with no INSTALL button.
   Chose **(b)**: there is no fetch button for a pack mod in this UI, so a hosted-but-missing entry was the same dead end as an unhosted one. `hosted` is carried in the payload so the panel can name the rebuild path as well. Undo: the `if not exists and not a.get("needs_install")` condition in `serve.py:load_entries()`.
+- **Treat "Add a mod flow — needs scoping first" as work, not as a blocker.**
+  Question: the owner parked it as needing scoping; the AUTO-run rule says a scope question is mine to decide.
+  Options: (a) leave it parked for the owner; (b) decide the design question, measure it against real files, and build step 1.
+  Chose **(b)**: the blocker was factual ("IWAD config is not derived from any file metadata") and facts can be measured. Step 1 is `tools/add_mod.py`, which derives the IWAD from map lumps and reports honestly when a mod ships no maps and the IWAD is a content choice instead. The UI surface and the copy step are deliberately NOT built — the owner may not want the flow at all, and the inspection half is the part that had to be true first. Undo: delete `tools/add_mod.py` and its selftest.
