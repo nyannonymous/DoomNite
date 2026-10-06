@@ -283,6 +283,37 @@ Facts: NN 0.6.5 is a **portable** build at `~\Desktop\NUKEMNET` — its config l
 
 ---
 
+## Inbox (agent-proposed)
+
+Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. Nothing here is started.
+
+- [ ] **The shipped launcher still loads two of its fonts from Google at runtime** [P2] [dependency health] [size:S]
+  Why: `app/index.html` (the built, shipped file — not just the dev shell) links `fonts.googleapis.com` for **Chakra Petch** and **Inter**, and the bundle's CSS really does use both. The pack self-hosts 53 `@fontsource` files precisely because it "runs off a local server and often has no internet" (section 0) — but the self-hosted families are Black Ops One / Oswald / JetBrains Mono, so the two families that carry the panel and technical text are CDN-only. Offline they fall back to `system-ui` and the look degrades exactly as section 0 warns; online, every launch makes a third-party request.
+  Done when: the built `app/index.html` contains no `fonts.googleapis.com`/`fonts.gstatic.com` reference, and Chakra Petch + Inter still render with the network disconnected.
+  Hints: `ui/index.html:8-13`; `grep -c Chakra app/assets/*.css` proves which families the CDN is the only source for; add `@fontsource/chakra-petch` + `@fontsource/inter` and import them in `ui/src/main.jsx` alongside the existing three.
+
+- [ ] **The filter chips announce a tablist they are not** [P2] [a11y] [size:S]
+  Why: `.chips` is `role="tablist"` and every chip is `role="tab"` with `aria-selected`, but there are no tabpanels, no `aria-controls`, and no roving tabindex or arrow-key handling. A screen reader therefore reports "tab 3 of 6, selected" for a widget where Tab moves through all six and arrows do nothing — the state is announced, the behaviour is not there.
+  Done when: either a real tablist (one tab stop, arrow keys move selection, `aria-controls` points at the grid) or the honest version — `role="group"` with `aria-pressed` per chip — and `ui/verify.mjs` still 21/21.
+  Hints: `ui/src/App.jsx:508-515`; `verify.mjs` already clicks every chip, so the filter behaviour is covered either way.
+
+- [ ] **README's "Verify without launching anything" lists 2 of the 6 checks now in the repo** [P3] [docs] [size:S]
+  Why: `tools/selftest_watch.py`, `selftest_settle.py`, `selftest_nn_preset.py`, `selftest_add_mod.py` and `ui/verify-watch.mjs` are each one command, offline, and safe to run unattended — but nothing points at them, so the next person re-derives what already exists or runs the game-launching probe instead.
+  Done when: that section lists every check with a one-line "what it proves", `python tools/build.py --check` still first, and the two that DO launch real games (`qa_mp_probe.py`, and `build.py --dryrun` is safe) are labelled as such.
+  Hints: `README.md:156-168`; the section currently names only `make_menu.py --dryrun` and `build.py --check`.
+
+- [ ] **`serve.py`'s refusal paths are asserted nowhere** [P2] [missing tests] [size:M]
+  Why: every guard in the HTTP layer exists because it matters — integer-only launch index, the 413 body cap, unknown install name → 404, unknown packmod → 404, `index` must be an int (not a bool). Nothing fails if one is deleted; `ui/verify.mjs` only ever exercises the happy path through the UI.
+  Done when: a `tools/selftest_serve.py` starts `serve.handler_factory()` on an ephemeral port and asserts 400 for a string index, 400 for `true`, 413 for an oversized body, 404 for an unknown `/api/install/` name and an unknown `/api/packmods/` name, and 200 for a valid `/api/dryrun`.
+  Hints: `serve.handler_factory()` + `ThreadingHTTPServer(("127.0.0.1", 0), ...)`; stdlib `urllib.request` is enough; point `serve.PACK` at a temp pack the way `selftest_watch.py` does.
+
+- [ ] **`nn_preset.py --entry <name>` does not say how to disambiguate** [P3] [UX] [size:S]
+  Why: `--game "Hexen Remade HD"` stops with "matches 2 entries; be more specific", but the two entries differ only by an IWAD tag that the message never shows, and the fix (pass the index) is not stated. The user is left guessing at a tool whose whole point is to remove guesswork.
+  Done when: the message lists each match as `<index> <label>` and says to pass one of those indexes.
+  Hints: `tools/nn_preset.py` `resolve_entry()`; the same listing is already printed by `--list`.
+
+---
+
 ## Decisions made (review me)
 
 Made by a worker on 2026-10-07 with nobody awake. Each is reversible; the undo is named.
