@@ -93,6 +93,9 @@ export function groupEntries(entries) {
             hd: !!v.hd,
             needsInstall: v.needs_install || null,
             standalone: !!v.standalone,
+            // Where a hand-placed ("browser" source) file has to go, when the
+            // server has one to report. See serve.py manual_hint().
+            manual: v.manual || null,
           }));
       }
       g.kind = e.kind;
@@ -109,6 +112,9 @@ export function groupEntries(entries) {
         hd: !!e.hd,
         needsInstall: e.needs_install || null,
         standalone: !!e.standalone,
+        // Same as the variants branch above: a "browser" source entry's
+        // hand-place hint, straight from the server.
+        manual: e.manual || null,
       });
     }
     if (e.art && !g.art) g.art = e.art;

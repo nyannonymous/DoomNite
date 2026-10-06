@@ -7,6 +7,7 @@ import {
   Trash2,
   Check,
   HardDrive,
+  FolderOpen,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dryrun, launchIndex, startInstall, removeInstall, removePackMod as apiRemovePackMod } from "./api";
@@ -461,7 +462,22 @@ export default function Panel({
         )}
 
         {cfg.exists === false && !group.needsInstall && (
-          <p className="warn">This config&apos;s files are missing from the pack.</p>
+          // Two different kinds of "not here yet". A mod the pack can fetch
+          // gets an INSTALL button; a mod it cannot fetch at all (no host in
+          // sources.json -- ModDB returns 403 to scripted requests) can only
+          // arrive by hand, and the one thing the user cannot guess is WHERE.
+          // The server resolves that folder out of the launcher it wrote, so
+          // say it instead of "files are missing" and nothing else.
+          cfg.manual ? (
+            <p className="panel-dlhint">
+              <FolderOpen size={13} aria-hidden="true" />
+              Not downloadable — get <code>{cfg.manual.files.join(", ")}</code>{" "}
+              and put it in <code>{cfg.manual.folder}</code>. The card appears
+              here on its own once it is there.
+            </p>
+          ) : (
+            <p className="warn">This config&apos;s files are missing from the pack.</p>
+          )
         )}
       </div>
       {confirming && inst && (

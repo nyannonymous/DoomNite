@@ -170,6 +170,66 @@ def _fetchable():
     return out
 
 
+def _missing_mod_refs(action):
+    """The files an entry's launcher wants, that are not on disk, under mods\\.
+
+    Reads the same launcher .bat _content_present() parses, for the same
+    reason: the manifest's `mods` list is basenames only, with the
+    mods\\<slug>\\ folder component stripped off, so it cannot say WHERE a
+    missing file has to go. The .bat is the one record that still has the real
+    path, and it is a file this server wrote at build time.
+
+    Deliberately limited to paths under mods\\. A missing IWAD is a different
+    problem with its own flow (/api/setup, iwadfinder.py), and offering to
+    hand-place DOOM2.WAD in the mods folder would be wrong advice.
+    """
+    bat = action.get("bat")
+    if not bat:
+        return []
+    bp = os.path.join(PACK, "launchers", bat)
+    try:
+        txt = open(bp, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return []
+    base = os.path.dirname(bp)
+    txt = txt.replace("%~dp0..\\", PACK + "\\").replace("%~dp0", base + "\\")
+    mods_prefix = os.path.normcase(os.path.join(PACK, "mods") + os.sep)
+    out = []
+    for r in re.findall(r'"([^"]+\.(?:pk3|pk7|wad|WAD))"', txt):
+        if not os.path.normcase(r).startswith(mods_prefix):
+            continue
+        if not os.path.isfile(r):
+            out.append(r)
+    return out
+
+
+def manual_hint(action):
+    """Where a hand-placed mod file has to go, or None.
+
+    Some entries cannot be fetched at all: sources.json has no host for their
+    files (ModDB sits behind a Cloudflare challenge that returns 403 to
+    scripted requests, so a download button would silently no-op). Those mods
+    only ever arrive by hand, and the one thing the UI cannot work out for
+    itself is WHERE to put the file. This is that answer, taken from the
+    launcher the server itself wrote.
+
+    Returns {"folder": "mods\\<slug>", "files": ["a.pk3", ...]} with folder
+    relative to the pack, so nothing here is an absolute path the UI could
+    turn into a traversal.
+    """
+    missing = _missing_mod_refs(action)
+    if not missing:
+        return None
+    folder = os.path.dirname(missing[0])
+    try:
+        rel = os.path.relpath(folder, PACK)
+    except ValueError:      # different drive: not a path inside the pack
+        return None
+    if rel.startswith(".."):
+        return None
+    return {"folder": rel, "files": sorted(os.path.basename(r) for r in missing)}
+
+
 def load_entries():
     """Build the flat entry list from the manifest.
 
@@ -214,6 +274,28 @@ def load_entries():
             label = g["name"]
             if len(acts) > 1 and len(iwads) > 1:
                 label += " [Doom 1]" if a["iwad"] == "DOOM.WAD" else " [Doom 2]"
+            # exists means "the launcher AND its content are present". A total
+            # conversion that has not been downloaded yet must report False, or
+            # clicking PLAY silently does nothing.
+            exists = (
+                os.path.isfile(os.path.join(PACK, "launchers", a["bat"]))
+                and _content_present(a)
+            )
+            # True when every mod this action loads has a hosted URL in
+            # sources.json. The UI offers INSTALL for these and labels the rest
+            # "in pack", instead of hardcoding which games those are.
+            is_fetchable = bool(
+                a.get("mods")
+                and all(m.replace("\\", "/") in fetchable for m in a["mods"]))
+            # A "browser" source entry: its content is not here, there is
+            # nowhere to fetch it from, and it is not one of installer.py's
+            # on-demand downloads -- so the only way it arrives is by hand.
+            # Say where, and let the UI watch for it (App.jsx polls while
+            # anything is in this state). Without the hint the user is told
+            # "files are missing" and given nothing to do about it.
+            manual = None
+            if not exists and not is_fetchable and not a.get("needs_install"):
+                manual = manual_hint(a)
             built.append({
                 "kind": "pack",
                 "label": label,
@@ -225,13 +307,7 @@ def load_entries():
                 "size": os.path.getsize(
                     os.path.join(PACK, "launchers", a["bat"]))
                 if os.path.isfile(os.path.join(PACK, "launchers", a["bat"])) else 0,
-                # exists means "the launcher AND its content are present". A
-                # total conversion that has not been downloaded yet must report
-                # False, or clicking PLAY silently does nothing.
-                "exists": (
-                    os.path.isfile(os.path.join(PACK, "launchers", a["bat"]))
-                    and _content_present(a)
-                ),
+                "exists": exists,
                 # Art resolution, in order of authority:
                 #   1. an explicit "art" on the launcher action, set in
                 #      build.py when a game has identity art of its own that
@@ -259,11 +335,12 @@ def load_entries():
                 # True when every mod this action loads has a hosted URL in
                 # sources.json. The UI offers INSTALL for these and labels
                 # the rest "in pack", instead of hardcoding which games those
-                # are. Empty today, so nothing changes yet.
-                "fetchable": bool(
-                    a.get("mods")
-                    and all(m.replace("\\", "/") in fetchable
-                            for m in a["mods"])),
+                # are.
+                "fetchable": is_fetchable,
+                # Where to put a hand-placed file, for a "browser" source entry
+                # (see manual_hint). None for everything else, including the
+                # two on-demand downloads -- those have an INSTALL button.
+                "manual": manual,
                 "standalone": bool(a.get("standalone")),
                 "primary": False,
             })
@@ -275,7 +352,8 @@ def load_entries():
                      "label": built[i]["variant"],
                      "mods": built[i]["mods"],
                      "iwad": built[i]["iwad"],
-                     "exists": built[i]["exists"]}
+                     "exists": built[i]["exists"],
+                     "manual": built[i]["manual"]}
                     for i in members]
         for i in members:
             built[i]["group_size"] = len(members)
@@ -304,6 +382,9 @@ def load_entries():
             # leaving the key off made the UI read .fetchable on an entry that
             # did not have it.
             "fetchable": False,
+            # Same reasoning: a standalone game ships its own exe and has no
+            # mods folder to hand-place anything into.
+            "manual": None,
         })
     # Single atomic rebind: concurrent readers see either the whole old list or
     # the whole new one, never a partially built one. Safe under the GIL.

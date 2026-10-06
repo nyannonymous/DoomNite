@@ -17,6 +17,27 @@ function Toast({ msg, bad }) {
   );
 }
 
+/**
+ * Would these two entry lists render differently?
+ *
+ * The folder watch below re-reads /api/entries every few seconds while a
+ * hand-placed file is outstanding. setRaw() with a fresh array would re-render
+ * every tile on every poll even when nothing changed, so the watch only
+ * publishes a new list when it differs. The server's payload is plain JSON, so
+ * comparing the serialised form is both the simplest test and the most
+ * accurate one -- it catches a changed `exists`, a changed `manual` hint, or a
+ * newly appeared variant, and nothing else.
+ */
+function sameEntries(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;   // circular or otherwise unserialisable: assume changed
+  }
+}
+
 export default function App() {
   const [raw, setRaw] = useState([]);
   const [error, setError] = useState(null);
@@ -85,7 +106,7 @@ export default function App() {
     () =>
       fetchEntries()
         .then((e) => {
-          setRaw(e);
+          setRaw((cur) => (sameEntries(cur, e) ? cur : e));
           return e;
         })
         .catch((err) => {
@@ -183,6 +204,35 @@ export default function App() {
     () => groups.map((g) => ({ ...g, pick: picks[g.key] ?? g.pick ?? 0 })),
     [groups, picks]
   );
+
+  /* ------------------------------------------------ hand-placed mod watch */
+  // A "browser" source mod -- one the pack has no URL for, so it can only
+  // arrive by hand -- lands on disk whenever the user gets round to it. The
+  // server re-derives every entry's state from the filesystem on each
+  // /api/entries, but this UI reads that once, so a file dropped into
+  // mods\<slug>\ while the app was open left the card greyed out until a
+  // reload. Poll while anything is in exactly that state, and stop as soon as
+  // nothing is: a complete pack polls nothing, so this cannot spin forever on
+  // a normal install.
+  //
+  // `manual` is the server's own verdict that the entry has no fetch path and
+  // no INSTALL button, which is what makes "it will only ever appear by hand"
+  // true rather than assumed.
+  const watching = merged.some(
+    (g) => g.missing && !g.needsInstall && !g.fetchable
+  );
+  useEffect(() => {
+    if (!watching) return;
+    const t = setInterval(() => {
+      // Deliberately not reloadEntries(): that sets the fatal `error` state,
+      // and a missed poll on a local server is not a reason to replace the
+      // whole UI with an error screen.
+      fetchEntries()
+        .then((e) => setRaw((cur) => (sameEntries(cur, e) ? cur : e)))
+        .catch(() => {});
+    }, 4000);
+    return () => clearInterval(t);
+  }, [watching]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
