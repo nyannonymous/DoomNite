@@ -215,12 +215,10 @@ export default function App() {
   // nothing is: a complete pack polls nothing, so this cannot spin forever on
   // a normal install.
   //
-  // `manual` is the server's own verdict that the entry has no fetch path and
-  // no INSTALL button, which is what makes "it will only ever appear by hand"
-  // true rather than assumed.
-  const watching = merged.some(
-    (g) => g.missing && !g.needsInstall && !g.fetchable
-  );
+  // `missing && !needsInstall` is exactly "the files are gone and there is no
+  // INSTALL button to press" -- which is what makes "it can only come back by
+  // hand" true rather than assumed.
+  const watching = merged.some((g) => g.missing && !g.needsInstall);
   useEffect(() => {
     if (!watching) return;
     const t = setInterval(() => {
@@ -230,9 +228,15 @@ export default function App() {
       fetchEntries()
         .then((e) => setRaw((cur) => (sameEntries(cur, e) ? cur : e)))
         .catch(() => {});
+      // /api/packmods is the OTHER source of truth for "is this game's content
+      // here" -- it drives the REMOVED corner and the sidebar line. It used to
+      // be read once at mount, so a file put back by hand flipped the card but
+      // left the sidebar still saying REMOVED. Both read the same filesystem,
+      // so both have to be refreshed together or they disagree on screen.
+      loadPackMods().catch(() => {});
     }, 4000);
     return () => clearInterval(t);
-  }, [watching]);
+  }, [watching, loadPackMods]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();

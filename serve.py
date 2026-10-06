@@ -194,28 +194,42 @@ def _missing_mod_refs(action):
     base = os.path.dirname(bp)
     txt = txt.replace("%~dp0..\\", PACK + "\\").replace("%~dp0", base + "\\")
     mods_prefix = os.path.normcase(os.path.join(PACK, "mods") + os.sep)
-    out = []
+    # Every launcher repeats its whole command line inside the DOOMNITE_DRYRUN
+    # branch, so each path appears twice in the file. Report each file once:
+    # "put HOCUS.pk3, HOCUS.pk3 in mods\hocus" reads like a broken hint.
+    seen, out = set(), []
     for r in re.findall(r'"([^"]+\.(?:pk3|pk7|wad|WAD))"', txt):
-        if not os.path.normcase(r).startswith(mods_prefix):
+        key = os.path.normcase(r)
+        if not key.startswith(mods_prefix) or key in seen:
             continue
+        seen.add(key)
         if not os.path.isfile(r):
             out.append(r)
     return out
 
 
-def manual_hint(action):
-    """Where a hand-placed mod file has to go, or None.
+def manual_hint(action, hosted=False):
+    """Where a missing mod file has to go, or None.
 
-    Some entries cannot be fetched at all: sources.json has no host for their
-    files (ModDB sits behind a Cloudflare challenge that returns 403 to
-    scripted requests, so a download button would silently no-op). Those mods
-    only ever arrive by hand, and the one thing the UI cannot work out for
-    itself is WHERE to put the file. This is that answer, taken from the
-    launcher the server itself wrote.
+    Any pack entry whose content is not on disk and is not one of
+    installer.py's two on-demand downloads has a dead end in the UI: PLAY is
+    disabled, there is no INSTALL button, and the card just says the files are
+    missing. There are two ways out and the UI cannot name either of them by
+    itself, so this is that answer:
 
-    Returns {"folder": "mods\\<slug>", "files": ["a.pk3", ...]} with folder
-    relative to the pack, so nothing here is an absolute path the UI could
-    turn into a traversal.
+      * a "browser" source mod (sources.json has no host for it -- ModDB
+        answers 403 to scripted requests, so there is no download button to
+        offer) can only ever arrive by hand;
+      * a hosted one can be put back by hand *or* restored by rebuilding, which
+        is what `hosted` lets the caller say.
+
+    Either way the folder comes out of the launcher .bat, which the server
+    itself wrote at build time -- the manifest's `mods` list is basenames only
+    and cannot say where anything belongs.
+
+    Returns {"folder": "mods\\<slug>", "files": [...], "hosted": bool} with
+    folder relative to the pack, so nothing here is an absolute path the UI
+    could turn into a traversal.
     """
     missing = _missing_mod_refs(action)
     if not missing:
@@ -227,7 +241,9 @@ def manual_hint(action):
         return None
     if rel.startswith(".."):
         return None
-    return {"folder": rel, "files": sorted(os.path.basename(r) for r in missing)}
+    return {"folder": rel,
+            "files": sorted(os.path.basename(r) for r in missing),
+            "hosted": bool(hosted)}
 
 
 def load_entries():
@@ -287,15 +303,16 @@ def load_entries():
             is_fetchable = bool(
                 a.get("mods")
                 and all(m.replace("\\", "/") in fetchable for m in a["mods"]))
-            # A "browser" source entry: its content is not here, there is
-            # nowhere to fetch it from, and it is not one of installer.py's
-            # on-demand downloads -- so the only way it arrives is by hand.
-            # Say where, and let the UI watch for it (App.jsx polls while
-            # anything is in this state). Without the hint the user is told
-            # "files are missing" and given nothing to do about it.
+            # A pack entry whose content is missing has no button to press:
+            # PLAY is disabled, there is no INSTALL, and "ON DEMAND" is a
+            # label, not an action. Say where the file goes and let the UI
+            # watch for it (App.jsx polls while anything is in this state).
+            # Without this the user is told "files are missing" and given
+            # nothing to do about it. The two on-demand downloads are excluded
+            # -- they have a real INSTALL button.
             manual = None
-            if not exists and not is_fetchable and not a.get("needs_install"):
-                manual = manual_hint(a)
+            if not exists and not a.get("needs_install"):
+                manual = manual_hint(a, hosted=is_fetchable)
             built.append({
                 "kind": "pack",
                 "label": label,

@@ -144,6 +144,13 @@ export default function Panel({
   const primary = group.cfgs[0];
   const cfg = group.cfgs[group.pick] || primary;
   const disabled = busy || primary.exists === false;
+  // Where the selected build's missing files belong, when the server has
+  // worked it out (serve.py manual_hint). Strictly more informative than the
+  // "Already removed" line in the sidebar -- it names the files and the
+  // folder, and it covers a mod that went missing without ever being removed
+  // through the UI -- so when it is present it replaces that line instead of
+  // sitting next to it.
+  const manualHint = cfg?.manual || null;
 
   async function play(which) {
     setBusy(true);
@@ -387,7 +394,12 @@ export default function Panel({
                     ) : (
                       pm &&
                       !pmInstalled &&
-                      !pmPartial && (
+                      !pmPartial &&
+                      // Superseded by manualHint at the bottom of the panel,
+                      // which says the same thing and names the files and the
+                      // folder. Two lines saying "the files are gone" in one
+                      // sidebar read as two different problems.
+                      !manualHint && (
                         <p className="panel-dlhint">
                           <Trash2 size={13} aria-hidden="true" />
                           Already removed. Restore with{" "}
@@ -462,18 +474,31 @@ export default function Panel({
         )}
 
         {cfg.exists === false && !group.needsInstall && (
-          // Two different kinds of "not here yet". A mod the pack can fetch
-          // gets an INSTALL button; a mod it cannot fetch at all (no host in
-          // sources.json -- ModDB returns 403 to scripted requests) can only
-          // arrive by hand, and the one thing the user cannot guess is WHERE.
-          // The server resolves that folder out of the launcher it wrote, so
-          // say it instead of "files are missing" and nothing else.
-          cfg.manual ? (
+          // Two different kinds of "not here yet", and only one of them has a
+          // button. A mod the pack can host gets no action at all today (the
+          // ON DEMAND corner is a label, not a fetch), and a mod it cannot
+          // host at all (no entry in sources.json -- ModDB answers 403 to
+          // scripted requests) never will. Both are a dead end without this:
+          // PLAY is disabled and the card says nothing about what to do. The
+          // server resolves the folder out of the launcher it wrote, so name
+          // it, and the folder watch picks the file up the moment it lands.
+          manualHint ? (
             <p className="panel-dlhint">
               <FolderOpen size={13} aria-hidden="true" />
-              Not downloadable — get <code>{cfg.manual.files.join(", ")}</code>{" "}
-              and put it in <code>{cfg.manual.folder}</code>. The card appears
-              here on its own once it is there.
+              {manualHint.hosted ? (
+                <>
+                  Files missing — restore with <code>python tools\build.py</code>,
+                  or put <code>{manualHint.files.join(", ")}</code> back in{" "}
+                  <code>{manualHint.folder}</code>. The card returns on its own.
+                </>
+              ) : (
+                <>
+                  Not downloadable — get{" "}
+                  <code>{manualHint.files.join(", ")}</code> and put it in{" "}
+                  <code>{manualHint.folder}</code>. The card appears here on its
+                  own once it is there.
+                </>
+              )}
             </p>
           ) : (
             <p className="warn">This config&apos;s files are missing from the pack.</p>
