@@ -9,9 +9,9 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3) needs scoping first, because IWAD/launcher config is hand-authored in `tools/build.py` `GAMES` (section 5)
-- [ ] Multiplayer via NukemNet: write NN's `LaunchDefaults.json` from the chosen mod (backup first), `browser`-source folder-watch flip (section 6, carried over from the old launcher's todo)
+- [!] (blocked on the folder decision below; writes user config) Multiplayer via NukemNet: write NN's `LaunchDefaults.json` from the chosen mod (backup first), `browser`-source folder-watch flip (section 6, carried over from the old launcher's todo)
 - [!] Multiplayer: one folder or two for NN's mod files, junction vs copy (section 6; Stooge's call)
-- [ ] Multiplayer: fix `tools/qa_mp_probe.py` settle window, re-run all entries, classify MP-capable (section 6)
+- [!] (launches real games on the owner desktop; script is in legacy/playnite-launcher/tools/) Multiplayer: fix `tools/qa_mp_probe.py` settle window, re-run all entries, classify MP-capable (section 6)
 
 ---
 
