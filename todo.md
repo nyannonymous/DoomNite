@@ -4,7 +4,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 
 - [x] Commit the working tree (already committed in the WIP snapshot; tree was clean): 13 modified + 3 untracked files (card layout, REMOVE FROM PACK, zoom); verified build, `verify.mjs` 21/21, `check-zoom` 12/12 (section 0)
 - [x] Finish `ui/src/Panel.jsx`: already has Typed readout, TermRow, BootBar, DataStreams, .play-glow button; npm run build clean (nitesesh 2026-10-06; visual check is the owner's, verify.mjs needs the server running)
-- [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4)
+- [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4) — verified fixed 2026-10-06 (68/68 entries kept, `base_url` intact)
 - [x] Delete `mods/bdbe-3-38/` (already gone on disk, nothing references it) (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
@@ -207,10 +207,12 @@ config variants.
   Hand-copied while diagnosing; `build.py` slugifies into `mods/bdbe-v3-38/`
   instead, and nothing references the old folder. `MoveFileEx` reboot-delete
   returned false because of a stale Hermes kernel handle, not the game.
-- **`make_sources.py` wart.** It builds the manifest from local files, so
+- **`make_sources.py` wart — FIXED (2026-10-06, nitesesh).** It builds the manifest from local files, so
   re-running it while DOOM2.WAD is absent DELETES that entry and `base_url`
   from `sources.json`. Recover with `git checkout -- sources.json` and hand-edit
-  `no_host`. Not fixed.
+  `no_host`. Now carries forward `iwads/*` entries and `no_host` flags, and
+  re-emits `base_url` from the old document; verified live: DOOM2.WAD absent
+  from disk, one regen run, 68/68 entries kept, `base_url` intact, 0 no_host lost.
 - Earlier mod fixes, all verified: Shadow Warrior's asset pack was sitting
   unused in `Z:\GAMES`; Aliens TC needed pk3-before-mapset order or it booted
   the IWAD's own maps wearing Aliens enemies; Hexen Remade needed the Hexen
