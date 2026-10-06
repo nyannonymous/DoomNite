@@ -64,11 +64,8 @@ whole remaining gap in the UI.
 - [ ] Re-run across all 29 entries, then delete the current junk
       `data/mp_verified.json` (not committed) and regenerate.
 - [ ] Classify: MP-capable / single-player-only / not a Zandronum engine.
-      Already known non-Zandronum: `hl2doom.exe` (entry 28), `srb2win.exe`
-      (29).
-- [ ] **Doom III is disqualified from NN MP regardless of loadability** —
-      `D3.pk3` is 3.99 GB and NN pushes mod files to every joiner. Brutal Doom,
-      Aliens Eradication and Call of Doom are the sane online picks.
+      Already known non-Zandronum: `hl2doom.exe` (entry 26), `srb2win.exe`
+      (27).
 
 ## Phase 3 — Grow the catalogue
 

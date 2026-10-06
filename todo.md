@@ -10,7 +10,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3) needs scoping first, because IWAD/launcher config is hand-authored in `tools/build.py` `GAMES` (section 5)
 - [!] (blocked on the folder decision below; writes user config) Multiplayer via NukemNet: write NN's `LaunchDefaults.json` from the chosen mod (backup first), `browser`-source folder-watch flip (section 6, carried over from the old launcher's todo)
-- [!] Multiplayer: one folder or two for NN's mod files, junction vs copy (section 6; Stooge's call)
+- [ ] Multiplayer: give NN's folder the mod files via a junction (decided 2026-10-06; section 6)
 - [!] (launches real games on the owner desktop; script is in legacy/playnite-launcher/tools/) Multiplayer: fix `tools/qa_mp_probe.py` settle window, re-run all entries, classify MP-capable (section 6)
 
 ---
@@ -250,7 +250,7 @@ Full detail (phases, env facts) stays in `legacy/playnite-launcher/todo.md` and 
 Facts: NN 0.6.5 at `C:\Users\Serge\Desktop\NUKEMNET`; Zandronum + Doomseeker at `%LOCALAPPDATA%\Zandronum`. NN settings live in `%LOCALAPPDATA%\NukemNet\user\` (`Settings.json`, `LaunchDefaults.json`). NN room hosting is GUI-only (no CLI/socket API), so DoomNite can launch and configure but cannot create a room unattended.
 
 - [ ] Write NN's `LaunchDefaults.json` (per-game `file` list + gamemode/map/skill) from DoomNite's mod choice. Back it up before the first write, it is the user's config.
-- [!] One folder or two? NN launches Zandronum from `%LOCALAPPDATA%\Zandronum`; DoomNite entries run from `Z:\GAMES\BRUTAL_DOOM (uwu)`. NN needs the mod files in its own folder: junction (no duplicate disk) or copy (364 MB+). Needs Stooge's decision.
+- [ ] **Decided 2026-10-06 (Stooge): use a junction**, not a copy. NN launches Zandronum from `%LOCALAPPDATA%\Zandronum`, DoomNite entries run from `Z:\GAMES\BRUTAL_DOOM (uwu)`; NN needs the mod files in its own folder, so junction the mod files in (no duplicate disk). Create the junction only if the target does not already exist, never delete or overwrite a real folder, and log what was linked.
 - [ ] `browser` source entries: watch the mods folder and flip to installed when the file appears.
 - [ ] Fix `tools/qa_mp_probe.py`: the 14 s settle window is too short for big PK3s (false negative on Doom III). Scale it to asset size, re-run all entries, regenerate `data/mp_verified.json`, classify MP-capable / single-player-only / not Zandronum (`hl2doom.exe`, `srb2win.exe` already known non-Zandronum).
 - [ ] Game-launch lifetime: check that closing DoomNite does not kill a Doom/NN game still running (`taskkill /t` in `serve.py`); multiplayer must survive the launcher closing.
