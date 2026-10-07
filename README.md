@@ -158,9 +158,18 @@ manifest that build produces.
 Launching all 31 entries at once starts 31 copies of ZDoom. Don't.
 
 ```bash
-python tools/make_menu.py --dryrun 15      # what would entry 15 run?
 python tools/build.py --check              # every referenced file exists?
+python tools/make_menu.py --dryrun 15      # what would entry 15 run? (logs only)
+python tools/selftest_serve.py             # serve.py refuses bad index / oversize body / unknown names
+python tools/selftest_watch.py             # folder watch re-adds a hand-placed mod's card
+python tools/selftest_nn_preset.py         # NukemNet preset writer output
+python tools/selftest_add_mod.py           # add-a-mod inspector (IWAD guess, duplicates)
+python legacy/playnite-launcher/tools/selftest_settle.py   # probe settle window scales with asset size
+node ui/verify-watch.mjs                   # browser check of the folder watch (needs serve.py running)
 ```
+
+All of these are offline and never start a game. **Do launch real games:**
+`legacy/playnite-launcher/tools/qa_mp_probe.py` (27 entries, one at a time) - don't run it unattended.
 
 `--dryrun` logs the command line it *would* execute instead of running it.
 

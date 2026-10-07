@@ -297,12 +297,12 @@ Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. 
   Done when: either a real tablist (one tab stop, arrow keys move selection, `aria-controls` points at the grid) or the honest version — `role="group"` with `aria-pressed` per chip — and `ui/verify.mjs` still 21/21.
   Hints: `ui/src/App.jsx:508-515`; `verify.mjs` already clicks every chip, so the filter behaviour is covered either way.
 
-- [ ] **README's "Verify without launching anything" lists 2 of the 6 checks now in the repo** [P3] [docs] [size:S]
+- [x] **README's "Verify without launching anything" lists 2 of the 6 checks now in the repo** [P3] [docs] [size:S] **DONE 2026-10-07**
   Why: `tools/selftest_watch.py`, `selftest_settle.py`, `selftest_nn_preset.py`, `selftest_add_mod.py` and `ui/verify-watch.mjs` are each one command, offline, and safe to run unattended — but nothing points at them, so the next person re-derives what already exists or runs the game-launching probe instead.
   Done when: that section lists every check with a one-line "what it proves", `python tools/build.py --check` still first, and the two that DO launch real games (`qa_mp_probe.py`, and `build.py --dryrun` is safe) are labelled as such.
   Hints: `README.md:156-168`; the section currently names only `make_menu.py --dryrun` and `build.py --check`.
 
-- [ ] **`serve.py`'s refusal paths are asserted nowhere** [P2] [missing tests] [size:M]
+- [x] **`serve.py`'s refusal paths are asserted nowhere** [P2] [missing tests] [size:M] **DONE 2026-10-07** (`tools/selftest_serve.py`, passes)
   Why: every guard in the HTTP layer exists because it matters — integer-only launch index, the 413 body cap, unknown install name → 404, unknown packmod → 404, `index` must be an int (not a bool). Nothing fails if one is deleted; `ui/verify.mjs` only ever exercises the happy path through the UI.
   Done when: a `tools/selftest_serve.py` starts `serve.handler_factory()` on an ephemeral port and asserts 400 for a string index, 400 for `true`, 413 for an oversized body, 404 for an unknown `/api/install/` name and an unknown `/api/packmods/` name, and 200 for a valid `/api/dryrun`.
   Hints: `serve.handler_factory()` + `ThreadingHTTPServer(("127.0.0.1", 0), ...)`; stdlib `urllib.request` is enough; point `serve.PACK` at a temp pack the way `selftest_watch.py` does.
