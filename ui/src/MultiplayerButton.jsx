@@ -387,11 +387,26 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     joins a game that is quietly desyncing.
                   </p>
                   <p className="mp-hint">
-                    That address only works if they are on <b>your</b> network.
-                    To play from somewhere else, port {sharing.port} has to be
-                    forwarded on your router — and a lot of routers cannot do
-                    that. If yours cannot, they need to be on your VPN.
+                    <b>They do not need to change anything</b> — no ports, no
+                    settings, no installer. Only the host (you) needs anything
+                    set up, and only for people who are not on your network.
                   </p>
+                  {/* Only relevant when a non-LAN address was actually offered.
+                      On the same network there is nothing to forward, and
+                      saying otherwise is how people end up needlessly logging
+                      into their router. The owner asked exactly this question
+                      ("does the friend need to forward a port too?"), which is
+                      why it is stated plainly here rather than implied. */}
+                  {(sharing.addresses || []).some(
+                    (a) => a.kind === "cgnat-tailscale" || a.kind === "public"
+                  ) && (
+                    <p className="mp-hint">
+                      To play from <i>outside</i> your network, you (the host)
+                      must forward port {sharing.port} on your router. If your
+                      router cannot do that, put them on your VPN instead — the
+                      address marked above then works with no router changes.
+                    </p>
+                  )}
                 </section>
               )}
 

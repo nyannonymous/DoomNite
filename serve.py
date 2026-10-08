@@ -27,16 +27,40 @@ exposure to anything else.
 """
 import argparse
 import json
-import re
-
-import installer as _inst
-import iwadfinder as _iwad
 import os
 import posixpath
+import re
 import subprocess
 import sys
 import threading
 import webbrowser
+
+# This file's own directory must be importable BEFORE installer / iwadfinder /
+# mp_http are imported, and that has to be arranged here rather than assumed.
+#
+# The app launches this script with the embeddable Python, which ships a
+# python311._pth pinning sys.path to three fixed entries (the python folder and
+# two parents). A ._pth file disables Python's implicit current-directory entry,
+# so the folder holding installer.py is NOT on sys.path -- and the very first
+# import failed with:
+#
+#     ModuleNotFoundError: No module named 'installer'
+#
+# which is fatal: the launcher shows an error dialog and nothing works. This is
+# not new with 2.1.0 -- 2.0.0's serve.py has the same `import installer` and the
+# same ._pth, so the packaged app has been relying on whatever the third _pth
+# entry (\..\..\..) happened to resolve to. That is why the bug is intermittent
+# across versions rather than always present.
+#
+# Fix it at the top, unconditionally and idempotently: put THIS FILE'S directory
+# on sys.path before importing anything local, so the script works under any
+# interpreter, launched from any working directory.
+_PACK_DIR = os.path.dirname(os.path.abspath(__file__))
+if _PACK_DIR not in sys.path:
+    sys.path.insert(0, _PACK_DIR)
+
+import installer as _inst      # noqa: E402  (needs _PACK_DIR on sys.path first)
+import iwadfinder as _iwad     # noqa: E402
 
 # Multiplayer's HTTP surface. Imported as a top-level module because it lives
 # in tools\ alongside the other multiplayer helpers, and imported lazily inside

@@ -14,6 +14,16 @@ const REQUIRED = [
   "launchers",
   "art",
   "app",
+  // tools/ -- and this entry is not optional. serve.py imports mp_http at
+  // module level, and mp_http lives in tools/. Without this directory staged,
+  // every packaged install dies on startup with
+  //
+  //     ModuleNotFoundError: No module named 'mp_http'
+  //
+  // and the launcher shows an error dialog instead of the grid. It was
+  // missing because tools/ was assumed to be developer-only; it is not, it is
+  // runtime code now.
+  "tools",
 ];
 
 // Checked against the BUILD directory, not the pack root.
