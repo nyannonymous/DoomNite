@@ -3188,3 +3188,250 @@ kbd {
 .panel-inpack svg {
   flex: 0 0 auto;
 }
+
+
+/* ==========================================================================
+   UI pass: card legibility + corner-tag hierarchy
+   ==========================================================================
+
+   The corner badges ("IN PACK", "ON DEMAND", "REMOVED") were sized like body
+   copy and painted in the same red as the logo, so on a busy cover they read
+   as part of the artwork rather than as state. They are now small, quiet, and
+   grey -- state belongs to the interface, the red belongs to the brand.
+   Red is reserved for the things the user can act on.
+   ======================================================================== */
+
+/* Contrast scrim under the card title.
+   Applied to the cover, not the card body, because the title overflows the art
+   box on short covers and a body gradient would only cover the sliver of
+   overlap. Bottom-weighted so the upper two thirds of the artwork keep their
+   brightness -- darkening the whole image would cost more than it gained. */
+.cover-scrim {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 58%;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(0, 0, 0, 0.62) 28%,
+    rgba(0, 0, 0, 0.22) 62%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* The title has to paint over the scrim, not under it. */
+.tile-body {
+  position: relative;
+  z-index: 2;
+}
+
+/* Corner tags: small, muted, and out of the logo's way. */
+.tile-inpack,
+.tile-installbadge {
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  padding: 2px 5px;
+  border-radius: 2px;
+  background: rgba(12, 10, 14, 0.72);
+  border: 1px solid rgba(190, 180, 200, 0.22);
+  color: #a49aae;
+  /* Was competing with the cover art for attention. */
+  opacity: 0.9;
+}
+
+.tile-inpack {
+  top: 6px;
+  left: 6px;
+}
+
+.tile-installbadge {
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Hover reveals what the tag actually means, rather than making the tag itself
+   larger. A badge nobody can read is noise; one that explains itself on hover is
+   information. */
+.tile:hover .tile-inpack,
+.tile:focus-within .tile-inpack {
+  color: #d8d0de;
+  border-color: rgba(214, 200, 220, 0.4);
+}
+
+
+/* ==========================================================================
+   UI pass: sidebar density
+   --------------------------------------------------------------------------
+   The panel's problem was not space, it was hierarchy: a six-line .pk3 dump
+   and a "Cmd" button both sat at the same visual weight as the PLAY button,
+   which is the one control a launcher exists to offer. Both are now folded
+   away; PLAY is what is left at the top.
+   ======================================================================== */
+
+/* Active Mods disclosure. Monospace filenames, numbered, because the ORDER is
+   what matters -- Zandronum loads -file left to right, so position is meaning
+   and a bulleted list would throw that away. */
+.mods-fold {
+  margin-top: 10px;
+  border-top: 1px solid rgba(190, 180, 200, 0.12);
+  padding-top: 8px;
+}
+
+.mods-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9b93a6;
+  padding: 3px 0;
+  user-select: none;
+}
+
+.mods-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mods-fold > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 0.16s ease;
+}
+
+.mods-fold[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.mods-fold > summary:hover {
+  color: #cfc7d8;
+}
+
+.mods-count {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(190, 180, 200, 0.12);
+  color: #b6adc0;
+}
+
+.mods-fold .mods {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mods-fold .mods li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  /* Filenames are code, not prose: monospace so the .pk3 / .wad split and the
+     digits inside a version number read at a glance. */
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #b9b0c3;
+  min-width: 0;
+}
+
+.mods-n {
+  font-size: 9px;
+  color: #6f6878;
+  min-width: 12px;
+  text-align: right;
+  flex: none;
+}
+
+.mods-f {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.mods-why {
+  margin: 7px 0 0;
+  font-size: 10.5px;
+  color: #6f6878;
+}
+
+/* Advanced: the command line, folded. */
+.adv {
+  margin-top: 12px;
+  border-top: 1px solid rgba(190, 180, 200, 0.12);
+  padding-top: 8px;
+}
+
+.adv > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6f6878;
+  user-select: none;
+}
+
+.adv > summary::-webkit-details-marker {
+  display: none;
+}
+
+.adv > summary:hover {
+  color: #9b93a6;
+}
+
+.adv .cmd {
+  font-size: 10.5px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.adv .showcmd {
+  margin-top: 6px;
+  font-size: 10px;
+  padding: 4px 8px;
+  background: rgba(190, 180, 200, 0.08);
+  border: 1px solid rgba(190, 180, 200, 0.18);
+  border-radius: 3px;
+  color: #b6adc0;
+  cursor: pointer;
+}
+
+.adv .showcmd:hover {
+  background: rgba(190, 180, 200, 0.14);
+  color: #d8d0de;
+}
+
+/* PLAY: taller, and unmistakably the thing you came for. The glow is on hover
+   and on focus-visible only -- a permanent glow on the main CTA competes with
+   the artwork it sits next to and stops meaning "you can press this". */
+.panel-play {
+  min-height: 52px;
+}
+
+.panel-play:hover:not(:disabled),
+.panel-play:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(220, 60, 40, 0.5),
+    0 6px 24px rgba(200, 40, 25, 0.35);
+}
+
+.panel-play:active:not(:disabled) {
+  transform: translateY(0);
+}

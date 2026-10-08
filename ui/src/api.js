@@ -212,10 +212,26 @@ export async function revealFolder(index) {
   );
 }
 
+// `hint` is what the chip's title attribute shows. "Multi-config" and "Combos"
+// are internal vocabulary that means nothing until you know the rules -- combo
+// is `mods.length > 1`, multi-config is `cfgs.length > 1` -- so both are spelled
+// out rather than left to be guessed at.
 export const FILTERS = [
-  { id: "all", label: "All" },
-  { id: "doom1", label: "Doom 1" },
-  { id: "combo", label: "Combos" },
-  { id: "variants", label: "Multi-config" },
-  { id: "missing", label: "Missing files" },
+  { id: "all", label: "All", hint: "Everything in the pack" },
+  { id: "doom1", label: "Doom 1", hint: "Games built on DOOM.WAD (the original)" },
+  {
+    id: "combo",
+    label: "Combos",
+    hint: "Loads more than one mod at once, in a fixed order",
+  },
+  {
+    id: "variants",
+    label: "Multi-config",
+    hint: "Ships more than one build — different configs of the same game",
+  },
+  {
+    id: "missing",
+    label: "Missing files",
+    hint: "Not on this machine yet. Downloadable ones have a DOWNLOAD button",
+  },
 ];

@@ -533,6 +533,7 @@ export default function App() {
               aria-selected={filter === f.id}
               className={`chip ${filter === f.id ? "is-on" : ""}`}
               onClick={() => setFilter(f.id)}
+              title={f.hint}
             >
               {f.label}
             </button>

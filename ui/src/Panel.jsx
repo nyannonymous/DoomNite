@@ -232,13 +232,6 @@ export default function Panel({
             <span className="play-label">{busy ? "Starting…" : "Play"}</span>
             <span className="play-key">↵</span>
           </button>
-          <button
-            type="button"
-            className="showcmd"
-            onClick={() => setCmdOpen((v) => !v)}
-          >
-            {cmdOpen ? "Hide" : "Cmd"}
-          </button>
         </div>
         {/* Which build PLAY runs, stated rather than implied. */}
         <p className="play-target" aria-live="polite">
@@ -331,14 +324,30 @@ export default function Panel({
               </>
             )}
           </dl>
+          {/* The load order is load-bearing -- Zandronum reads -file left to
+              right -- but it is reference information, not something most
+              sessions need on screen. A disclosure keeps it one click away
+              without letting six .pk3 filenames own the panel. */}
           {cfg.mods.length > 0 && (
-            <ul className="mods">
-              {cfg.mods.map((m, i) => (
-                <li key={i} style={{ "--i": i }} title={m}>
-                  {m}
-                </li>
-              ))}
-            </ul>
+            <details className="mods-fold">
+              <summary>
+                Active Mods
+                <span className="mods-count">{cfg.mods.length}</span>
+              </summary>
+              <ul className="mods">
+                {cfg.mods.map((m, i) => (
+                  <li key={i} style={{ "--i": i }} title={m}>
+                    <span className="mods-n" aria-hidden="true">
+                      {i + 1}
+                    </span>
+                    <span className="mods-f">{m}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mods-why">
+                Loaded top to bottom in this order.
+              </p>
+            </details>
           )}
         </section>
 
@@ -354,15 +363,29 @@ export default function Panel({
           )}
         </div>
 
-        {cmdOpen && (
-          <pre className="cmd">
-            {cmd
-              ? cmd.error
-                ? "Could not read the command."
-                : cmd.command
-              : "Reading…"}
-          </pre>
-        )}
+        {/* Advanced, folded away. The command line is the single least-used thing in
+            a launcher whose entire job is to run games for you, so it moved
+            out from beside PLAY -- where it read as a peer of the primary
+            action -- to a disclosure at the bottom of the panel. */}
+        <details className="adv">
+          <summary>Advanced</summary>
+          {cmdOpen && (
+            <pre className="cmd">
+              {cmd
+                ? cmd.error
+                  ? "Could not read the command."
+                  : cmd.command
+                : "Reading…"}
+            </pre>
+          )}
+          <button
+            type="button"
+            className="showcmd"
+            onClick={() => setCmdOpen((v) => !v)}
+          >
+            {cmdOpen ? "Hide command" : "Show command"}
+          </button>
+        </details>
 
         {/* On-demand total conversion: install/uninstall at the bottom of the
             sidebar, where the rest of this game's controls live.

@@ -71,6 +71,11 @@ function Cover({ group, className = "" }) {
       <span className="cover-sheen" aria-hidden="true" />
       {/* Specular highlight that tracks the pointer across the "glass". */}
       <span className="cover-glare" aria-hidden="true" />
+      {/* Contrast scrim. The title sits on top of arbitrary artwork, so its
+          legibility was whatever the cover happened to be -- white text on a
+          white logo vanished. This is a bottom-weighted gradient, not a flat
+          darkening, so the art keeps its brightness where it matters. */}
+      <span className="cover-scrim" aria-hidden="true" />
     </div>
   );
 }
