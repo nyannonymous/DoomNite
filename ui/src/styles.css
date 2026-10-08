@@ -2179,7 +2179,11 @@ kbd {
   position: fixed;
   left: 50%;
   bottom: 50px;
-  z-index: 900;
+  /* MUST be above .mp-overlay (z-index: 900) so a toast raised while the
+     multiplayer dialog is open stays readable instead of being painted over
+     by the modal scrim. Both are portalled to <body> now, so they share the
+     root stacking context and this number is actually comparable. */
+  z-index: 1000;
   transform: translateX(-50%);
   padding: 10px 18px;
   background: rgba(20, 10, 14, 0.95);

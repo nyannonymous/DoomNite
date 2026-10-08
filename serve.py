@@ -38,6 +38,16 @@ import sys
 import threading
 import webbrowser
 
+# Multiplayer's HTTP surface. Imported as a top-level module because it lives
+# in tools\ alongside the other multiplayer helpers, and imported lazily inside
+# handler_factory() would be the alternative -- see the note on the do_POST
+# branch that uses it.
+_TOOLS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+
+import mp_http as _mp_http   # noqa: E402  (needs _TOOLS on sys.path first)
+
 PACK = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(PACK, "pack-manifest.json")
 INDEX = os.path.join(PACK, "app", "index.html")
@@ -688,6 +698,14 @@ def handler_factory():
 
         def do_POST(self):
             path = _up.urlparse(self.path).path
+            # Multiplayer (setup / host / join) lives in tools/mp_http.py rather
+            # than inline below: do_POST is already ~180 lines of flat branches,
+            # and one more four-way block here is how the file got mangled once.
+            # mp_http returns (status, payload) and enforces the same
+            # integer-only, never-a-path discipline as /api/launch below.
+            if self.command == "POST" and _mp_http.handles(path):
+                status, payload = _mp_http.ROUTES[path](self, resolve)
+                return self._send(status, _json.dumps(payload))
             if path == "/api/setup":
                 n = int(self.headers.get("Content-Length") or 0)
                 if n > 8192:

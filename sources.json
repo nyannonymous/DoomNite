@@ -21,9 +21,9 @@
    "size": 14943400
   },
   "iwads/Hexen.wad": {
-   "no_host": true,
    "sha256": "f74b857076b3ffe2597d0e05bdecc687496e6e8a9582d7a47db681e0e78e4001",
-   "size": 20083672
+   "size": 20083672,
+   "hosted": "published 2026-08; verified byte-identical on the bucket"
   },
   "mods/adventures-of-square/square1.pk3": {
    "sha256": "d076ed44f8d4ec11b2d68f95bd851192e8c7b4a103417e2558825d51447b6901",

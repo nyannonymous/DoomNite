@@ -1,0 +1,433 @@
+/* ---------------------------------------------------------------
+   Multiplayer button + the Host / Join dialog.
+
+   Design rule for this file: the user should not need to know what
+   NukemNet is. So there is no "NukemNet setup", no junction output, and no
+   preset diff on screen -- the hidden setup runs server-side on open, and
+   this panel shows two buttons plus, after hosting, the address to share.
+   The technical details live in a collapsed <details> for when a mod will
+   not load online and the exact arguments are the thing you need.
+   --------------------------------------------------------------- */
+
+/* -- the header button ---------------------------------------------- */
+/* Lives inside .topbar, which is display:flex. Without `flex: none` the
+   button is squeezed by .search (flex: 1 1 180px) as the window narrows and
+   its label truncates, which reads as a rendering fault rather than a small
+   window. */
+.mp-btn {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font: 700 0.72rem/1 var(--d-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease),
+    transform var(--fast) var(--ease);
+}
+/* Styled as one of the other header chips rather than a lone red box, so it
+   belongs to the bar instead of competing with the DOOMNITE brand mark. The
+   blood tint is the hover state only; at rest it matches `.chip`. */
+.mp-btn svg {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mp-btn:hover {
+  color: #fff;
+  background: linear-gradient(180deg, var(--blood-hot), var(--blood-dim));
+  border-color: var(--blood-hot);
+  box-shadow:
+    0 0 24px -4px rgba(224, 42, 28, 0.85),
+    inset 0 1px 0 rgba(255, 200, 180, 0.35);
+  transform: translateY(-1px);
+}
+.mp-btn:active { transform: translateY(0) scale(0.97); }
+.mp-btn:focus-visible {
+  outline: 2px solid var(--blood-hot);
+  outline-offset: 2px;
+}
+
+/* -- overlay ------------------------------------------------------- */
+.mp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+  animation: mp-fade 160ms var(--ease);
+}
+@keyframes mp-fade {
+  from { opacity: 0; }
+}
+
+/* The native crosshair cursor is set on .uac-root, so this dialog's own
+   controls opt back out -- a crosshair over a text input is unusable. */
+.mp-overlay,
+.mp-overlay * { cursor: auto; }
+
+.mp-modal {
+  width: min(520px, 92vw);
+  /* dvh tracks the viewport as the window resizes; the min() keeps it from
+     outgrowing a short display. `overflow` is deliberately NOT on the modal:
+     a scrolling modal takes its own header off the top, which is how the
+     title used to vanish. The header is flex:none and .mp-scroll scrolls. */
+  max-height: min(88vh, 92dvh);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(15, 9, 24, 0.97), rgba(9, 5, 15, 0.98));
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3), 0 0 40px rgba(224, 42, 28, 0.16);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  animation: mp-rise 220ms var(--ease);
+}
+@keyframes mp-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+}
+
+.mp-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0.9rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+.mp-title {
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.mp-close {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.3rem 0.45rem;
+  transition: color var(--fast), border-color var(--fast);
+}
+.mp-close:hover { color: #fff; border-color: var(--blood-hot); }
+.mp-close:focus-visible { outline: 2px solid var(--blood-hot); outline-offset: 2px; }
+
+.mp-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-section {
+  flex: none;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid var(--line);
+}
+.mp-section:last-child { border-bottom: none; }
+.mp-section h3 {
+  margin: 0 0 0.7rem;
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+/* -- text ---------------------------------------------------------- */
+.mp-note { margin: 0; padding: 1.2rem; color: var(--fg-dim); font-size: 12.5px; }
+.mp-hint { margin: 0.6rem 0 0; font-size: 12px; line-height: 1.55; color: var(--fg-dim); }
+
+/* "All set, nothing to do" -- the reassuring state. Green, because it means
+   the hidden setup succeeded. */
+.mp-ok {
+  margin: 0.7rem 0 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--ok);
+  background: rgba(92, 255, 168, 0.07);
+  border: 1px solid rgba(92, 255, 168, 0.25);
+  border-radius: var(--radius);
+}
+.mp-warn {
+  margin: 0.7rem 0 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--ember);
+  background: rgba(255, 154, 60, 0.08);
+  border: 1px solid rgba(255, 154, 60, 0.28);
+  border-radius: var(--radius);
+}
+.mp-err {
+  margin: 0;
+  padding: 10px 1.2rem;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--blood-hot);
+  background: rgba(224, 42, 28, 0.09);
+  border-bottom: 1px solid rgba(224, 42, 28, 0.3);
+}
+
+/* -- fields --------------------------------------------------------- */
+.mp-game { display: flex; }
+/* The name field sits below the game picker with a little air between them,
+   because it is a different kind of control -- it is about YOU, not the mod.
+   Stacked rather than side-by-side so a long name cannot squeeze the picker. */
+.mp-field--name { margin-top: 0.9rem; }
+.mp-field { display: block; width: 100%; min-width: 0; }
+.mp-label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+/* One recipe for both controls. The inset bevel is what makes these read as
+   DOS widgets rather than as web form fields. */
+.mp-select,
+.mp-input {
+  display: block;
+  width: 100%;
+  padding: 9px 11px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  transition: border-color var(--med) var(--ease), box-shadow var(--med) var(--ease);
+}
+.mp-input { font-family: var(--d-mono); font-size: 12.5px; }
+.mp-select:hover,
+.mp-input:hover { border-color: var(--line-2); }
+.mp-select:focus,
+.mp-input:focus {
+  border-color: var(--blood-dim);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 0 3px rgba(224, 42, 28, 0.16);
+}
+.mp-input::placeholder { color: var(--fg-faint); }
+
+/* A native checkbox cannot be recoloured, so it would be the one bright OS
+   control in a themed panel. Visually hidden but kept in the accessibility
+   tree, with the tick drawn by .mp-check::before instead. `:has()` is what
+   lets the styled span react to the real input's state. */
+.mp-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 0.9rem;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.mp-check input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.mp-check::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.5);
+  transition: background var(--fast), border-color var(--fast), box-shadow var(--fast);
+}
+.mp-check:has(input:checked)::before {
+  background: var(--blood-hot);
+  border-color: var(--blood-hot);
+  box-shadow: 0 0 10px rgba(255, 90, 60, 0.55);
+}
+.mp-check:has(input:focus-visible)::before {
+  outline: 2px solid var(--blood-hot);
+  outline-offset: 2px;
+}
+
+/* -- buttons -------------------------------------------------------- */
+.mp-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.mp-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.7em 1.1em;
+  font: 700 0.75rem/1 var(--d-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    color var(--fast) var(--ease),
+    background var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    transform var(--fast) var(--ease);
+}
+.mp-action:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+.mp-action:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+.mp-action:disabled { opacity: 0.45; cursor: not-allowed; }
+.mp-action:focus-visible { outline: 2px solid var(--blood-hot); outline-offset: 2px; }
+
+/* "Host a game" is the action people came here for, so it gets the same
+   treatment as PLAY in the sidebar: the heavy industrial switch. */
+.mp-action--primary {
+  flex: 1 1 auto;
+  color: #fff;
+  background: linear-gradient(180deg, #8c1418 0%, #4a0b0e 100%);
+  border-color: #b71c1c;
+  box-shadow:
+    0 4px 0 #2b0608,
+    0 10px 22px -10px rgba(224, 47, 47, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.mp-action--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #a2181d 0%, #5c0d11 100%);
+  filter: brightness(1.12);
+}
+.mp-action--primary:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    0 0 0 #2b0608,
+    0 4px 10px -4px rgba(224, 47, 47, 0.6),
+    inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* -- join form ------------------------------------------------------ */
+.mp-join {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.mp-join .mp-row { margin-top: 0.8rem; }
+
+/* -- share list ----------------------------------------------------- */
+/* The addresses a host hands out, each on its own line so it can be read out
+   or copied without a mouse. */
+.mp-share {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mp-share li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mp-share code {
+  display: block;
+  padding: 7px 10px;
+  font-family: var(--d-mono);
+  font-size: 12.5px;
+  color: var(--ok);
+  background: rgba(92, 255, 168, 0.07);
+  border: 1px solid rgba(92, 255, 168, 0.25);
+  border-radius: var(--radius);
+  /* The whole point is that this is copyable, so select it on click. */
+  cursor: text;
+  user-select: all;
+}
+/* An address that is on this machine but is not a real network -- a virtual
+   adapter, or the VPN address when the friend is not on the tailnet. Shown,
+   greyed, and labelled: a hidden entry would leave the user wondering where
+   one of their addresses went, and a green one would be sent in good faith and
+   simply fail. */
+.mp-share li.is-dead code {
+  color: var(--fg-faint);
+  background: rgba(0, 0, 0, 0.35);
+  border-color: var(--line);
+  text-decoration: line-through;
+  text-decoration-color: var(--fg-faint);
+}
+.mp-share-why {
+  font-size: 11px;
+  color: var(--fg-faint);
+  padding-left: 2px;
+}
+
+/* -- technical details ---------------------------------------------- */
+.mp-details summary {
+  font-family: "Chakra Petch", system-ui, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.mp-details summary::-webkit-details-marker { display: none; }
+.mp-details summary::before { content: "+ "; }
+.mp-details[open] summary::before { content: "\2212  "; }
+.mp-details summary:hover { color: var(--fg-dim); }
+.mp-details summary:focus-visible { outline: 2px solid var(--blood-hot); outline-offset: 2px; }
+
+.mp-out {
+  margin: 0.7rem 0 0;
+  padding: 9px 11px;
+  max-height: 14rem;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-family: var(--d-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fg-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  /* Selectable: when something is wrong, the user needs to paste the exact
+     command into a terminal. */
+  user-select: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mp-overlay,
+  .mp-modal { animation: none; }
+  .mp-action:hover:not(:disabled) { transform: none; }
+}

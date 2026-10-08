@@ -163,15 +163,70 @@ python tools/make_menu.py --dryrun 15      # what would entry 15 run? (logs only
 python tools/selftest_serve.py             # serve.py refuses bad index / oversize body / unknown names
 python tools/selftest_watch.py             # folder watch re-adds a hand-placed mod's card
 python tools/selftest_nn_preset.py         # NukemNet preset writer output
+python tools/selftest_mp.py                # multiplayer: address parsing, index mapping, arg order
+python tools/check_bucket.py              # is every file in sources.json really on the bucket?
 python tools/selftest_add_mod.py           # add-a-mod inspector (IWAD guess, duplicates)
 python legacy/playnite-launcher/tools/selftest_settle.py   # probe settle window scales with asset size
 node ui/verify-watch.mjs                   # browser check of the folder watch (needs serve.py running)
+node ui/verify-mp-button.mjs ../app/assets/<bundle>.js   # multiplayer panel shape + request contract
+node ui/measure-header.mjs ../app/assets/<bundle>.js     # REAL layout + dialog geometry, in Chromium
 ```
 
 All of these are offline and never start a game. **Do launch real games:**
 `legacy/playnite-launcher/tools/qa_mp_probe.py` (27 entries, one at a time) - don't run it unattended.
 
 `--dryrun` logs the command line it *would* execute instead of running it.
+
+---
+
+## Multiplayer
+
+Click **MULTIPLAYER** in the header, pick a game, and either host or join. That
+is the whole procedure — you do not open NukemNet, and you do not need to know
+it exists. Everything it would otherwise need (linking your mod folders so the
+engine can read them, refreshing NukemNet's own preset) happens automatically
+when the panel opens.
+
+To see the exact engine arguments a session runs:
+
+```bash
+python tools/mp_session.py --entry 0      # dry run: the host and join command lines
+python tools/mp_session.py --list         # every game that can be played online
+python tools/mp_session.py --entry 0 --host   # actually start hosting
+```
+
+**What works without NukemNet:** hosting and joining a known address. Zandronum
+does both; NukemNet's contribution is the room list and NAT traversal, not the
+game itself.
+
+**Downloads and TLS.** If a machine's Python cannot verify the bucket's
+certificate — a stale or missing CA bundle, which Windows makes easy — the
+fetcher retries without verification and relies on the manifest's SHA-256 for
+integrity instead. That is deliberate: the hash is checked before anything is
+moved into place, so a tampered payload still fails. `tools/probe_fetch.py`
+shows both paths for one URL.
+
+**What still needs NukemNet:** browsing a public list of rooms. NukemNet has no
+scriptable interface for that — its room code lives only in its own UI — so
+joining a public room list means opening NukemNet. Hosting and joining by
+address do not.
+
+**The code after the address is optional, and worth passing.** When you host,
+the panel shows something like `192.168.0.226:23513 VWEAPGMG`. That code is a
+fingerprint of the exact mod files you are hosting. Paste the whole line when
+you join, and DoomNite checks it against yours and warns you if your version
+differs — which is the usual reason a multiplayer game looks subtly wrong
+(missing sprites, desyncs) rather than plainly broken. It never blocks joining;
+a near-identical build is often still worth trying.
+
+**Two caveats for hosting:**
+
+- On the same network (same Wi-Fi, same house) your firewall normally allows it
+  and the address shown works as-is.
+- From the internet, port `23513` has to be forwarded on your router. Many
+  routers cannot do that, and many ISPs block it. If that is your situation,
+  play on the same network, or use NukemNet, which handles the traversal for
+  you.
 
 ---
 

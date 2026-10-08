@@ -46,3 +46,4 @@ desktop/release/
 desktop/build/python/
 desktop/build/python-embed.zip
 desktop/build/pack/
+.bucketcheck/

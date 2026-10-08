@@ -1,3 +1,5 @@
+import './MultiplayerButton.css';
+import MultiplayerButton from "./MultiplayerButton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchEntries, groupEntries, FILTERS, launchIndex, artUrl } from "./api";
 import { posterFor } from "./poster";
@@ -7,13 +9,31 @@ import Panel from "./Panel";
 import EmberField from "./EmberField";
 import VariantMenu from "./VariantMenu";
 import CRTOverlay, { LaunchFlash } from "./CRTOverlay";
+import { createPortal } from "react-dom";
 
 function Toast({ msg, bad }) {
   if (!msg) return null;
-  return (
+  /* PORTALLED TO <body>, and this is a bug fix, not a style choice.
+
+     .toast is `position: fixed; z-index: 900` -- the same z-index as the
+     multiplayer dialog's `.mp-overlay`. But it used to render inside
+     `.app`, which establishes its own stacking context at z-index: 1. Two
+     z-index: 900 elements in DIFFERENT stacking contexts do not stack
+     against each other: the one whose ancestor context is lower paints
+     first and is then covered. Measured in Chromium: the toast appeared,
+     and elementFromPoint at its own centre returned the dialog's
+     `.mp-out` box -- the toast was completely hidden behind the modal.
+     That is the "it pops up but I can't read it" report.
+
+     Rendering it under <body> puts it in the root stacking context, where
+     z-index 900 actually wins against the overlay's 900 (later in tree
+     order). .mp-overlay is z-index 900, so the toast is bumped to 1000 to
+     be unambiguously above it. */
+  return createPortal(
     <div className={`toast ${bad ? "is-bad" : ""}`} role="status">
       {msg}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -478,7 +498,7 @@ export default function App() {
       {flashing && <LaunchFlash onDone={() => setFlashing(false)} />}
       <EmberField />
       <div className="vignette" aria-hidden="true" />
-      <header className="topbar">
+            <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <span className="brand-text">
@@ -518,6 +538,20 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        {/* `current?.cfgs?.[current.pick].index` and NOT `sel`. `sel` is a
+            group KEY -- a display name -- while the multiplayer endpoints take
+            a server entry index, which is a different number for a game with
+            several configs. Passing the key would silently host the wrong
+            build: group "Brutal Doom v22 test 6" has four configs at server
+            indexes 0..3, and the group key is none of them. cfgs are already
+            sorted by that index, and `pick` is which one the user has chosen,
+            so this is the config they are actually looking at. */}
+        <MultiplayerButton
+          toast={toast}
+          entries={raw}
+          selected={current?.cfgs?.[current.pick]?.index ?? null}
+        />
       </header>
 
       <main className="stage">

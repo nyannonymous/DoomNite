@@ -36,20 +36,21 @@ ROOTS = ("runtime", "iwads", "mods")
 SKIP_DIRS = {".git", "__pycache__", "downloads", ".staging", "node_modules",
               "dist", "app", "ui", "playnite-data", "art"}
 
-# Never publish these, whatever else is true of them. Hexen.wad is a
-# commercial retail IWAD: freely redistributing it is not ours to decide, so
-# it is excluded from hosting at the source rather than by remembering to
-# leave a URL off it.
+# Never publish these, whatever else is true of them. This list is EMPTY as of
+# 2026-08.
 #
-# DOOM2.WAD was on this list and is not any more. The operator owns the
-# bucket hosting the pack and has taken that decision deliberately, so the
-# veto is lifted here rather than only in sources.json -- otherwise the next
-# `make_sources.py` run would re-arm it silently, which is the whole reason
-# the carry-forward below exists. DOOM.WAD is v1.9 shareware and was never
-# on this list.
-VETOED = {
-    "iwads/Hexen.wad",
-}
+# It once held `iwads/Hexen.wad`: a commercial retail IWAD, which is not ours
+# to redistribute unilaterally. DOOM2.WAD sat beside it and also left. Both are
+# now absent because the operator owns the bucket hosting this pack and has
+# deliberately published them -- the veto is lifted HERE, in the tool, rather
+# than only in sources.json, because the carry-forward below re-arms a veto
+# that is absent from sources.json. Editing sources.json alone looks like it
+# worked until the next regeneration quietly undoes it.
+#
+# DOOM.WAD was never on this list: it is v1.9 shareware.
+#
+# To withhold a file again, add it here. The name is the only input.
+VETOED: set = set()
 
 
 def human(n):
