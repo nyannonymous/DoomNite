@@ -131,6 +131,10 @@
     inset: 0;
     z-index: 60;
     pointer-events: none;
+    /* De-layered. This rule used to sit above every one of them; see the
+       block comment further down for the full count and why it mattered.
+       Scanlines are now edge-weighted (mask) instead of full-field, so the
+       centre of the screen -- where the text is -- is untouched. */
     /* Was 1px dark every 3px at 0.28 -- three layers of darkening at once
        (scanlines + vignette + aberration) turned that into visible vertical
        banding over the dense sidebar text. A 1-in-4 duty cycle at 0.16 reads
@@ -142,8 +146,11 @@
       transparent 1px,
       transparent 4px
     );
-    mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
-    -webkit-mask-image: radial-gradient(ellipse 120% 100% at 50% 50%, #000 45%, transparent 100%);
+    /* Edge-weighted: full strength at the far edges, gone by 55% radius. The
+       old mask kept them at full strength across the centre 45%, which is
+       exactly where the panel text sits. */
+    mask-image: radial-gradient(ellipse 130% 115% at 50% 50%, transparent 52%, #000 96%);
+    -webkit-mask-image: radial-gradient(ellipse 130% 115% at 50% 50%, transparent 52%, #000 96%);
   }
 
   /* CRT intensity 0 means the effect is off, not merely faint. opacity:0
@@ -198,9 +205,10 @@
     /* 180px spread at 0.82 black was darkening the whole viewport, not just
        its corners -- with the scanlines on top, the UI read as dim rather than
        as vignetted. Pulled back to a corner-weighted falloff. */
-    box-shadow:
-      inset 0 0 140px 10px rgba(0, 0, 0, 0.55),
-      inset 0 0 50px 0 rgba(0, 0, 0, 0.28);
+    /* One corner-weighted shadow instead of two stacked insets. The inner
+       50px ring darkened the middle of the screen as well as the edges, which
+       is the second half of the stacking problem. */
+    box-shadow: inset 0 0 180px 40px rgba(0, 0, 0, 0.42);
   }
 
   /* Very low-alpha colour fringing on the whole screen. Kept subtle on
@@ -379,14 +387,32 @@
     filter: blur(14px) saturate(0.55) brightness(0.42);
     transform: scale(1.08); /* hides the blur's soft edge */
   }
-  /* Dark overlay so text over the art keeps contrast. */
+  /* Dark overlay so text over the art keeps contrast.
+
+     De-layered. This was 0.82 / 0.60 / 0.92 of black over the entire
+     viewport. Combined with the blurred hero beneath it (brightness 0.42)
+     and the four CRT layers above it, that is five darkening passes before
+     any content is read -- which is why the interface read as dim and muddy
+     rather than as dark.
+
+     The hero is already blurred 14px at 42% brightness, so it is
+     low-contrast by construction and does not need a heavy veil, and the
+     panels carry their own backgrounds. This is now only enough to keep the
+     topbar glass legible: weighted to the top and bottom edges where the
+     header and status bar sit, and near-zero across the middle. */
   .d-hero-veil {
     position: fixed;
     inset: 0;
     z-index: 1;
     pointer-events: none;
     background:
-      linear-gradient(180deg, rgba(8, 9, 11, 0.82) 0%, rgba(8, 9, 11, 0.6) 45%, rgba(8, 9, 11, 0.92) 100%);
+      linear-gradient(
+        180deg,
+        rgba(8, 9, 11, 0.62) 0%,
+        rgba(8, 9, 11, 0.16) 38%,
+        rgba(8, 9, 11, 0.2) 62%,
+        rgba(8, 9, 11, 0.68) 100%
+      );
   }
 
   /* ---------- launch flash ---------- */
@@ -735,15 +761,6 @@
     min-height: 0;
   }
 
-  .panel-head {
-    flex: none;
-    padding: 12px 14px 10px;
-    border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, rgba(8, 14, 8, 0.9), rgba(4, 8, 4, 0.7));
-    position: relative;
-    z-index: 5;
-  }
-
   .panel-head .panel-title { margin-bottom: 10px; }
 
   .panel-head .panel-actions {
@@ -817,16 +834,34 @@
  */
 
 :root {
-  /* Near-black with a red undertone, so the whole UI sits in Doom's world. */
+  /* Surface model.
+     ---------------------------------------------------------------------------
+     This is the other half of why the interface read as cheap, and it is not a
+     palette problem -- the hues were fine. It was the VALUE RANGE.
+
+     --panel was #0d0714 (5% lightness) sitting on --bg #07040d (3%). A 2%
+     difference between a panel and its background is not a surface, it is a
+     slightly different black. With every surface that close to the page, the
+     only thing separating a panel from the background is a 1px border at 16%
+     lightness -- so the entire UI read as thin outlines on black, which is
+     exactly what "cheap" looks like.
+
+     Real dark UIs get their depth from a genuine value step between the page and
+     its panels, and then use border and shadow for refinement rather than for
+     basic legibility. These are spaced so a panel is unmistakably lighter than
+     the page behind it, while text still has a large ratio against it. */
   --void: #05030a;
   --bg: #07040d;
-  --panel: #0d0714;
-  --panel-2: #120a1c;
-  --line: #2a1a2e;
-  --line-2: #3d2642;
-  --fg: #ece4f0;
-  --fg-dim: #a996b4;
-  --fg-faint: #6b5a78;
+  /* 8% -> 11% -> 14%: a real three-step ramp, so nesting reads without borders. */
+  --panel: #14101f;
+  --panel-2: #1b1526;
+  /* Warm-shifted so the page reads as scorched stone rather than cold slate,
+     and lifted enough to catch light on the top edge of a surface. */
+  --line: #3a2c42;
+  --line-2: #4d3a56;
+  --fg: #f4eef7;
+  --fg-dim: #b8a8c2;
+  --fg-faint: #7d6a88;
 
   /* The one saturated colour, reserved for action. */
   --blood: #e02a1c;
@@ -1675,20 +1710,59 @@ kbd {
    markup is gone, and the only rule that still referenced them was the
    missing-files tint below, which now hangs off the card itself. */
 
-/* ----------------------------------------------------------------- panel */
+/* ----------------------------------------------------------------- panel
 
+   Consolidated from three separate `.panel` rules that had drifted apart:
+   one for layout, one for the action bar, one here for the surface. They
+   disagreed on colour -- this one and .topbar used a purple rgba while
+   .panel-head used rgba(8, 14, 8), a GREEN, over the same panel. That is
+   the third contributor to the cheap look: a header tinted a different hue
+   from the surface it sits on, so the panel read as two mismatched pieces
+   rather than one object.
+
+   The surface is now an opaque ramp from the --panel tokens instead of a
+   translucent gradient, which matters because the panel has backdrop-filter
+   over a moving ember canvas: a translucent surface over moving colour reads
+   as noise, whereas an opaque one reads as a material. The gradient is kept
+   only as a very slight vertical lift so the surface is not flat. */
 .panel {
   min-width: 0;
   border-left: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(15, 9, 24, 0.9), rgba(9, 5, 15, 0.94));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel-2) 88%, transparent) 0%,
+      var(--panel) 34%,
+      color-mix(in srgb, var(--panel) 92%, var(--void)) 100%
+    );
   backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
   min-height: 0;
   position: relative;
   z-index: 1;
-  box-shadow: inset 1px 0 0 rgba(255, 200, 150, 0.06);
+  /* The left edge catches light, and a real drop shadow separates the panel
+     from the grid behind it instead of relying on a 1px border alone. */
+  box-shadow:
+    inset 1px 0 0 rgba(255, 210, 170, 0.07),
+    -18px 0 44px -22px rgba(0, 0, 0, 0.9);
   animation: panel-in var(--slow) var(--ease) both;
+}
+
+/* The header used to paint rgba(8, 14, 8) -- green -- under a purple panel.
+   Now it is one step up the same ramp, with the bottom border doing the
+   separation work. */
+.panel-head {
+  flex: none;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--panel-2) 70%, transparent),
+    color-mix(in srgb, var(--panel-2) 30%, transparent)
+  );
+  position: relative;
+  z-index: 5;
 }
 
 /* Remounts per game (key=group.key), so this replays on selection change. */
