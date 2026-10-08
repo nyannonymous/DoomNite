@@ -92,6 +92,9 @@ export function groupEntries(entries) {
             exists: v.exists,
             hd: !!v.hd,
             needsInstall: v.needs_install || null,
+            // Hosted and absent: the server fetches it on POST. Drives
+            // the INSTALL button for every pack game, not just SPECS.
+            downloadable: !!v.downloadable,
             standalone: !!v.standalone,
             // Where a hand-placed ("browser" source) file has to go, when the
             // server has one to report. See serve.py manual_hint().
@@ -111,6 +114,7 @@ export function groupEntries(entries) {
         wdir: e.wdir,
         hd: !!e.hd,
         needsInstall: e.needs_install || null,
+        downloadable: !!e.downloadable,
         standalone: !!e.standalone,
         // Same as the variants branch above: a "browser" source entry's
         // hand-place hint, straight from the server.
@@ -175,6 +179,20 @@ export async function fetchPackModStatus() {
 // this as closer to "remove from this pack" than "uninstall and reinstall
 // later". Folders shared with another game (e.g. BDBE_v3.38.pk3) are kept;
 // the server reports them back under "skipped".
+// Download one baked-in game's mods from the hosted bucket.
+//
+// This is what makes a fresh install usable. The shipped installer carries the
+// launcher shell and the manifest but NOT the mods -- 2.7 GB of them, fetched
+// from R2 on demand. Before this call existed the server could report a game as
+// missing but nothing could fetch it, so a new user saw 30 greyed-out cards
+// with no button. There is no bulk-fetch UI: this is the existing per-game
+// INSTALL button, pointed at the files the manifest already names.
+export async function downloadPackMod(name) {
+  return j(
+    await fetch(`/api/packmods/${encodeURIComponent(name)}`, { method: "POST" })
+  );
+}
+
 export async function removePackMod(name) {
   return j(
     await fetch(`/api/packmods/${encodeURIComponent(name)}`, { method: "DELETE" })

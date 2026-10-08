@@ -10,7 +10,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { dryrun, launchIndex, startInstall, removeInstall, removePackMod as apiRemovePackMod } from "./api";
+import { dryrun, launchIndex, startInstall, removeInstall, downloadPackMod, removePackMod as apiRemovePackMod } from "./api";
 import { Cover } from "./Tile";
 import ConfirmDownload from "./ConfirmDownload";
 import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
@@ -87,6 +87,26 @@ export default function Panel({
   const pmInstalled = !!pm?.installed;
   const pmPartial = !!pm?.partial;
   const pmRemovable = !!pm && (pmInstalled || pmPartial) && pm.exclusive.length > 0;
+
+  // Fetch this game's mods from the hosted bucket. This is what a fresh
+  // install needs: the installer ships the shell and the manifest, not the
+  // 2.7 GB of mods, so without this a new user's cards are all greyed out with
+  // nothing to press. Per-game on purpose -- there is no bulk fetch UI, and the
+  // folder watch flips the card back on its own once the files land.
+  const [dlBusy, setDlBusy] = useState(false);
+  async function downloadMods() {
+    setDlBusy(true);
+    try {
+      await downloadPackMod(group.label);
+      onPackModRemoved?.();     // refresh /api/packmods so the card updates
+      onInstalled?.();          // refresh /api/entries so PLAY re-enables
+      toast(`Downloaded ${group.label}.`);
+    } catch (e) {
+      toast(`Could not download ${group.label}: ${e.message}`, true);
+    } finally {
+      setDlBusy(false);
+    }
+  }
 
   async function removePackMod() {
     if (!pmRemovable || pmBusy) return;
@@ -483,12 +503,29 @@ export default function Panel({
           // server resolves the folder out of the launcher it wrote, so name
           // it, and the folder watch picks the file up the moment it lands.
           manualHint ? (
+            <>
+            {/* DOWNLOAD appears only when the server says the files are
+                hosted AND absent. That pair is what downloadPackMod() needs:
+                a URL to fetch from and somewhere to put the result. Without
+                the button this block was a dead end on a fresh install --
+                PLAY disabled, and the only advice was a command line the user
+                had no reason to know about. */}
+            {manualHint.hosted && (
+              <button
+                type="button"
+                className="btn-primary dl-btn"
+                onClick={downloadMods}
+                disabled={dlBusy}
+              >
+                {dlBusy ? "Downloading…" : "DOWNLOAD"}
+              </button>
+            )}
             <p className="panel-dlhint">
               <FolderOpen size={13} aria-hidden="true" />
               {manualHint.hosted ? (
                 <>
-                  Files missing — restore with <code>python tools\build.py</code>,
-                  or put <code>{manualHint.files.join(", ")}</code> back in{" "}
+                  Not on this machine yet. Download it, or put{" "}
+                  <code>{manualHint.files.join(", ")}</code> in{" "}
                   <code>{manualHint.folder}</code>. The card returns on its own.
                 </>
               ) : (
@@ -500,6 +537,7 @@ export default function Panel({
                 </>
               )}
             </p>
+            </>
           ) : (
             <p className="warn">This config&apos;s files are missing from the pack.</p>
           )

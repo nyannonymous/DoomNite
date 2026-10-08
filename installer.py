@@ -52,6 +52,8 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
 # name -> install spec. Mirrors are tried in order; the first that works wins.
 # size is used only to show progress; sha256 is what gates the install.
+import fetcher
+
 SPECS = {
     "adventures-of-square": {
         "label": "The Adventures of Square",
@@ -183,6 +185,69 @@ def pack_mod_status(name):
         "partial": 0 < len(present) < len(folders),
         "size_h": _human(freed) if freed else None,
     }
+
+
+def download_pack_mod(name):
+    """Fetch one baked-in game's mods from the hosted bucket.
+
+    This is the missing half of pack_mod_status(). That function could already
+    report that a game's folders were absent, and the server already knew which
+    of the manifest's files were fetchable (`fetchable`), but nothing ever asked
+    fetcher.py for them. So a fresh install had the launcher shell, the manifest
+    and the UI, and no way to acquire the 66 files between it and a playable
+    game -- INSTALL existed for exactly two hand-written SPECS entries.
+
+    Nothing new is invented here. The file list comes from pack-manifest.json's
+    own `mods` paths (the same source pack_mod_registry uses), and the download
+    itself is fetcher.fetch_one, which already resolves URLs, percent-encodes
+    paths, retries unverified when a machine's certificate store is broken, and
+    verifies sha256 before anything is moved into place.
+
+    Only ever called with a name from the manifest. Like every other write path
+    here, the folders come from pack_mod_registry() -- never from the request.
+
+    Returns the per-file results so the UI can show progress and, on failure,
+    which file is missing rather than just "it did not work".
+    """
+    per_game, _owners = pack_mod_registry()
+    folders = per_game.get(name)
+    # A SET of folder names, and sets are unordered -- never index it. The
+    # first version did `per_game[name][0]` and died with "set object is not
+    # subscriptable" for every game.
+    if not folders:
+        raise KeyError(name)
+
+    manifest = _load_manifest() or {}
+    # Per-file records (size, sha256, urls, no_host) come from sources.json --
+    # the manifest only knows which mods a game loads, not where they live, so
+    # reading it here made every game look like it had no host. fetcher.load()
+    # returns that dict.
+    records = fetcher.load() or {}
+    wanted = []
+    for g in manifest.get("games", []):
+        if g.get("name") != name:
+            continue
+        for a in g.get("actions", []):
+            if a.get("needs_install"):
+                continue          # an on-demand SPECS entry; install() owns it
+            for m in a.get("mods", []):
+                rel = m.replace("\\", "/")
+                if rel not in wanted:
+                    wanted.append(rel)
+
+    results = []
+    for rel in wanted:
+        rec = records.get(rel)
+        if not rec:
+            results.append({"rel": rel, "status": "no-host",
+                            "detail": "not in sources.json"})
+            continue
+        try:
+            r_rel, r_status, r_detail = fetcher.fetch_one(rel, rec)
+            results.append({"rel": r_rel, "status": r_status, "detail": r_detail})
+        except Exception as e:      # a network or disk fault on one file
+            results.append({"rel": rel, "status": "error", "detail": str(e)})
+    return results
 
 
 def remove_pack_mod(name):

@@ -358,7 +358,16 @@ def load_entries():
                 # Without this the UI reports exists=True for a game whose 4 MB
                 # of content are not on disk, and the install button never
                 # appears.
+                # Anything hosted that is absent from disk can be fetched, and
+                # /api/packmods/<name> POST now does it. Before this, the UI had
+                # no way to offer that: needs_install is only set on the two
+                # hand-written SPECS entries, so a fresh install showed every
+                # other game as permanently "missing files" with no button.
+                # flag_downloadable() sets it for the rest.
                 "needs_install": a.get("needs_install"),
+                "downloadable": bool(
+                    (not exists) and not a.get("needs_install")
+                    and is_fetchable),
                 # True when every mod this action loads has a hosted URL in
                 # sources.json. The UI offers INSTALL for these and labels
                 # the rest "in pack", instead of hardcoding which games those
@@ -772,6 +781,23 @@ def handler_factory():
                 except RuntimeError as e:
                     return self._send(409, _json.dumps({"error": str(e)}))
                 return self._send(200, _json.dumps(r))
+            if path.startswith("/api/packmods/") and self.command == "POST":
+                # Download one baked-in game's mods from the hosted bucket.
+                # The name is looked up in the manifest-derived registry and
+                # never turned into a path, exactly as the DELETE route below
+                # does.
+                name = _up.unquote(path[len("/api/packmods/"):])
+                try:
+                    results = _inst.download_pack_mod(name)
+                except KeyError:
+                    return self._send(404, _json.dumps({"error": "unknown"}))
+                except Exception as exc:
+                    return self._send(500, _json.dumps({"error": str(exc)}))
+                done = all(r.get("status") in ("ok", "present", "fetched")
+                           for r in results)
+                return self._send(200, _json.dumps({
+                    "ok": done, "results": results,
+                    "status": _inst.pack_mod_status(name)}))
             if path.startswith("/api/packmods/") and self.command == "DELETE":
                 # Uninstall of a BAKED-IN game -- every mod the pack ships
                 # with, not just the two on-demand downloads. The name is

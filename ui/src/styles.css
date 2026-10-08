@@ -2393,6 +2393,16 @@ kbd {
 }
 
 .panel-installed,
+/* The DOWNLOAD button in the missing-files block. Full width, because it is
+   the only action on a card whose files are absent -- the alternative was a
+   paragraph telling the user to run a Python command they had no reason to
+   know existed. */
+.dl-btn {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+}
+
 .panel-dlhint {
   display: flex;
   align-items: center;
