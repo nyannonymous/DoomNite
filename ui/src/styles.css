@@ -2366,12 +2366,6 @@ kbd {
 /* Card-level state label (IN PACK / REMOVED / ON DEMAND), top-left of the
    cover. It was originally the wrapper for a trash button; that button moved
    to the sidebar, so only the label is styled here. */
-.tile-uninstall {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 5;
-}
 
 /* Sidebar install block, below Details. */
 .panel-install {
@@ -3099,23 +3093,6 @@ kbd {
 /* The counterpart to the trash button. Same corner, but it states a fact rather
    than offering an action, so it is flat and dim -- a trash button that cannot
    be clicked would look broken, which is why this is a span, not a button. */
-.tile-inpack {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 6px;
-  font: 700 0.5rem/1 var(--d-mono, "JetBrains Mono", monospace);
-  letter-spacing: 0.1em;
-  color: var(--fg-dim);
-  opacity: 0.55;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid var(--line-2);
-  border-radius: 3px;
-  cursor: default;
-}
-.tile:hover .tile-inpack {
-  opacity: 0.8;
-}
 
 /* ------------------------------------------------ ghost buttons (base rule) */
 
@@ -3218,41 +3195,7 @@ kbd {
   z-index: 2;
 }
 
-/* Corner tags: small, muted, and out of the logo's way. */
-.tile-inpack,
-.tile-installbadge {
-  font-size: 8.5px;
-  letter-spacing: 0.08em;
-  padding: 2px 5px;
-  border-radius: 2px;
-  background: rgba(12, 10, 14, 0.72);
-  border: 1px solid rgba(190, 180, 200, 0.22);
-  color: #a49aae;
-  /* Was competing with the cover art for attention. */
-  opacity: 0.9;
-}
 
-.tile-inpack {
-  top: 6px;
-  left: 6px;
-}
-
-.tile-installbadge {
-  top: 6px;
-  right: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-/* Hover reveals what the tag actually means, rather than making the tag itself
-   larger. A badge nobody can read is noise; one that explains itself on hover is
-   information. */
-.tile:hover .tile-inpack,
-.tile:focus-within .tile-inpack {
-  color: #d8d0de;
-  border-color: rgba(214, 200, 220, 0.4);
-}
 
 
 /* ==========================================================================
@@ -3426,3 +3369,5 @@ kbd {
 .panel-play:active:not(:disabled) {
   transform: translateY(0);
 }
+
+

@@ -196,19 +196,6 @@ export default function Tile({
     setDl(null);
   }
 
-  /* ---------------------------------------------------- baked-in state only */
-    // Removal moved to the sidebar (Panel.jsx), which already owned the on-demand
-        // UNINSTALL. What is left here is the corner LABEL -- "IN PACK" / "REMOVED"
-        // -- so the card still reports what is on disk without offering a second,
-        // more prominent destructive control.
-        //
-        // pm is null for a group with nothing on disk to remove (no mods
-        // reference any mods\\<slug> folder -- e.g. a pure-IWAD entry) and for the
-        // two on-demand entries, which use `inst`/`uninstall` above instead.
-        const pmInstalled = !!pm?.installed;
-        const pmPartial = !!pm?.partial;
-
-
   /**
    * Pointer-tracked 3D tilt.
    *
@@ -412,46 +399,12 @@ export default function Tile({
           DELETE for anything else with 404 "unknown", so offering the button
           would be a lie.
 
-          Everything else is labelled IN PACK rather than left blank, because an
-          absent button reads as a missing feature rather than as "there was
-          never anything here to remove". The label is honest today: no file in
-          sources.json has a hosted URL yet, so nothing can be fetched.
-
-          When the operator publishes hosting and a URL appears in sources.json,
-          serve.py flips these cards to fetchable and this corner changes with
-          it -- no edit here. */}
-      {!group.needsInstall && (
-              <span className="tile-uninstall">
-                {/* The remove BUTTON used to live here, top-left of every card. It is
-                    now in the sidebar (Panel.jsx), which already owned the on-demand
-                    UNINSTALL -- so this corner is state only, never an action. Two
-                    trash affordances for one job put the pack's most destructive
-                    action in the most repeated position on screen, reachable by a
-                    stray click while scanning the grid. Removal is deliberate or it
-                    does not happen; the label still reports what is on disk.
-
-                    REMOVING... is gone with the button: progress now shows in the
-                    sidebar, which is where the action was started, and duplicating it
-                    here needed state this component no longer owns. */}
-                <span
-                  className="tile-inpack"
-                  title={
-                    group.fetchable
-                      ? "Can be re-fetched from hosted URLs"
-                      : pm && !pmInstalled && !pmPartial
-                        ? "Already removed -- run tools\\build.py to restore"
-                        : "Ships inside the pack - nothing to download or remove"
-                  }
-                >
-                  {pm && !pmInstalled && !pmPartial
-                    ? "REMOVED"
-                    : group.fetchable
-                      ? "ON DEMAND"
-                      : "IN PACK"}
-                </span>
-              </span>
-            )}
-            {group.needsInstall && busy && (
+          An empty corner is honest here: the overwhelming majority of cards
+          have nothing to say, and a permanent "IN PACK" badge on all of them is
+          what the owner called noise. What a card DOES say is reported in the
+          corner -- REMOVED when a file is gone -- and the disabled PLAY button
+          says the same thing in the place the user is about to click. */}
+      {group.needsInstall && busy && (
         <span className="tile-install" role="status" aria-live="polite">
           <span className="tile-installbar">
             <span className="tile-installfill" style={{ width: `${pct}%` }} />

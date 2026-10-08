@@ -148,12 +148,13 @@ try {
   const t2 = tileFor(w, GAME);
   check("and it is launchable again",
     !!t2 && t2.querySelector(".tile-play")?.disabled === false);
-  // The corner label is driven by /api/packmods, a second source of truth for
-  // the same filesystem fact. If the watch refreshes only one of them, the
-  // card comes back while the sidebar still says REMOVED.
-  const corner = t2?.querySelector(".tile-inpack")?.textContent || "";
-  check("and the REMOVED corner is gone too", !/REMOVED/.test(corner),
-    corner || "(no corner label)");
+  // The corner badge (IN PACK / REMOVED) was removed from the cards at the
+  // owner's request, so there is no longer a second source of truth on the card
+  // to fall out of step with the sidebar. What still has to hold is that no
+  // stale removal chrome survives on the restored card.
+  const corner = t2?.querySelector(".tile-inpack");
+  check("the restored card carries no removal badge", !corner,
+    corner?.textContent || "(none rendered)");
   const after = [...d.querySelectorAll(".panel-dlhint")].map((h) => h.textContent).join(" | ");
   check("and the sidebar hint is gone", !after.includes("missing") && !after.includes("Not downloadable"),
     after.slice(0, 120) || "(no hint)");
