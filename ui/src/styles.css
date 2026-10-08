@@ -744,15 +744,6 @@
      positioned overlay, and Framer owns the transform outright. */
   .panel { animation: none; }
 
-  .panel-boot {
-    position: relative;
-    z-index: 4;
-    margin: 12px 0;
-    padding: 11px 12px;
-    background: linear-gradient(180deg, rgba(6, 12, 6, 0.92), rgba(4, 8, 4, 0.96));
-    border: 1px solid color-mix(in srgb, var(--d-toxic-500) 40%, transparent);
-  }
-
   /* DataStreams was absolutely positioned against .panel-scroll, a scrolling
      flex child, so the falling streaks were pinned to the scroll CONTENT box
      and slid with it. Scoped to the panel itself instead. */

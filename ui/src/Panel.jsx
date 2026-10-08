@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { dryrun, launchIndex, startInstall, removeInstall, downloadPackMod, removePackMod as apiRemovePackMod } from "./api";
 import { Cover } from "./Tile";
 import ConfirmDownload from "./ConfirmDownload";
-import { Typed, TermRow, BootBar, DataStreams } from "./Terminal";
+import { Typed, TermRow, DataStreams } from "./Terminal";
 
 function bytes(n) {
   if (!n) return "";
@@ -33,12 +33,7 @@ export default function Panel({
   const [busy, setBusy] = useState(false);
   // Brief boot readout on every game switch. Purely presentational: the details
   // below are already mounted, this just covers them for half a second.
-  const [booting, setBooting] = useState(true);
-  useEffect(() => {
-    setBooting(true);
-    const t = setTimeout(() => setBooting(false), 480);
-    return () => clearTimeout(t);
-  }, [group?.key]);
+
   const [cmd, setCmd] = useState(null);
   const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -199,14 +194,6 @@ export default function Panel({
       {/* Falling data streams behind the readout. Decorative only, so it is
           aria-hidden and pointer-transparent in the component. */}
       <DataStreams />
-      {/* UAC boot sequence, shown once per game switch. The panel remounts on
-          key change, so a fresh mount is a fresh boot -- no extra state. */}
-      {booting ? (
-        <div className="panel-boot">
-          <BootBar ms={520} label="LOADING" />
-        </div>
-      ) : null}
-
       {/* Primary action lives ABOVE the scroll area, not at the bottom of it.
           It used to be the last thing in .panel-scroll, below Configs,
           Details, the term rows and the whole mod list -- so on a short window
