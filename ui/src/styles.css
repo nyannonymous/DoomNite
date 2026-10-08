@@ -366,35 +366,6 @@
 
   /* "Data streams": falling characters. The streaks are gradients, not
      glyphs, so they cost nothing to animate. */
-  .d-streams {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    opacity: 0.5;
-  }
-  .d-streams::before,
-  .d-streams::after {
-    content: "";
-    position: absolute;
-    top: -100%;
-    width: 2px;
-    height: 200%;
-    background: linear-gradient(
-      180deg,
-      transparent,
-      var(--d-toxic-400),
-      transparent
-    );
-    animation: d-fall 1.6s linear infinite;
-  }
-  .d-streams::before { left: 12%; animation-duration: 1.9s; }
-  .d-streams::after  { left: 78%; animation-duration: 1.4s; animation-delay: 0.5s; }
-  @keyframes d-fall {
-    0%   { transform: translateY(-50%); opacity: 0; }
-    20%  { opacity: 0.8; }
-    100% { transform: translateY(50%); opacity: 0; }
-  }
 
   /* ---------- hero ---------- */
 
@@ -577,12 +548,9 @@
 
   /* The streams sit behind the text, so the pane needs its own stacking
      context for them not to escape. */
-  .d-streamwrap { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-  .d-termpane > *:not(.d-streamwrap) { position: relative; z-index: 1; }
 
   /* Offset the second stream pair so they do not fall in lockstep. */
-  .d-streams-2 { transform: scaleX(-1); opacity: 0.3; }
-
+  
   .d-termpane-head { margin-bottom: 12px; }
 
   .d-termpane-title {
@@ -747,9 +715,6 @@
   /* DataStreams was absolutely positioned against .panel-scroll, a scrolling
      flex child, so the falling streaks were pinned to the scroll CONTENT box
      and slid with it. Scoped to the panel itself instead. */
-  .panel > .d-streamwrap { position: absolute; inset: 0; z-index: 0; }
-  .panel > .d-streamwrap .d-streams { opacity: 0.22; }
-  .panel > *:not(.d-streamwrap) { position: relative; z-index: 1; }
 
   .panel-termrows {
     display: flex;
@@ -829,8 +794,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .d-scan-sweep::after,
-  .d-streams::before,
-  .d-streams::after,
   .d-caret::after { animation: none; }
   .d-glitch::before, .d-glitch::after { opacity: 0 !important; }
   .panel .play:hover { animation: none; }

@@ -105,14 +105,6 @@ export function TermRow({ k, v, accent }) {
  * Falling "data streams", decorative. Rendered only while a panel is active,
  * since they are pure motion and cost a compositor layer each.
  */
-export function DataStreams() {
-  return (
-    <div className="d-streamwrap" aria-hidden="true">
-      <div className="d-streams" />
-      <div className="d-streams d-streams-2" />
-    </div>
-  );
-}
 
 export default function TermPane({ title, subtitle, facts = [], bootKey, children }) {
   // Show the boot bar briefly whenever the selected game changes, then the

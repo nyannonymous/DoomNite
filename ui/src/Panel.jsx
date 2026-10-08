@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { dryrun, launchIndex, startInstall, removeInstall, downloadPackMod, removePackMod as apiRemovePackMod } from "./api";
 import { Cover } from "./Tile";
 import ConfirmDownload from "./ConfirmDownload";
-import { Typed, TermRow, DataStreams } from "./Terminal";
+import { Typed, TermRow } from "./Terminal";
 
 function bytes(n) {
   if (!n) return "";
@@ -191,9 +191,6 @@ export default function Panel({
       transition={{ type: "spring", stiffness: 320, damping: 26, mass: 0.8 }}
     >
       <Cover group={group} className="panel-cover" />
-      {/* Falling data streams behind the readout. Decorative only, so it is
-          aria-hidden and pointer-transparent in the component. */}
-      <DataStreams />
       {/* Primary action lives ABOVE the scroll area, not at the bottom of it.
           It used to be the last thing in .panel-scroll, below Configs,
           Details, the term rows and the whole mod list -- so on a short window
