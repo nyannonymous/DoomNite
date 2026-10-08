@@ -258,6 +258,20 @@ check("no unexpected runtime errors", errors.length === 0,
   check("Host/Join come BEFORE the name field",
     hostBtn !== -1 && nameLbl !== -1 && hostBtn < nameLbl,
     `host@${hostBtn} name@${nameLbl}`);
+
+  // The join box must not live behind a toggle. The owner asked twice where it
+  // was, so assert the two things that fix that: the field is the FIRST control
+  // in the choice block, and nothing gates it on `mode`.
+  const addrField = f.search(/className="mp-field mp-addrfield"/);
+  check("the address field is the first control in the choice block",
+    addrField !== -1 && addrField < hostBtn,
+    `addr@${addrField} host@${hostBtn}`);
+  check("no mode gate hides the address field",
+    !/mode === "join" && \(\s*<div className="mp-join"/.test(f) && !f.includes("mp-join"));
+  check("the mode toggle state is gone entirely",
+    !f.includes("const [mode, setMode]") && !f.includes("setMode("));
+  check("there is exactly one address input",
+    (f.match(/value=\{addr\}/g) || []).length === 1);
   check("panel leads with the host-or-join question",
     f.includes("Hosting a game or joining one?"));
   check("address field says to paste the whole line",

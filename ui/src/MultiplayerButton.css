@@ -335,13 +335,8 @@
     inset 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
-/* -- join form ------------------------------------------------------ */
-.mp-join {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
-}
-.mp-join .mp-row { margin-top: 0.8rem; }
+
+
 
 /* -- share list ----------------------------------------------------- */
 /* The addresses a host hands out, each on its own line so it can be read out
@@ -442,4 +437,58 @@
   color: #cfc7d8;
   font-size: 13px;
   line-height: 1.45;
+}
+
+
+/* ==========================================================================
+   The choice is pinned, not scrolled to
+   --------------------------------------------------------------------------
+   Host / Join is the panel's entire purpose, and it sat under the game picker,
+   the Zandronum warning and the error line. On a short window the fold landed
+   between them, so the dialog read as "pick a game" and offered nothing else --
+   which is what happened: the owner asked twice where the join box was, and
+   pasted an address into the name field because it was the only visible input.
+
+   .mp-scroll is a flex column, so `margin-top: auto` pins this block to the
+   bottom of whatever height is available. The buttons are then present at any
+   window size, with or without scrolling, instead of being reachable only by
+   someone who happens to scroll.
+   ======================================================================== */
+
+.mp-choose {
+  margin-top: auto;
+  padding-top: 14px;
+  /* The scroll region's bottom padding is on this block, so the pinned row
+     never sits flush against the dialog edge. */
+  padding-bottom: 2px;
+  flex: none;
+}
+
+.mp-choice .mp-action {
+  min-height: 40px;
+}
+
+/* Below the choice, the name field is reference material. Keep it visually
+   subordinate so the eye lands on the buttons first. */
+.mp-choose .mp-field--name {
+  margin-top: 12px;
+  opacity: 0.92;
+}
+
+/* The address field leads the choice block, so it needs no top margin of its
+   own and its hint sits tight under the input rather than beside the buttons. */
+
+/* -- address field --------------------------------------------------
+   The first control in the choice block. It replaced .mp-join, the
+   divider-separated form that only existed after pressing "Join a game". */
+.mp-addrfield {
+  margin-bottom: 12px;
+}
+
+.mp-addrfield .mp-input {
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace);
+}
+
+.mp-addrfield .mp-hint {
+  margin-top: 6px;
 }

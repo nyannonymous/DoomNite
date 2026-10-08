@@ -38,7 +38,6 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   // `command` is the argument line this session actually ran, which IS shown.
   const [setupLines, setSetupLines] = useState([]);
   const [command, setCommand] = useState("");
-  const [mode, setMode] = useState(null);       // "host" | "join" | null
   const [pick, setPick] = useState(0);          // position in `playable`
   const [addr, setAddr] = useState("");
   const [dm, setDm] = useState(false);
@@ -114,7 +113,6 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
     setErr(null);
     setSetupLines([]);
     setCommand("");
-    setMode(null);
     setSharing(null);
     setMismatch(null);
     try {
@@ -163,8 +161,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
         const d = await r.json();
         if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
         setCommand(d.command || "");
-        setMode(which);
-        if (which === "host") {
+            if (which === "host") {
           setSharing(d.sharing);
           setMismatch(null);
           toast(`Hosting ${d.label}. Share the address with your friends.`);
@@ -234,7 +231,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   {/* Say what this panel is for before asking for anything.
                       The owner opened it, saw only a name field, and pasted a
                       network address into it. Lead with the choice instead. */}
-                  {phase === "ready" && !mode && (
+                  {phase === "ready" && (
                     <p className="mp-lead">
                       Hosting a game or joining one? Everything else is already
                       set up.
@@ -271,9 +268,33 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                 </p>
               )}
 
-              {phase === "ready" && !mode && (
-                <section className="mp-section">
-                  <div className="mp-row">
+              {phase === "ready" && (
+                <section className="mp-section mp-choose">
+                  {/* The address field is the first control, not a second
+                      screen. Reaching it behind a mode toggle meant the panel
+                      appeared to have no way to join at all. */}
+                  <label className="mp-field mp-addrfield">
+                    <span className="mp-label">
+                      Their address — paste the whole line here
+                    </span>
+                    <input
+                      className="mp-input"
+                      value={addr}
+                      onChange={(e) => setAddr(e.target.value)}
+                      placeholder="192.168.0.226:23513 ABCD2345"
+                      spellCheck={false}
+                      autoComplete="off"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && addr.trim()) start("join");
+                      }}
+                    />
+                    <span className="mp-hint">
+                      Leave this empty to host instead. The code after the port
+                      only checks you have the same version.
+                    </span>
+                  </label>
+
+                  <div className="mp-row mp-choice">
                     <button
                       className="mp-action mp-action--primary"
                       onClick={() => start("host")}
@@ -283,21 +304,23 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     </button>
                     <button
                       className="mp-action"
-                      onClick={() => setMode("join")}
+                      onClick={() => {
+                        // An empty address is a real mistake on Join, not a
+                        // request to open another screen. Say so rather than
+                        // silently doing nothing.
+                        if (!addr.trim()) {
+                          setErr("Paste the address they gave you, or use Host.");
+                          return;
+                        }
+                        start("join");
+                      }}
                       disabled={busy || !chosen}
                     >
                       Join a game
                     </button>
                   </div>
 
-                  <label className="mp-check">
-                    <input
-                      type="checkbox"
-                      checked={dm}
-                      onChange={(e) => setDm(e.target.checked)}
-                    />
-                    <span>Deathmatch instead of cooperative</span>
-                  </label>
+
                   {/* Deliberately one line of reassurance, not a report. The
                       junctions and the preset are already handled; the user has
                       no action to take here and no reason to care. */}
@@ -322,42 +345,16 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     </p>
                   )}
 
-                  {mode === "join" && (
-                    <div className="mp-join">
-                      <label className="mp-field">
-                        <span className="mp-label">
-                          Their address — paste the whole line here
-                        </span>
-                        <input
-                          className="mp-input"
-                          value={addr}
-                          onChange={(e) => setAddr(e.target.value)}
-                          placeholder="192.168.0.226:23513 ABCD2345"
-                          spellCheck={false}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && addr.trim()) start("join");
-                          }}
-                        />
-                      </label>
-                      <p className="mp-hint">
-                        Paste the whole line they gave you, code included. The
-                        code is optional -- it only checks you have the same
-                        version.
-                      </p>
-                      <div className="mp-row">
-                        <button
-                          className="mp-action mp-action--primary"
-                          onClick={() => start("join")}
-                          disabled={busy || !addr.trim()}
-                        >
-                          Join
-                        </button>
-                        <button className="mp-action" onClick={() => setMode(null)}>
-                          Back
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <label className="mp-check">
+                    <input
+                      type="checkbox"
+                      checked={dm}
+                      onChange={(e) => setDm(e.target.checked)}
+                    />
+                    <span>Deathmatch instead of cooperative</span>
+                  </label>
+
+                  
                 </section>
               )}
 
