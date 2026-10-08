@@ -231,6 +231,15 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
 
               {ready && (
                 <section className="mp-section">
+                  {/* Say what this panel is for before asking for anything.
+                      The owner opened it, saw only a name field, and pasted a
+                      network address into it. Lead with the choice instead. */}
+                  {phase === "ready" && !mode && (
+                    <p className="mp-lead">
+                      Hosting a game or joining one? Everything else is already
+                      set up.
+                    </p>
+                  )}
                   <div className="mp-game">
                     <label className="mp-field">
                       <span className="mp-label">Game</span>
@@ -251,29 +260,6 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     <p className="mp-warn">
                       Zandronum was not found on this machine, so a game cannot
                       be started yet.
-                    </p>
-                  )}
-                  {/* Deliberately one line of reassurance, not a report. The
-                      junctions and the preset are already handled; the user has
-                      no action to take here and no reason to care. */}
-                  <label className="mp-field mp-field--name">
-                    <span className="mp-label">Your name</span>
-                    <input
-                      className="mp-input"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="NukemNet"
-                      maxLength={16}
-                      spellCheck={false}
-                    />
-                  </label>
-                  <p className="mp-hint">
-                    Everyone playing together should use a different one -- the
-                    scoreboard and the connect log identify players by name.
-                  </p>
-                  {ready.ready?.nn?.found && ready.ready?.nn?.linked && (
-                    <p className="mp-ok">
-                      Multiplayer is set up. Nothing else to configure.
                     </p>
                   )}
                 </section>
@@ -312,11 +298,36 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     />
                     <span>Deathmatch instead of cooperative</span>
                   </label>
+                  {/* Deliberately one line of reassurance, not a report. The
+                      junctions and the preset are already handled; the user has
+                      no action to take here and no reason to care. */}
+                  <label className="mp-field mp-field--name">
+                    <span className="mp-label">Your name</span>
+                    <input
+                      className="mp-input"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="NukemNet"
+                      maxLength={16}
+                      spellCheck={false}
+                    />
+                  </label>
+                  <p className="mp-hint">
+                    Everyone playing together should use a different one -- the
+                    scoreboard and the connect log identify players by name.
+                  </p>
+                  {ready.ready?.nn?.found && ready.ready?.nn?.linked && (
+                    <p className="mp-ok">
+                      Multiplayer is set up. Nothing else to configure.
+                    </p>
+                  )}
 
                   {mode === "join" && (
                     <div className="mp-join">
                       <label className="mp-field">
-                        <span className="mp-label">Their address</span>
+                        <span className="mp-label">
+                          Their address — paste the whole line here
+                        </span>
                         <input
                           className="mp-input"
                           value={addr}

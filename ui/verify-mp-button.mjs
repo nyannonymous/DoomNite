@@ -242,10 +242,33 @@ check("the harness never launched a game", launched.length === 0,
 check("no unexpected runtime errors", errors.length === 0,
   [...new Set(errors)].slice(0, 2).join(" | "));
 
+// --- ordering: the choice comes before the name field -------------------
+// The panel used to render "Your name" above the Host/Join buttons, so the
+// only visible input was a name box and a network address got pasted into it.
+// Assert the order in the source, since jsdom here renders no layout.
+{
+  const f = readFileSync(new URL("./src/MultiplayerButton.jsx", import.meta.url), "utf8");
+  const hostBtn = f.indexOf("Host a game");
+  const joinBtn = f.indexOf("Join a game");
+  const nameLbl = f.search(/<span className="mp-label">\s*Your name/);
+
+  check("Host button exists", hostBtn !== -1);
+  check("Join button exists", joinBtn !== -1);
+  check("name field exists", nameLbl !== -1);
+  check("Host/Join come BEFORE the name field",
+    hostBtn !== -1 && nameLbl !== -1 && hostBtn < nameLbl,
+    `host@${hostBtn} name@${nameLbl}`);
+  check("panel leads with the host-or-join question",
+    f.includes("Hosting a game or joining one?"));
+  check("address field says to paste the whole line",
+    f.includes("paste the whole line here"));
+}
+
 let pass = 0, fail = 0;
 for (const r of results) {
   if (r.pass) { pass++; console.log(`PASS  ${r.name}${r.detail ? "  [" + r.detail + "]" : ""}`); }
   else { fail++; console.log(`FAIL  ${r.name}${r.detail ? "  [" + r.detail + "]" : ""}`); }
 }
+
 console.log(`\n${pass}/${pass + fail} checks passed`);
 if (fail) process.exit(1);

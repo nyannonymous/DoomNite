@@ -431,3 +431,15 @@
   .mp-modal { animation: none; }
   .mp-action:hover:not(:disabled) { transform: none; }
 }
+/* Leads the multiplayer panel with the actual question. The owner opened it,
+   saw a name field and no other box, and pasted a network address into it --
+   so the first thing rendered is now "hosting or joining?". */
+.mp-lead {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent, #b8342a);
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfc7d8;
+  font-size: 13px;
+  line-height: 1.45;
+}
