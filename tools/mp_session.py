@@ -172,12 +172,20 @@ def _check_addr(addr):
 
 
 def zandronum_exe():
-    """Zandronum's own exe, from NN's Settings.json, or None.
+    """Zandronum's own exe, preferring the bundled copy if present,
+    otherwise from NN's Settings.json, or None.
 
     NN records where it launches the engine from; that is the only place on
     this machine known to hold a working Zandronum, and reusing it means the
     multiplayer path and the single-player path run the same binary.
+    If a bundled Zandronum is present under runtime/zandronum/zandronum.exe,
+    it is used to allow friends to play without a separate Zandronum install.
     """
+    # 1. Check for bundled Zandronum under the pack.
+    bundled = os.path.join(PACK, "runtime", "zandronum", "zandronum.exe")
+    if os.path.isfile(bundled):
+        return bundled
+    # 2. Fallback to NN's configured Zandronum.
     nn_user = _nn.find_nn()
     if not nn_user:
         return None

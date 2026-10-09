@@ -24,6 +24,8 @@ const REQUIRED = [
   // missing because tools/ was assumed to be developer-only; it is not, it is
   // runtime code now.
   "tools",
+  // Bundle Zandronum so friends don't need to install it separately.
+  "runtime/zandronum",
 ];
 
 // Checked against the BUILD directory, not the pack root.
@@ -82,7 +84,12 @@ async function stagePack(context = {}) {
     const source = path.join(sourceRoot, relative);
     const target = path.join(destination, relative);
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.cpSync(source, target, { recursive: true });
+    // Per-user engine config (zandronum-<user>.ini) holds the builder's own
+    // IWAD paths and settings; a friend's copy must generate its own.
+    fs.cpSync(source, target, {
+      recursive: true,
+      filter: (src) => !/[\\/]runtime[\\/]zandronum[\\/][^\\/]+\.ini$/i.test(src),
+    });
   }
 
   console.log(`stage-pack: staged ${REQUIRED.length} items -> ${destination}`);

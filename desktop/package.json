@@ -1,7 +1,7 @@
 {
   "name": "doomnite-desktop",
   "productName": "DoomNite",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "description": "DoomNite desktop shell. Runs the pack's own Python server and shows the launcher in a real window.",
   "main": "main.js",
