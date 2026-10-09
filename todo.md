@@ -290,7 +290,7 @@ Facts: NN 0.6.5 is a **portable** build at `~\Desktop\NUKEMNET` — its config l
   - [x] (1) **DONE — the bucket is verified** (see above)
   - [ ] (1b) a bulk-fetch route so the 66 remaining files can download on demand
   - [x] (2) DONE 2026-10-09 (Zandronum only; NukemNet not bundled, multiplayer no longer needs it) bundle Zandronum + NukemNet (~310 MB) — owner chose to bundle, NOT bucket-serve. Note `runtime/` is gitignored and unstaged, so this needs a `.gitignore` + `stage-pack.js` decision, not just a copy
-  - [x] (3) DONE 2026-10-09 v2.3.0 rebuild the installer, publish a release
+  - [ ] (3) v2.3.0 BUILT 2026-10-09 (assets in Z:Tempel, notes.md there; code pushed to nyannonymous main as 2692e5a) but NOT PUBLISHED: active gh account Chimthuwu has pull-only on nyannonymous/DoomNite. Needs the owning account to run `gh release create v2.3.0`
   - [ ] (4) owner updates the Cloudflare links
   - [ ] (5) uninstall the local build so the real installer gets tested
   **Do NOT uninstall the owner's local build before a replacement release exists** — that leaves them with nothing to test.
