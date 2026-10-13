@@ -78,7 +78,32 @@ async function stagePack(context = {}) {
     );
   }
 
-  fs.rmSync(destination, { recursive: true, force: true });
+  // The multiplayer command shape is a SHIPPING requirement, verified the
+  // same way the single-player launchers are (build.py --check probes the real
+  // engine). This exact shape shipped broken twice: the base WAD as a bare
+  // name (the "Welcome to Zandronum!" folder dialog) and then also a second
+  // time as -file (base game loaded twice). check_mp_command.py stubs only the
+  // engine path and the IWAD resolution, so it runs on a machine with no pack
+  // content -- exactly the case this bootstrap handles (a friend unpacks, no
+  // WADs yet). A regression fails the build, not the user.
+  const { spawnSync } = require("node:child_process");
+  const py = process.env.DOOMNITE_PYTHON || "python";
+  const probe = spawnSync(
+    py,
+    [path.join(sourceRoot, "tools", "check_mp_command.py")],
+    { encoding: "utf8" }
+  );
+  const tail = (probe.stdout || "").trim().split("\n").slice(-6).join("\n");
+  if (probe.error || probe.status !== 0) {
+    throw new Error(
+      `stage-pack: the multiplayer command line failed its shape check` +
+        ` (exit ${probe.status ?? "spawn error"}).\n` +
+        (tail ? `--- tools/check_mp_command.py says --\n${tail}\n---\n` : "") +
+        `A shipped installer with a broken multiplayer command line opens` +
+        ` Zandronum's "point us to your Doom directory" dialog on launch.`
+    );
+  }
+  console.log(`stage-pack: multiplayer command shape OK`);
   fs.mkdirSync(destination, { recursive: true });
   for (const relative of REQUIRED) {
     const source = path.join(sourceRoot, relative);

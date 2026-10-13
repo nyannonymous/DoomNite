@@ -32,11 +32,13 @@
 //
 // Run: node verify-mp-button.mjs <bundle.js>
 // Requires: python serve.py already running on 127.0.0.1:8765.
+// DOOMNITE_BASE overrides that address, so this can run against a second
+// server on another port without disturbing the one already serving the pack.
 
 import { readFileSync } from "node:fs";
 import { JSDOM, VirtualConsole } from "jsdom";
 
-const BASE = "http://127.0.0.1:8765";
+const BASE = process.env.DOOMNITE_BASE || "http://127.0.0.1:8765";
 const jsPath = process.argv[2];
 if (!jsPath) {
   console.error("usage: node verify-mp-button.mjs <bundle.js>");
@@ -270,6 +272,21 @@ check("no unexpected runtime errors", errors.length === 0,
     !/mode === "join" && \(\s*<div className="mp-join"/.test(f) && !f.includes("mp-join"));
   check("the mode toggle state is gone entirely",
     !f.includes("const [mode, setMode]") && !f.includes("setMode("));
+
+  // The STATUS LINE reports whether a game can start, never whether NukemNet is
+  // installed. It used to require `nn.found && nn.linked`, so a fresh install --
+  // which does not ship NukemNet -- was the one machine that never saw
+  // "Multiplayer is set up", and the panel read as unconfigured on a machine
+  // where hosting worked. Asserted on the source because jsdom renders this
+  // server's payload, and this machine does have NukemNet.
+  check("the status line is driven by playability, not by NukemNet",
+    f.includes("ready.ready.can_play"),
+    "expected ready.ready.can_play in the panel");
+  check("the status line can explain WHY a game cannot start",
+    f.includes("ready.ready.why"));
+  check("nothing in the panel is gated on NukemNet being linked",
+    !f.includes("nn?.linked") && !f.includes("nn?.found"),
+    f.includes("nn?.linked") ? "nn?.linked still gates something" : "");
   check("there is exactly one address input",
     (f.match(/value=\{addr\}/g) || []).length === 1);
   check("panel leads with the host-or-join question",
@@ -285,4 +302,8 @@ for (const r of results) {
 }
 
 console.log(`\n${pass}/${pass + fail} checks passed`);
-if (fail) process.exit(1);
+// Exit EXPLICITLY, as verify.mjs does. Falling off the end left the process
+// alive indefinitely (a keep-alive socket from the forwarded fetch holds the
+// event loop open), so a fully PASSING run never returned and its exit status
+// -- the thing a caller reads -- was never reported.
+process.exit(fail ? 1 : 0);

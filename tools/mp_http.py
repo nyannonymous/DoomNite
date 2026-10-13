@@ -76,9 +76,16 @@ def _int(raw, key, default=None, required=False):
 def setup(handler, resolve):
     """POST /api/multiplayer/setup -- do everything the user should not have to.
 
-    Creates NN's junctions, refreshes its preset, and reports whether this
-    machine can host at all. Idempotent, so the UI can call it every time the
+    Runs the hidden prep (NN's junctions and preset, when NN is here at all),
+    then answers the question the panel actually needs: can this machine start
+    a game for this entry? Idempotent, so the UI can call it every time the
     button is pressed.
+
+    `ok` is that answer -- engine and IWAD present -- and NOT whether the
+    NukemNet step succeeded. NukemNet is not needed to host or join, so a
+    machine without it used to get `ok: false` and a log line calling a working
+    machine unconfigured; anything reading that field would fail closed on a
+    fresh install. `log` stays the prep step's own report, for diagnosis.
     """
     raw, err = _body(handler)
     if err:
@@ -88,8 +95,17 @@ def setup(handler, resolve):
         return err
     try:
         import mp_session
-        ok, lines = mp_session._ensure_ready()
-        return 200, {"ok": bool(ok), "ready": mp_session.describe(idx),
+        # Prep first, THEN describe: `ready.nn.linked` is read off the disk and
+        # is meant to report the state after this call, which is how it read
+        # before. can_play() does not depend on either step.
+        _prepared, lines = mp_session._ensure_ready()
+        ready = mp_session.describe(idx)
+        ok = bool(ready.get("can_play"))
+        return 200, {"ok": ok,
+                     "error": None if ok else (ready.get("why") or
+                                               "Multiplayer is not set up on "
+                                               "this machine."),
+                     "ready": ready,
                      "log": lines}
     except Exception as exc:
         return 500, {"error": str(exc)}
@@ -185,7 +201,7 @@ def _launch(handler, resolve, mode):
         # directory to the folder the engine's relative paths expect.
         subprocess.Popen(
             ["cmd", "/c", "start", "", "/D", os.path.dirname(argv[0])] + argv,
-            cwd=os.path.dirname(argv[0]),
+            cwd=os.path.dirname(argv[0]), env=mp_session.launch_env(),
             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
     except OSError as e:
         return 500, {"error": str(e)}

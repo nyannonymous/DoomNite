@@ -8,7 +8,9 @@
 import { JSDOM, VirtualConsole } from "jsdom";
 import { readFileSync } from "node:fs";
 
-const BASE = "http://127.0.0.1:8765";
+// DOOMNITE_BASE overrides the address, so this can run against a second server
+// on another port without disturbing the one already serving the pack.
+const BASE = process.env.DOOMNITE_BASE || "http://127.0.0.1:8765";
 const jsPath = process.argv[2] || "../dist/assets/index-B8X2JXlS.js";
 
 const errors = [];

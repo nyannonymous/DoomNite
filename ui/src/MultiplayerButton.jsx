@@ -9,8 +9,10 @@ import { Users } from "lucide-react";
    NukemNet exists, never opens it, and never runs a command.
 
    Pressing MULTIPLAYER:
-     1. calls /api/multiplayer/setup, which makes the junctions and refreshes
-        the NN preset server-side (idempotent, so this is safe every time);
+     1. calls /api/multiplayer/setup, which does the hidden prep server-side
+        (NukemNet's junctions and preset, when NN is on the machine at all --
+        it is optional and multiplayer does not need it) and reports whether a
+        game can actually be started (idempotent, safe every time);
      2. shows two buttons: HOST and JOIN.
 
    HOST starts Zandronum with -host and reports what to share.
@@ -126,11 +128,15 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
       if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
       setReady(d);
       setSetupLines(d.log || []);
-      // A refused setup still shows the panel -- the user needs to read WHY,
-      // not be bounced back to the grid.
+      // The panel is gated on the ENTRY resolving, never on this machine being
+      // able to play: a missing engine or a missing WAD is rendered as the
+      // status line's reason, with Host/Join still in front of the user. A
+      // refused setup shows the panel too -- the user needs to read WHY, not be
+      // bounced back to the grid.
       setPhase(d.ready && d.ready.ok ? "ready" : "error");
       if (!d.ready || !d.ready.ok) {
-        setErr(d.ready?.error || "Multiplayer is not set up on this machine.");
+        setErr(d.ready?.error || d.error ||
+               "Multiplayer is not set up on this machine.");
       }
     } catch (e) {
       setPhase("error");
@@ -253,12 +259,28 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       </select>
                     </label>
                   </div>
-                  {ready.ready && !ready.ready.zandronum && (
+                  {/* ONE status line, and it reports whether a game can start --
+                      never whether NukemNet is installed. The previous version
+                      needed `nn.found && nn.linked` to say "Multiplayer is set
+                      up", so the machines that most needed to hear it (a fresh
+                      install, which does not ship NukemNet) were the only ones
+                      that never saw it, and the panel looked unconfigured on a
+                      machine where nothing was wrong. NukemNet is not needed to
+                      host or join: the engine is started directly. */}
+                  {ready.ready && (!ready.ready.zandronum ? (
                     <p className="mp-warn">
                       Zandronum was not found on this machine, so a game cannot
                       be started yet.
                     </p>
-                  )}
+                  ) : ready.ready.can_play ? (
+                    <p className="mp-ok">
+                      Multiplayer is set up. Nothing else to configure.
+                    </p>
+                  ) : ready.ready.can_play === false ? (
+                    <p className="mp-warn">
+                      {ready.ready.why || "This game cannot be started yet."}
+                    </p>
+                  ) : null)}
                 </section>
               )}
 
@@ -339,12 +361,6 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     Everyone playing together should use a different one -- the
                     scoreboard and the connect log identify players by name.
                   </p>
-                  {ready.ready?.nn?.found && ready.ready?.nn?.linked && (
-                    <p className="mp-ok">
-                      Multiplayer is set up. Nothing else to configure.
-                    </p>
-                  )}
-
                   <label className="mp-check">
                     <input
                       type="checkbox"

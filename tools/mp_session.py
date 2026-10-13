@@ -59,6 +59,7 @@ sys.path.insert(0, HERE)
 
 import serve as _serve                     # noqa: E402  (entry list, resolve)
 import nn_preset as _nn                    # noqa: E402  (find NN, junctions)
+import iwadfinder as _iwad                 # noqa: E402  (resolve the IWAD to a file)
 
 # The port NN itself uses, so a game hosted here is reachable by anyone who
 # found the address the usual way. Overridable per session.
@@ -227,6 +228,82 @@ def iwad_for_entry(idx):
     return (entry or {}).get("iwad") or ""
 
 
+def iwad_path_for_entry(idx):
+    """Absolute path to the IWAD that entry needs, or "" if it cannot be found.
+
+    The engine is handed its IWAD by PATH. A bare basename only resolves if the
+    engine's own IWAD search list happens to name the folder holding the WAD,
+    and a freshly unzipped pack's does not: `runtime\\zandronum` holds the
+    engine and nothing else, while the WADs sit one level up in `iwads\\`.
+    Zandronum therefore opened its "Welcome to Zandronum! / point us to your
+    Doom directory" dialog on every multiplayer launch, and pointing it at the
+    right folder did not survive the next launch, because the launch handed it
+    the same unresolvable name again.
+
+    The pack's own single-player launchers already pass an absolute path
+    (`-iwad "%~dp0..\\iwads\\DOOM2.WAD"`); this is the multiplayer path doing
+    the same thing. Resolution goes through iwadfinder, so it honours both
+    config.json and the pack's own `iwads\\` folder, and it validates that the
+    file really is an IWAD rather than trusting the filename.
+    """
+    name = os.path.basename(iwad_for_entry(idx) or "")
+    if not name:
+        return ""
+    return _iwad.available(name) or ""
+
+
+def can_play(idx):
+    """(ok, why) -- can this machine actually start a game for this entry?
+
+    Deliberately silent about NukemNet. Multiplayer runs Zandronum directly and
+    does not need NN for anything, so a machine without NN is a normal, working
+    machine -- reporting it as "not set up" was what made the panel look broken
+    on a fresh install. What a launch actually needs is the engine and the
+    entry's own IWAD, so those are the only two things asked here.
+
+    Never raises: this is the readiness answer the panel renders, and an entry
+    that cannot be played online (a standalone game, or one whose files are not
+    on disk) has to come back as a readable reason rather than an exception. It
+    used to raise ValueError out of describe(), which the setup route turned
+    into a 500 -- and a 500 is what hides the Host/Join buttons entirely.
+    """
+    try:
+        files = files_for_entry(idx)
+    except ValueError as e:
+        return False, str(e)
+    if not files:
+        return False, "that entry loads no files"
+    name = os.path.basename(iwad_for_entry(idx) or "")
+    if not name:
+        return False, "that entry has no IWAD, so Zandronum cannot start it"
+    try:
+        if not zandronum_exe():
+            return False, ("Zandronum was not found on this machine, so a "
+                           "game cannot be started yet.")
+    except Exception:
+        return False, ("Zandronum could not be located on this machine, so a "
+                       "game cannot be started yet.")
+    if not iwad_path_for_entry(idx):
+        return False, (name + " was not found, so Zandronum cannot start. Put "
+                       "it in the pack's iwads folder, or point the launcher "
+                       "at your Doom install.")
+    return True, ""
+
+
+def launch_env():
+    """os.environ plus DOOMWADDIR pointing at the pack's IWADs.
+
+    Belt and braces beside the absolute -iwad path above. `$DOOMWADDIR` is one
+    of the engine's OWN default IWAD search directories, so this teaches the
+    engine where the pack keeps its WADs rather than depending on the argument
+    alone -- which matters on a first run with no config yet, and for any file
+    the engine is handed by name rather than by path.
+    """
+    env = dict(os.environ)
+    env["DOOMWADDIR"] = os.path.join(PACK, "iwads")
+    return env
+
+
 def base_argv(idx, hostname="NukemNet"):
     """zandronum + -iwad + every -file, i.e. everything except host/join.
 
@@ -244,9 +321,36 @@ def base_argv(idx, hostname="NukemNet"):
         raise ValueError("that entry loads no files")
     argv = [exe]
     iwad = iwad_for_entry(idx)
+    base_wad = ""
     if iwad:
-        argv += ["-iwad", os.path.basename(iwad)]
+        base_wad = iwad_path_for_entry(idx)
+        if not base_wad:
+            # Refuse rather than launch. Handing the engine a name it cannot
+            # resolve is what opened its "point us to your Doom directory"
+            # dialog, and the user cannot tell that dialog apart from a crash.
+            raise ValueError(
+                os.path.basename(iwad) + " was not found, so Zandronum cannot "
+                "start. Put it in the pack's iwads folder, or point the "
+                "launcher at your Doom install, then try again.")
+        argv += ["-iwad", base_wad]
+    # The base game is passed ONCE.
+    #
+    # files_for_entry() reads the pack's own launcher .bat, and that file names
+    # its IWAD too (`-iwad "%~dp0..\iwads\DOOM2.WAD"`), so the WAD came out of
+    # this list as well and went back onto the command line as `-file`. The
+    # engine then loaded the base game twice: the same 11-20 MB of lumps once as
+    # the game and again as a mod stacked on top of itself. The pack's own
+    # single-player launchers never do that, and neither does NN. Every OTHER
+    # file keeps its exact position -- the order is the entry's own and is
+    # load-bearing (BDBE must precede its episode wad, Aliens TC its mapset).
+    #
+    # normcase+abspath because the same file reaches this function by two
+    # different spellings: the .bat's `%~dp0..` expansion is not guaranteed to
+    # match the config/case iwadfinder resolves to.
+    skip = os.path.normcase(os.path.abspath(base_wad)) if base_wad else ""
     for f in files:
+        if skip and os.path.normcase(os.path.abspath(f)) == skip:
+            continue
         argv += ["-file", f]
     argv += ["+name", hostname]
     return argv
@@ -600,25 +704,40 @@ def _resolve_index(arg):
 
 
 def describe(idx, port=DEFAULT_PORT):
-    """Everything the UI needs to show a Host/Join panel for one entry."""
+    """Everything the UI needs to show a Host/Join panel for one entry.
+
+    `can_play`/`why` answer whether a game can actually be started, and they are
+    what the panel renders. `nn` is kept only as diagnostics: NukemNet is not
+    needed for multiplayer any more, so nothing here may be gated on it.
+    """
     _ensure_loaded()
     entry = _serve.resolve(idx)
     if entry is None:
         return {"ok": False, "error": "no such entry"}
+    playable, why = can_play(idx)
     info = {
         "ok": True,
         "index": idx,
         "label": entry.get("label", ""),
         "iwad": iwad_for_entry(idx),
         "port": port,
+        "can_play": playable,
+        "why": why,
         "nn": {
             "found": bool(_nn.find_nn()),
             "linked": None,
         },
         "local_ips": local_addresses(),
-        "files": [_nn.mask(f) for f in files_for_entry(idx)]
-        if entry.get("kind") == "pack" else [],
+        "files": [],
     }
+    # A standalone game has no file list at all, and a pack entry whose launcher
+    # cannot be read has none either. Neither is an error the panel should die
+    # on -- can_play() has already said why -- so the list is best-effort.
+    if entry.get("kind") == "pack":
+        try:
+            info["files"] = [_nn.mask(f) for f in files_for_entry(idx)]
+        except ValueError:
+            pass
     zdir = None
     nn_user = _nn.find_nn()
     if nn_user:
@@ -670,10 +789,17 @@ def _ensure_ready(write_preset=True):
     lines = []
     nn_user = _nn.find_nn()
     if not nn_user:
-        return False, ["NukemNet was not found on this machine."]
+        # NOT a failure of multiplayer, and worded so it cannot be misread as
+        # one: NN is not needed to host or join, it is only where an old
+        # install put a second copy of the engine. The word "NukemNet" here is
+        # for the CLI report; the panel shows this log only when it is broken.
+        return True, ["NukemNet is not installed. Multiplayer does not need "
+                      "it: the engine is started directly, so there is "
+                      "nothing to set up here."]
     zdir = _nn.nn_zandronum_dir(nn_user)
     if not zdir:
-        return False, ["NukemNet has no Zandronum path set."]
+        return True, ["NukemNet has no Zandronum path set, which is fine -- "
+                      "multiplayer does not use it. Nothing to set up here."]
     try:
         r = subprocess.run(
             [sys.executable, os.path.join(HERE, "nn_preset.py"), "--link", "--write"],
@@ -761,7 +887,7 @@ def main():
     # start /D so the engine's cwd is the folder its relative paths expect,
     # detached so closing DoomNite does not kill a hosted game.
     subprocess.Popen(["cmd", "/c", "start", "", "/D", os.path.dirname(argv[0])] + argv,
-                     cwd=os.path.dirname(argv[0]),
+                     cwd=os.path.dirname(argv[0]), env=launch_env(),
                      creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
     return 0
 

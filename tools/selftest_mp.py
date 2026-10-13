@@ -28,6 +28,8 @@ a request reaches a command line: it must accept exactly `a.b.c.d:port` and
 refuse everything else, including a hostname (which would need a DNS lookup and
 is not what NN hands out) and anything with shell metacharacters.
 """
+import io
+import json
 import os
 import sys
 
@@ -111,11 +113,63 @@ if standalone:
 
 # ------------------------------------------------------------ arg building
 idx, entry = playable[0]
-host = M.host_argv(idx, 23513)
-join = M.join_argv(idx, "1.2.3.4:23513")
+try:
+    host = M.host_argv(idx, 23513)
+    join = M.join_argv(idx, "1.2.3.4:23513")
+except ValueError as e:
+    # mp_session refuses to build a command when the entry's IWAD cannot be
+    # found (see the refusal check below). A pack without iwads is already
+    # reported by the "every file exists on disk" check; degrade to the empty
+    # list so the checks below FAIL with a reason instead of crashing the run.
+    host, join = [""], [""]
+    check("host/join argv can be built (the entry's IWAD is present)",
+          False, str(e))
 check("host command starts with zandronum.exe",
       os.path.basename(host[0]).lower() in ("zandronum.exe", "gzdoom.exe"),
       os.path.basename(host[0]))
+# The IWAD must reach the engine as a PATH. It was passed as a bare basename
+# ("DOOM2.WAD"), which only resolves when the engine's own IWAD search list
+# already names the folder holding it -- and a freshly unzipped pack's does
+# not, so every multiplayer launch opened Zandronum's "Welcome to Zandronum! /
+# point us to your Doom directory" dialog even after the user pointed it at the
+# right folder by hand.
+iwad_args = [host[i + 1] for i, a in enumerate(host) if a == "-iwad"]
+check("the engine is handed exactly one -iwad", len(iwad_args) == 1,
+      str(len(iwad_args)))
+check("the IWAD is passed as an absolute path, not a bare name",
+      bool(iwad_args) and os.path.isabs(iwad_args[0]),
+      iwad_args[0] if iwad_args else "(none)")
+check("the IWAD path exists and is the entry's own",
+      bool(iwad_args) and os.path.isfile(iwad_args[0])
+      and os.path.basename(iwad_args[0]).upper() == (entry.get("iwad") or "").upper(),
+      iwad_args[0] if iwad_args else "(none)")
+check("iwad_path_for_entry agrees with the command line",
+      bool(iwad_args) and M.iwad_path_for_entry(idx) == iwad_args[0],
+      M.iwad_path_for_entry(idx) or "(unresolved)")
+check("DOOMWADDIR points at the pack's iwads",
+      os.path.normcase(M.launch_env().get("DOOMWADDIR") or "")
+      == os.path.normcase(os.path.join(PACK, "iwads")),
+      M.launch_env().get("DOOMWADDIR") or "(unset)")
+check("launch_env keeps the rest of the environment",
+      "PATH" in M.launch_env() or "Path" in M.launch_env())
+
+# A pack that is missing the IWAD must be REFUSED with a readable reason. The
+# bug this replaces was silent: the engine was handed a name it could not
+# resolve, opened its own folder picker, and the user had no way to tell that
+# dialog apart from the launcher being broken.
+_orig_available = M._iwad.available
+try:
+    M._iwad.available = lambda name: None
+    try:
+        M.host_argv(idx, 23513)
+        check("a missing IWAD refuses to build a launch command", False,
+              "built a command anyway")
+    except ValueError as e:
+        check("a missing IWAD refuses to build a launch command", True,
+              str(e)[:60])
+finally:
+    M._iwad.available = _orig_available
+
 check("host command carries -host 64", "-host" in host and "64" in host)
 check("host command carries the port", "23513" in host)
 check("host command sets sv_hostname", "+sv_hostname" in host)
@@ -128,25 +182,136 @@ files = M.files_for_entry(idx)
 check("the entry yields files", len(files) > 0, f"{len(files)}")
 check("every file exists on disk", all(os.path.isfile(f) for f in files))
 hosted = [host[i + 1] for i, a in enumerate(host) if a == "-file"]
-check("host argv passes every file with -file",
-      hosted == files, f"{len(hosted)} vs {len(files)}")
-if len(files) >= 2:
+# The base game is passed ONCE, as -iwad.
+#
+# files_for_entry() reads the pack's launcher .bat, and that file names its IWAD
+# too, so the WAD used to come back out of this list and go onto the command
+# line a second time as `-file`: the engine then loaded the base game twice,
+# once as the game and once as a mod stacked on itself. Every other file keeps
+# the entry's own order, which is load-bearing.
+mods_only = [f for f in files
+             if os.path.normcase(os.path.abspath(f))
+             != os.path.normcase(os.path.abspath(iwad_args[0]))] \
+    if iwad_args else list(files)
+check("host argv passes every file with -file, minus the base WAD",
+      hosted == mods_only, f"{len(hosted)} vs {len(mods_only)}")
+check("the base WAD is not also passed as -file (it would load twice)",
+      len(hosted) == len(files) - 1 if iwad_args else len(hosted) == len(files),
+      f"{len(hosted)} -file vs {len(files)} entry files")
+check("the base WAD appears exactly once in the whole command line",
+      sum(1 for a in host
+          if iwad_args and os.path.normcase(os.path.abspath(a))
+          == os.path.normcase(os.path.abspath(iwad_args[0]))) == 1,
+      str(host.count(iwad_args[0]) if iwad_args else 0))
+if len(mods_only) >= 2:
     check("load order matches the entry's launcher order",
-          hosted[:len(files)] == files,
-          " -> ".join(os.path.basename(f) for f in files[:3]))
+          hosted[:len(mods_only)] == mods_only,
+          " -> ".join(os.path.basename(f) for f in mods_only[:3]))
 
 # Hexen Remade needs the Hexen IWAD, which exists only in the pack.
 hexen = [i for i, e in enumerate(serve.ENTRIES)
          if e.get("iwad") == "Hexen.wad"]
 if hexen:
-    h = M.host_argv(hexen[0], 23513)
-    check("a Hexen entry carries the Hexen IWAD", "Hexen.wad" in h)
+    try:
+        h = M.host_argv(hexen[0], 23513)
+        check("a Hexen entry carries the Hexen IWAD",
+              any(os.path.basename(x).upper() == "HEXEN.WAD" for x in h),
+              ", ".join(os.path.basename(x) for x in h[:6]))
+    except ValueError as e:
+        check("a Hexen entry carries the Hexen IWAD", False, str(e)[:60])
 else:
     check("a Hexen entry carries the Hexen IWAD", True, "no Hexen entry to test")
 
 # A custom hostname reaches the command line, length-capped.
 named = M.host_argv(idx, 23513, hostname="Bob's Server")
 check("a custom hostname reaches the command line", "Bob's Server" in named)
+
+# ------------------------------------------------- readiness without NukemNet
+# NukemNet is not needed to host or join -- the engine is started directly -- so
+# nothing that answers "can this machine play?" may depend on it. The setup
+# route used to report `ok: false` and log "NukemNet was not found on this
+# machine" on a perfectly working machine that simply does not have NN
+# installed, which is every fresh install of the shipped pack.
+_ok_play, _why_play = M.can_play(idx)
+check("a real entry reports itself playable", _ok_play is True, _why_play or "ok")
+check("describe() carries the playability verdict",
+      M.describe(idx).get("can_play") is True,
+      str(M.describe(idx).get("why")))
+
+# describe() must not raise for an entry that cannot be played online. It used
+# to raise ValueError out of files_for_entry() for a standalone game, which
+# mp_http.setup turned into a 500 -- and a 500 is what hides the panel.
+if standalone:
+    i = standalone[0]
+    try:
+        info = M.describe(i)
+        check("describe() survives a standalone entry instead of raising",
+              info.get("ok") is True and info.get("can_play") is False,
+              str(info.get("why"))[:70])
+    except Exception as e:
+        check("describe() survives a standalone entry instead of raising",
+              False, f"{type(e).__name__}: {e}")
+
+# The HTTP payload, through the real handler: the same class of request the
+# panel makes, with no socket and no game launched.
+class _FakeHandler:
+    """Just enough of BaseHTTPRequestHandler for mp_http._body()."""
+
+    def __init__(self, body):
+        raw = json.dumps(body).encode("utf-8")
+        self.headers = {"Content-Length": str(len(raw))}
+        self.rfile = io.BytesIO(raw)
+
+
+# Every setup() call below runs with NukemNet reported ABSENT, on purpose, and
+# that is also what keeps this file side-effect free: _ensure_ready() returns
+# before it runs nn_preset, so nothing writes a junction or a preset. With NN
+# present it shells out to nn_preset.py, which is a real write and is pinned by
+# tools/selftest_nn_preset.py instead. The no-NukemNet machine is also the case
+# this whole section exists for.
+_orig_find_nn = M._nn.find_nn
+try:
+    M._nn.find_nn = lambda: None
+    status, body = H.setup(_FakeHandler({"index": idx}), serve.resolve)
+    log = " ".join(body.get("log") or [])
+
+    check("a machine with no NukemNet is reported as ok",
+          status == 200 and body.get("ok") is True,
+          f"{status} ok={body.get('ok')} err={body.get('error')}")
+    check("a machine with no NukemNet still reports can_play",
+          (body.get("ready") or {}).get("can_play") is True,
+          str((body.get("ready") or {}).get("why")))
+    check("a machine with no NukemNet reports no error",
+          body.get("error") is None, str(body.get("error")))
+    check("setup still describes the entry for the panel",
+          (body.get("ready") or {}).get("label") == entry.get("label"))
+    check("the no-NukemNet log explains itself instead of complaining",
+          "not installed" in log and "does not need" in log,
+          log[:90] or "(empty log)")
+    check("the no-NukemNet log never calls a working machine unconfigured",
+          "was not found" not in log, log[:90])
+    check("the NukemNet step reports success when there is nothing to do",
+          M._ensure_ready()[0] is True, str(M._ensure_ready()[1])[:70])
+
+    # A machine that genuinely cannot play says so, in the payload and in words,
+    # and still describes the entry so the panel can render with the reason.
+    M._iwad.available = lambda name: None
+    try:
+        status, body = H.setup(_FakeHandler({"index": idx}), serve.resolve)
+        check("an unplayable machine is reported as not ok",
+              status == 200 and body.get("ok") is False,
+              f"{status} ok={body.get('ok')}")
+        check("and it explains why in a sentence for a human",
+              "was not found" in str(body.get("error")),
+              str(body.get("error"))[:80])
+        check("it still describes the entry, so the panel can render",
+              (body.get("ready") or {}).get("label") == entry.get("label"))
+        check("an unplayable machine says so in describe() too",
+              M.describe(idx).get("can_play") is False)
+    finally:
+        M._iwad.available = _orig_available
+finally:
+    M._nn.find_nn = _orig_find_nn
 
 # ---------------------------------------------------------- the HTTP layer
 # Request contract, without a socket: _int rejects bools and strings, which is
@@ -272,12 +437,21 @@ for junk in ("1.2.3.4:23513 !!", "1.2.3.4:23513 ABCD2345 extra",
 # EVERY real fingerprint must survive the address parser. This is the check
 # that would have caught the digit rule rejecting VWEAPGMG: it is a property of
 # the CODES, not of the one code the test happened to pick.
+#
+# fingerprint() is None for an entry whose files are not all on disk -- this
+# pack is not always complete -- and a None carries no code to round-trip.
+# Concatenating one crashed this file with a TypeError before any of the checks
+# below had run, so the codes that DO exist are what gets tested, and the count
+# of uncoded entries is reported rather than silently shrinking the sample.
 all_codes = [M.fingerprint(i) for i, _e in playable]
-unparseable = [c for c in all_codes
+codes = [c for c in all_codes if c]
+unparseable = [c for c in codes
                if M.split_addr_and_fp("1.2.3.4:23513 " + c)[2] != c]
 check("every real fingerprint round-trips through the address parser",
-      not unparseable,
-      f"{len(unparseable)} of {len(all_codes)} failed: {unparseable[:3]}")
+      bool(codes) and not unparseable,
+      f"{len(unparseable)} of {len(codes)} failed: {unparseable[:3]}"
+      + (f"  ({len(all_codes) - len(codes)} entries have no code: files missing)"
+         if len(codes) != len(all_codes) else ""))
 
 # describe() publishes it, because the UI reads it from there.
 d = M.describe(idx)
