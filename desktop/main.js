@@ -218,12 +218,21 @@ function resolvePackRoot() {
   return { root: path.join(app.getPath("userData"), "pack"), managed: true };
 }
 
-// Copy <src> over <dest>, skipping files whose size already matches.
+// Copy <src> over <dest>, skipping files that are already byte-identical.
 //
-// Size rather than a hash: the seed is a few hundred KB of text plus 15 MB of
-// art, and the only reason to overwrite anything is that a newer build shipped
-// a newer copy -- a rebuilt UI, a regenerated manifest. A size-identical file
-// is the same file.
+// Size is only the cheap reject. It used to be the WHOLE test, with the
+// reasoning "a size-identical file is the same file" -- and that is false for
+// the one file that matters most. Vite names the bundle index-<8 chars>.js, so
+// app/index.html is 442 bytes no matter which bundle it points at: every UI
+// rebuild produced a same-size, different-content index.html, the size check
+// skipped it forever, and a managed pack stayed pinned to whatever bundle it
+// was first seeded with while the new bundles piled up beside it unreferenced.
+// The multiplayer fix shipped in 2.3.1 is what found this -- the backend half
+// copied (different sizes) and the UI half did not.
+//
+// So: sizes differ -> copy; sizes match -> compare the bytes. The seed is a few
+// hundred KB of text plus ~15 MB of art, which is a few tens of ms of reading
+// once per launch, against the cost of silently serving a stale UI forever.
 function copyTree(src, dest, onFile) {
   fs.mkdirSync(dest, { recursive: true });
   let copied = 0;
@@ -236,7 +245,11 @@ function copyTree(src, dest, onFile) {
     }
     let same = false;
     try {
+      // Size first: a mismatch is decided without reading either file, which
+      // is every file the build actually changed.
       same = fs.statSync(d).size === fs.statSync(s).size;
+      // Same size is not the same file. Settle it on the bytes.
+      if (same) same = fs.readFileSync(d).equals(fs.readFileSync(s));
     } catch {
       /* not there yet */
     }

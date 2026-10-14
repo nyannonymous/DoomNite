@@ -472,9 +472,30 @@ def _guess_virtual(ip):
     These are RFC 1918 addresses that no real router hands out on a home
     network: VirtualBox's default host-only segment, VMware's, and Docker's.
     Offering one as "share this to play" wastes the user's time.
+
+    172.16.0.0/12 is the whole of it, not just Docker's 172.17/172.18. WSL2 and
+    Hyper-V carve their host-only segments out of the same /12, and the octet
+    moves between machines -- the owner's was 172.20.96.1, which this function
+    used to call a real LAN. shareable_addresses() then ranked it "lan", i.e.
+    SECOND, above the Tailscale address that is the one thing that actually
+    reaches a remote friend, and a mate spent an evening on an address that
+    could never have worked: a vEthernet (WSL) segment exists inside one PC.
+
+    Home routers essentially never use 172.16-31 (they use 192.168.x, sometimes
+    10.x), so claiming the /12 costs nothing real -- and the one case it could
+    get wrong, a genuine 172.x network, is handled by the caller, which never
+    calls the default-route address virtual whatever range it sits in.
     """
-    return ip in ("192.168.56.1",) or ip.startswith("172.17.") or \
-        ip.startswith("172.18.") or ip.startswith("192.168.99.")
+    if ip in ("192.168.56.1",) or ip.startswith("192.168.99."):
+        return True
+    parts = ip.split(".")
+    if len(parts) < 2 or parts[0] != "172":
+        return False
+    try:
+        second = int(parts[1])
+    except ValueError:
+        return False
+    return 16 <= second <= 31
 
 
 def shareable_addresses():
@@ -485,9 +506,14 @@ def shareable_addresses():
     "virtual" should not be offered at all.
     """
     out = []
-    for ip in local_addresses():
+    # local_addresses() puts the default-route address first: the one the OS
+    # itself would use to reach the internet. Whatever range it sits in, that
+    # is by definition a real network, so it is never demoted to "virtual".
+    addrs = local_addresses()
+    primary = addrs[0] if addrs else None
+    for ip in addrs:
         kind = _classify_ip(ip)
-        if _guess_virtual(ip):
+        if _guess_virtual(ip) and ip != primary:
             out.append((ip, "virtual"))
         elif kind != "private":
             out.append((ip, kind))       # cgnat-tailscale, public, link-local

@@ -529,6 +529,23 @@ check("a real LAN address is not called virtual",
       not M._guess_virtual("192.168.0.226"))
 check("Docker's ranges are recognised as virtual",
       M._guess_virtual("172.17.0.1") and M._guess_virtual("172.18.0.1"))
+# The WSL case, which cost a real evening: 172.20.96.1 is vEthernet (WSL), an
+# adapter that exists only inside one PC, and it used to be classified "lan"
+# and ranked SECOND -- above the Tailscale address that is the only one that
+# reaches a friend who is not in the house. A mate sat on "CONNECTING TO" until
+# it was found. The whole /12 is claimed, so the octet moving between machines
+# cannot reintroduce it.
+check("WSL's vEthernet segment is virtual, not a LAN",
+      M._guess_virtual("172.20.96.1"), "the address that caused the outage")
+check("the whole of 172.16.0.0/12 is virtual",
+      all(M._guess_virtual(f"172.{n}.0.1") for n in range(16, 32)))
+check("the /12 stops where it should",
+      not M._guess_virtual("172.15.0.1") and not M._guess_virtual("172.32.0.1"))
+check("Tailscale outranks every virtual adapter",
+      [k for _, k in M.shareable_addresses()].index("cgnat-tailscale")
+      < min([i for i, (_, k) in enumerate(M.shareable_addresses())
+             if k == "virtual"] or [99]),
+      "a remote friend's only working address must beat a dead one")
 
 # Ordering: a usable private address must come FIRST, because that is the one
 # most likely to work and the UI shows them in this order.
