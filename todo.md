@@ -2,6 +2,34 @@
 
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
+## STATUS — end of 2026-10-15 session
+
+**Shipped:** **v2.3.1 is published and live.** The multiplayer IWAD fix (`e2b6919`) had been committed but never released, so doomnite.pages.dev was still serving 2.3.0 installers built five days *before* it — every fresh download still hit Zandronum's "point us to your Doom directory" dialog. 2.3.1 closes that: release is Latest with both assets, both download URLs return 200 with byte counts matching the local builds, and the site auto-deployed from the push.
+
+**The headline finding: the mate's failure to connect was never the launcher.** Three independent causes, in the order they bit:
+1. **Ten Windows Firewall BLOCK rules on `zandronum.exe`**, one on the live binary. **Block beats Allow**, so adding a port rule did nothing until they were deleted. They accumulate from clicking Cancel on the "allow this app?" popup. Now cleared. The old note in this file claiming "firewall allows it" was wrong — it was only ever tested on loopback, which never touches the firewall.
+2. **The panel handed out an unroutable address** — `172.20.96.1` is `vEthernet (WSL)`, ranked *second*, above the only address that works remotely. Fixed.
+3. **A LAN address cannot reach a remote friend at all.** He is on the internet, not the house Wi-Fi.
+
+**Open decisions for whoever picks this up:**
+- [ ] **3 commits are unpushed** (`a59eb21`, `69c2c97`, `99c31df`) — the owner never said push. Working tree is clean.
+- [ ] **2.3.2 is not built.** The `copyTree` fix below only reaches a real install through a build; until then every managed pack stays pinned to its 8 Oct UI.
+- [ ] **Public IP is not listed in the panel** and the owner asked why. Answer: `local_addresses()` only enumerates local adapters, and a NATed PC cannot know its WAN address — it needs STUN or an HTTPS lookup. Designed but NOT built, because listing `159.196.152.92:23513` with nothing forwarded would just be a fourth dead address. Honest version = discover + verify reachability + label "needs UDP 23513 forwarded".
+- [ ] **The NN research item (below) gates all of the above networking work.** Do not build UPnP, bundle a VPN, or redesign the share flow before it is answered.
+
+**Fixed and committed today, beyond the release:**
+- `copyTree()` skipped any same-size file on the reasoning "a size-identical file is the same file". `app/index.html` is 442 bytes whichever `index-<8 chars>.js` it points at, so **every UI rebuild since 8 Oct was silently skipped** and the owner's install has eight stale bundles beside an index.html pointing at an old one. Size is now only the cheap reject; bytes settle a tie.
+- `_guess_virtual()` now claims all of `172.16.0.0/12` (WSL and Hyper-V move the octet; it only knew Docker's 172.17/18), and the default-route address is never demoted, so a genuine 172.x LAN is still safe. `selftest_mp.py` **129/129**, four new tests pin it.
+- `artifactName` moved into `desktop/package.json`, so builds emit `DoomNite - Windows Setup v<ver>.exe` directly instead of being renamed at upload.
+- `.gitignore` gained `*.grp` — `duke3d.grp` is 44 MB of copyrighted game data that was one `git add -A` from being committed.
+
+**Traps for the next agent:**
+- **`Get-NetFirewallRule` returns nothing in the sandboxed shell** — it reported 0 rules on a machine with 792 and produced a confident false negative that sent this session down the wrong path. Use `netsh advfirewall firewall show rule name=all dir=in verbose`.
+- **Publish the release BEFORE pointing the site at it.** Doing it the other way round put dead 404 download links on the live page for a few minutes.
+- The `gh` account `Chimthuwu` is **pull-only** on `nyannonymous/DoomNite`; releases need the `nyannonymous` account (`gh auth switch -u nyannonymous`). The `origin` remote (`Chimthuwu/DoomNite`) no longer exists at all.
+- Managed packs live in `%APPDATA%\DoomNite\pack` (3.5 GB here), **outside** the install dir, so installing over the top never re-downloads. Both the installer and the portable zip are "managed"; only a hand-copied pack or `DOOMNITE_PACK` is not — and for those `seedPack` is deliberately skipped, so installing over the top will NOT update their pack code.
+
+
 - [x] Commit the working tree (already committed in the WIP snapshot; tree was clean): 13 modified + 3 untracked files (card layout, REMOVE FROM PACK, zoom); verified build, `verify.mjs` 21/21, `check-zoom` 12/12 (section 0)
 - [x] Finish `ui/src/Panel.jsx`: already has Typed readout, TermRow, BootBar, DataStreams, .play-glow button; npm run build clean (nitesesh 2026-10-06; visual check is the owner's, verify.mjs needs the server running)
 - [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4) — verified fixed 2026-10-06 (68/68 entries kept, `base_url` intact)
