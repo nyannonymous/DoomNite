@@ -47,3 +47,6 @@ desktop/build/python/
 desktop/build/python-embed.zip
 desktop/build/pack/
 .bucketcheck/
+
+# Duke3D game data (copyrighted, 44 MB) - never commit
+*.grp

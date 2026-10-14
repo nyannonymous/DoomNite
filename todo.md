@@ -9,7 +9,48 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3): **step 1 built 2026-10-07** — `tools/add_mod.py` reads a candidate file and derives the IWAD from its map lumps, flags an IWAD-instead-of-a-mod, and detects a duplicate the pack already has (28 checks). **PARKED by the owner 2026-10-08** — a previous worker read "RECOMMENDED" in this line as licence to build the UI surface unprompted, and shipped an Add-mod button and a file-upload endpoint that the owner rejected. The UI surface and the copy+manifest step are NOT wanted. Do not build them without asking. `serve.py` had no `/api/addmod` route in git and the upload handler is reverted; verify with `git log -- serve.py` before touching anything here.
-- [x] **(obsolete 2026-10-08, superseded below)** writing NN's `LaunchDefaults.json` by hand — the multiplayer panel now does this itself on open, so there is no command for the owner to remember
+- [ ] **Duke3D / eduke32 (separate from DukeBoomem — a different game, not a DOOM mod)**: install base eduke32 via https://wiki.eduke32.com/wiki/Main_Page, then bring in the ModDB addons. Installer URL: https://wiki.eduke32.com/wiki/Main_Page
+
+**Install** (eduke32 + base): `https://wiki.eduke32.com/wiki/Main_Page`.
+
+**Mod list** (full catalogue, listed in the launcher but NOT auto-fetched on first open — card/img gets opacity down so it reads "installable", not "in pack"). Full list:
+
+  - https://www.moddb.com/mods/imagination-world-tc
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-nuclear-winter
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-caribbean-lifes-a-beach
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-it-out-in-d-c
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-xtreme1
+  - https://www.moddb.com/mods/duke-nukum-v
+  - https://www.moddb.com/mods/duke-nukem-3d-savior-of-babes
+  - https://www.moddb.com/mods/voxel-duke-nukem-3d
+  - https://www.moddb.com/mods/duke-nukem-3d-legacy-edition
+  - https://www.moddb.com/mods/duke-nukem-forever
+  - https://www.moddb.com/mods/freerunner
+  - https://www.moddb.com/mods/duke-plus
+  - https://www.moddb.com/mods/enhanced-resource-pack-for-duke-nukem-3d
+  - https://www.moddb.com/mods/duke-nukem-advance-tc
+  - https://www.moddb.com/mods/duke-in-los-angeles
+  - https://www.moddb.com/mods/kickass-duke
+  - https://www.moddb.com/mods/nuclear-showdown-redux
+  - https://www.moddb.com/mods/duke-nukem-eternity
+  - https://www.moddb.com/mods/duke-nukem-weapon-of-mass-destruction
+  - https://www.moddb.com/mods/ultima-tc
+  - https://www.moddb.com/mods/platoon-tc
+  - https://www.moddb.com/mods/dn64
+  - https://www.moddb.com/mods/dntm
+  - https://www.moddb.com/mods/god-of-war
+  - https://www.moddb.com/mods/decay2
+  - https://www.moddb.com/mods/kickass-duke
+  - https://www.moddb.com/mods/duke-nukem-3d-legacy-edition/images/the-sonic-resonator2
+  - https://www.moddb.com/mods/kickass-duke
+
+**Initial fetch subset** (`Doomnite` grabs these when first opened): only these three, the rest stay de-emphasized:
+
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-caribbean-lifes-a-beach
+  - https://www.moddb.com/games/duke-nukem-3d/addons/duke-it-out-in-d-c
+  - https://www.moddb.com/mods/voxel-duke-nukem-3d
+
+**Open to investigate**: can `voxel-duke-nukem-3d` AND `duke-caribbean-lives-a-beach` & `duke-it-out-in-d-c` run together? (engine/load-order / mod-compat question, not a launcher issue)
 - [x] `browser`-source mods: the folder watch is built — the server says where a missing file belongs and the UI flips the card the moment it appears, with no reload (`selftest_watch.py` 17 checks, `ui/verify-watch.mjs` 11 checks) (section 6)
 - [x] (writes outside the repo, into %LOCALAPPDATA%\Zandronum; **done 2026-10-07**) Multiplayer: give NN's folder the mod files via a junction (decided 2026-10-06; section 6) — the pre-existing `mods` link was verified and left alone; two additive links (`doomnite-mods`, `doomnite-iwads`) were added, taking NN from 20/32 to 32/32 files visible
 - [x] Fix `tools/qa_mp_probe.py`'s settle window: it now scales to the bytes an entry actually loads instead of a flat 14 s, which was the false negative on big PK3s; `tools/selftest_settle.py` 27/27, and 25/27 real entries now wait longer than the old window (section 6)
@@ -305,7 +346,7 @@ Facts: NN 0.6.5 is a **portable** build at `~\Desktop\NUKEMNET` — its config l
   - [ ] (1b) a bulk-fetch route so the 66 remaining files can download on demand
   - [x] (2) DONE 2026-10-09 (Zandronum only; NukemNet not bundled, multiplayer no longer needs it) bundle Zandronum + NukemNet (~310 MB) — owner chose to bundle, NOT bucket-serve. Note `runtime/` is gitignored and unstaged, so this needs a `.gitignore` + `stage-pack.js` decision, not just a copy
   - [x] (3) DONE 2026-10-09: v2.3.0 published (Latest) at https://github.com/nyannonymous/DoomNite/releases/tag/v2.3.0; assets `DoomNite.-.Windows.Setup.v2.3.0.exe` + `...Portable.v2.3.0.zip`, download link returns 200
-  - [ ] (4) owner updates the Cloudflare links
+  - [x] (4) DONE 2026-10-14: **v2.3.1 published and the site points at it.** The download page served 2.3.0 installers built 2026-10-09, i.e. five days BEFORE the multiplayer IWAD fix (`e2b6919`), so every fresh download still hit the "point us to your Doom directory" dialog. 2.3.1 is that fix shipped. Cloudflare Pages auto-deploys `site/` from `nyannonymous/main` (confirmed: the live page tracked the 2.3.0 commit without an owner step), so pushing the site edit is the deploy. Artifact names are now produced by electron-builder itself (`artifactName` in `desktop/package.json`) instead of being renamed at upload.
   - [ ] (5) uninstall the local build so the real installer gets tested
   **Do NOT uninstall the owner's local build before a replacement release exists** — that leaves them with nothing to test.
 - [!] **NOT BUILT ON PURPOSE: a public room list.** Browsing rooms needs NN's IRC/relay. Verified against the installed NN 33.0.1: `createRoom`/`hostGame`/`joinRoom` appear only in the SolidJS renderer bundle and never in `electron_index.js`, so there is no scriptable interface. The panel omits the feature instead of shipping a dead button. The owner's original "lobby showing other people's games" is therefore NOT delivered — that is the one part of the ask outstanding, and it needs NN's protocol spoken directly or its UI driven.

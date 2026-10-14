@@ -1,7 +1,7 @@
 {
   "name": "doomnite-desktop",
   "productName": "DoomNite",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": true,
   "description": "DoomNite desktop shell. Runs the pack's own Python server and shows the launcher in a real window.",
   "main": "main.js",
@@ -29,6 +29,7 @@
       "first-run.html",
       "package.json"
     ],
+    "artifactName": "${productName} - Windows Portable v${version}.${ext}",
     "win": {
       "target": [
         "nsis",
@@ -37,6 +38,7 @@
       "icon": "build/icon.ico"
     },
     "nsis": {
+      "artifactName": "${productName} - Windows Setup v${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
