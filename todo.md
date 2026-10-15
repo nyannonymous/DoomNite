@@ -37,7 +37,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3): **step 1 built 2026-10-07** — `tools/add_mod.py` reads a candidate file and derives the IWAD from its map lumps, flags an IWAD-instead-of-a-mod, and detects a duplicate the pack already has (28 checks). **PARKED by the owner 2026-10-08** — a previous worker read "RECOMMENDED" in this line as licence to build the UI surface unprompted, and shipped an Add-mod button and a file-upload endpoint that the owner rejected. The UI surface and the copy+manifest step are NOT wanted. Do not build them without asking. `serve.py` had no `/api/addmod` route in git and the upload handler is reverted; verify with `git log -- serve.py` before touching anything here.
-- [ ] **Duke3D / eduke32 (separate from DukeBoomem — a different game, not a DOOM mod)**: install base eduke32 via https://wiki.eduke32.com/wiki/Main_Page, then bring in the ModDB addons. Installer URL: https://wiki.eduke32.com/wiki/Main_Page
+- [~] **Duke3D / eduke32** — research read (`notes/duke3d-research.md`); not installed (external binary; blocked on owner approval for new dependency).
 
 **Install** (eduke32 + base): `https://wiki.eduke32.com/wiki/Main_Page`.
 
