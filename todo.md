@@ -15,7 +15,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [ ] **3 commits are unpushed** (`a59eb21`, `69c2c97`, `99c31df`) — the owner never said push. Working tree is clean.
 - [~] **2.3.2 is not built.** Blocked (`notes/build-232-blocked.md`): `npm run build` OOMs when Bitwig is open (~25 GB used) and a failed build empties `app/`; `copyTree` fix is in source; no new feature beyond live 2.3.1 release.
 - [~] **Public IP is not listed in the panel.** Blocked (decision `f12edcd`): STUN/reachability design not fully settled; skip until reachability + port-forward label verified.
-- [ ] **The NN research item (below) gates all of the above networking work.** Do not build UPnP, bundle a VPN, or redesign the share flow before it is answered.
+- [x] **The NN research item (answered 2026-10-15).** Gate open: the four-tier ladder (direct IPv6 → LAN → IPv6 tunnel → STUN punch, then relay opt-in) and the IRC broker are documented in §6 (line 372+). Building UPnP, a bundled VPN, or a redesigned share flow is NOT needed; STUN tier is already built (`tools/stun.py`, `punch.py`).
 
 **Fixed and committed today, beyond the release:**
 - `copyTree()` skipped any same-size file on the reasoning "a size-identical file is the same file". `app/index.html` is 442 bytes whichever `index-<8 chars>.js` it points at, so **every UI rebuild since 8 Oct was silently skipped** and the owner's install has eight stale bundles beside an index.html pointing at an old one. Size is now only the cheap reject; bytes settle a tie.
