@@ -526,6 +526,10 @@ Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. 
   Undo: `tools/mp_session.py` and `tools/mp_http.py` are standalone; delete them and the two UI files' multiplayer wiring to return to the old panel.
 
 Made by a worker on 2026-10-07 with nobody awake. Each is reversible; the undo is named.
+- **2026-10-16 (this run) — leave 5 unpushed commits unpushed.** Checkpoint SHA `37e444d`.
+  Question: push 5 commits (a59eb21, 69c2c97, 99c31df, 084e350, cd93c13) when owner recorded "never said push"?
+  Options: (a) push (settings `push:true`); (b) leave unpushed (owner explicitly did not approve).
+  Chose **(b)** — pushing is an outward-facing step; without owner approval it violates the standing convention recorded in the file. Undo: nothing to revert; the checkpoint commit itself is pushed (`37e444d`).
 
 - **Create the two junctions into `%LOCALAPPDATA%\Zandronum` rather than leaving them for the owner.**
   Question: the todo said "owner must run" for anything writing into the Zandronum folder.
