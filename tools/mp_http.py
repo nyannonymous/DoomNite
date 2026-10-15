@@ -142,6 +142,57 @@ def _launch(handler, resolve, mode):
     if not (1024 < port < 65536):
         return 400, {"error": "port must be 1025-65535"}
 
+    # STUN punch mode for this launch. Same routes, same body, one new
+    # flag -- the UI asks for it by sending {"stun": true}. Nothing else
+    # about the request changes: direct (LAN/Tailscale) play and punched
+    # play are the same flow with one extra bulletproof step on the wire.
+    want_stun = bool(raw.get("stun"))
+    relay = None
+    punch_payload = {}
+    host_ip, host_port = None, None
+    if want_stun:
+        import punch as _punch
+        # One relay per side at a time, and a NEW request replaces an
+        # older one: the share line the user handed out names THAT
+        # socket's mapping, so an orphaned relay is a silent dead address.
+        # start_relay() stops the previous one on purpose.
+        relay = _punch.start_relay("host" if mode == "host" else "join")
+        try:
+            # THE mapping question. Must be answered on the relay's own
+            # socket: a second socket's answer would describe a path the
+            # engine never sends on. ~4 servers x ~2 s worst case; live
+            # probes have answered in a few hundred ms.
+            mapped = relay.map_with_stun()
+            if mapped is None:
+                relay.stop()
+                _punch.RELAYS.pop("host" if mode == "host" else "join", None)
+                return 502, {"error": (
+                    "No STUN server answered, so DoomNite cannot open the "
+                    "internet hole here. Check the connection (or play on "
+                    "the same network / VPN instead).")}
+            if mode == "host" and relay.nat == "symmetric":
+                # Refuse BEFORE launching: the host's published endpoint
+                # would be a lie for every peer, punches would fail with no
+                # error anywhere, and the fix (Tailscale / NukemNet) is a
+                # user choice no panel can make for them.
+                relay.stop()
+                _punch.RELAYS.pop("host" if mode == "host" else "join", None)
+                return 400, {"error": (
+                    "Your router gives every internet destination a "
+                    "different port (symmetric NAT), so the punch can't "
+                    "open a stable path. Host with NukemNet or make it a "
+                    "Tailscale LAN instead -- both work with no changes "
+                    "from the other player.")}
+        except Exception as exc:
+            # Probe failure is a state, not a game. The engine must not
+            # start into a hole nobody drilled.
+            try:
+                relay.stop()
+                _punch.RELAYS.pop("host" if mode == "host" else "join", None)
+            except Exception:
+                pass
+            return 502, {"error": f"the STUN probe failed: {exc}"}
+
     try:
         import mp_session
         # Name is DISPLAY-ONLY but still validated, because it reaches the
@@ -177,7 +228,17 @@ def _launch(handler, resolve, mode):
             # inside the string the address parser silently discards.
             addr = str(raw.get("addr") or "")
             _h, _p, inline_fp = mp_session.split_addr_and_fp(addr)
-            argv = mp_session.join_argv(idx, addr, hostname=name)
+            host_ip, host_port = _h, int(_p)
+            # PUNCHED joins never dial the host's real address: the engine
+            # gets the loopback relay, whose socket has already punched
+            # toward the real endpoint, so the route is one path with all
+            # its packets on it. The real address becomes the relay's peer
+            # (set below, right before the engine starts).
+            if want_stun:
+                argv = mp_session.join_argv(idx, "127.0.0.1:%d" % relay.local_port,
+                                            hostname=name)
+            else:
+                argv = mp_session.join_argv(idx, addr, hostname=name)
         # The fingerprint is optional and NEVER blocks a join. The joiner pastes
         # "1.2.3.4:23513 ABCD1234"; a match is reported, a mismatch warns but
         # still connects -- a near-identical build is worth trying, and refusing
@@ -194,6 +255,37 @@ def _launch(handler, resolve, mode):
         return 400, {"error": str(e)}
     except Exception as exc:
         return 500, {"error": str(exc)}
+
+    if want_stun:
+        import punch as _punch
+        if mode == "host":
+            # Only the HOST can be firewalled for inbound on the punch
+            # socket (the joiner's replies ride its outbound flow). Windows
+            # Firewall applies Block before Allow, which is EXACTLY the
+            # state these rules can reach: a program-block on this very
+            # python.exe for the Public profile says the punched packets
+            # will be dropped and the user must be TOLD, not left guessing
+            # while the share line looks fine.
+            # Payload assembled HERE rather than beside the probe: the share
+            # line embeds the entry fingerprint, which is only defined after
+            # the argv block below — the first version built it early and
+            # died with UnboundLocalError on every punched host, found by
+            # selftest_stun.py's contract section before any real session.
+            fw = _firewall_advisory()
+            _ip, _mp = relay.mapped
+            punch_payload = {"ip": _ip, "punch_port": _mp,
+                             "nat": relay.nat,
+                             "local_port": relay.local_port,
+                             "line": (f"{_ip}:{_mp} {ours or ''}".strip()),
+                             "firewall": fw}
+        else:
+            # BEFORE the engine starts, not after: the first packet out of a
+            # fresh Zandronum client may already be the server handshake, and
+            # without a peer that packet is held back -- a held-back handshake
+            # is a silent connect that never completes.
+            relay.set_peer(host_ip, host_port, lock=True)
+            punch_payload = {"connect": "127.0.0.1:%d" % relay.local_port,
+                             "host": f"{host_ip}:{host_port}", "nat": relay.nat}
 
     try:
         # Detached via cmd /c start, so closing DoomNite cannot kill a hosted
@@ -228,7 +320,74 @@ def _launch(handler, resolve, mode):
                      ],
                      "fingerprint": ours}
                     if mode == "host" else None),
+        # Present when this launch ran the punch path; the key is simply
+        # absent otherwise, so the UI reacts to its presence alone.
+        **({"punch": punch_payload} if punch_payload else {}),
     }
+
+
+# ---------------------------------------------------------------- firewall
+_FW_CACHE = {"t": 0.0, "payload": {"ok": True, "rule": None, "why": None}}
+
+
+def _firewall_advisory():
+    """Will Windows Firewall let punched packets IN to this process?
+
+    Windows-only, tolerant, and definitive wherever netsh can answer. The
+    trap this file's history documented (Block beats Allow; the owner's
+    zandronum.exe had TEN such rules) applies byte for byte to the python
+    that runs the punch socket: two inbound Block rules on python.exe exist
+    for the Public profile on the machine this tier was built on. An Allow
+    for the Private profile does not oppose a Block for the Public one,
+    because each profile is judged on its own.
+
+    Cached ~30 s: netsh costs a few hundred ms, and the host flow may be
+    retried while the user dithers over the invitation dialog.
+    """
+    import time as _time
+    import re as _re
+    when = _time.time()
+    if when - _FW_CACHE["t"] < 30:
+        return _FW_CACHE["payload"]
+
+    out = {"ok": True, "rule": None, "why": None}
+    if os.name != "nt":
+        _FW_CACHE.update({"t": when, "payload": out})
+        return out
+    try:
+        me = os.path.normcase(os.path.abspath(sys.executable))
+        txt = subprocess.run(
+            ["netsh", "advfirewall", "firewall", "show", "rule",
+             "name=all", "dir=in", "verbose"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=10).stdout or ""
+        for block_text in txt.split("\n\n"):
+            if "python.exe" not in block_text.lower():
+                continue
+            if not _re.search(r"Action[ \t]*:[ \t]*Block\b", block_text):
+                continue
+            m = _re.search(r"Program[ \t]*:[ \t]*(\S+)", block_text)
+            prog = os.path.normcase(m.group(1)) if m else ""
+            if prog != me:
+                continue
+            if not _re.search(r"Protocol[ \t]*:[ \t]*UDP\b", block_text):
+                continue
+            rname = _re.search(r"Rule Name[ \t]*:[ \t]*(.+)", block_text)
+            out = {"ok": False,
+                   "rule": rname.group(1).strip() if rname else "a block rule",
+                   "why": ("Windows Firewall has an inbound BLOCK rule on "
+                           "the python that would run the punch socket, "
+                           "Public profile -- and Block beats Allow, so "
+                           "the punched packets would be dropped. Clear "
+                           "that block rule (or host over Tailscale, whose "
+                           "adapter is Private).")}
+            break
+    except Exception:
+        # An unreadable firewall state must never stop a launch the user
+        # asked for: report unknown-ok and let the real session tell.
+        out = {"ok": True, "rule": None, "why": None}
+    _FW_CACHE.update({"t": when, "payload": out})
+    return out
 
 
 # The path -> (method, handler) table serve.py consults. Keeping it explicit

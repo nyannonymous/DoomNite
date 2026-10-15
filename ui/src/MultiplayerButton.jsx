@@ -65,6 +65,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   });
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(null); // what to hand to a friend
+  const [punch, setPunch] = useState(null);     // survives only for the STUN tier
   const [mismatch, setMismatch] = useState(null); // mod differs from the host
   const [err, setErr] = useState(null);
 
@@ -116,6 +117,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
     setSetupLines([]);
     setCommand("");
     setSharing(null);
+    setPunch(null);
     setMismatch(null);
     try {
       const idx = chosen ? chosen._idx : 0;
@@ -145,13 +147,15 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   }, [chosen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = useCallback(
-    async (which) => {
+    async (which, stunMode = false) => {
       if (!chosen) return;
       setBusy(true);
       setErr(null);
       setSharing(null);
+      setPunch(null);
       try {
         const body = { index: chosen._idx, port: 23513, name };
+        if (stunMode) body.stun = true;
         if (which === "host") {
           body.deathmatch = dm;
         } else {
@@ -169,9 +173,15 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
         setCommand(d.command || "");
             if (which === "host") {
           setSharing(d.sharing);
+          setPunch(d.punch || null);
           setMismatch(null);
-          toast(`Hosting ${d.label}. Share the address with your friends.`);
+          toast(
+            stunMode
+              ? `Punched an internet path for ${d.label}. Send the internet line to your friend.`
+              : `Hosting ${d.label}. Share the address with your friends.`
+          );
         } else {
+          if (stunMode) setPunch(d.punch || null);
           // mod_match is true / false / null (nothing was pasted to check).
           // A mismatch WARNS and still connects: a slightly different build is
           // often still worth trying, and blocking would leave someone stuck
@@ -341,6 +351,44 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       Join a game
                     </button>
                   </div>
+                  {/* The STUN punch tier: internet play without router work,
+                      on the same routes with one body flag. Kept VISIBLE
+                      rather than gesture-hidden -- it is the answer to the
+                      question this whole multiplayer feature exists for:
+                      playing with someone NOT on this network. Cost is real
+                      CPU: the host's probe runs first, in place, before the
+                      engine can start, and refuses cleanly rather than
+                      silently. */}
+                  <div className="mp-row mp-choice mp-internet">
+                    <button
+                      className="mp-action"
+                      onClick={() => start("host", true)}
+                      disabled={busy || !chosen}
+                    >
+                      Host over the internet
+                    </button>
+                    <button
+                      className="mp-action"
+                      onClick={() => {
+                        if (!addr.trim()) {
+                          setErr("Paste the internet line they gave you -- it works exactly like an address here.");
+                          return;
+                        }
+                        start("join", true);
+                      }}
+                      disabled={busy || !chosen}
+                    >
+                      Join over the internet
+                    </button>
+                  </div>
+                  <p className="mp-hint">
+                    Internet play with no router changes and no VPN: DoomNite
+                    asks STUN servers which port the internet sees for THIS
+                    machine, and keeps it open with pings until your friend
+                    arrives through it. A few routers hand every destination a
+                    different port — the panel says so, and "Host" plus your
+                    VPN (or a forwarded port) covers those instead.
+                  </p>
 
 
                   {/* Deliberately one line of reassurance, not a report. The
@@ -374,9 +422,55 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                 </section>
               )}
 
+              {punch && (
+                <section className="mp-section">
+                  {punch.line ? (
+                    <>
+                      <h3>Internet line — send this to them</h3>
+                      <ul className="mp-share">
+                        <li>
+                          <code>{punch.line}</code>
+                          <span className="mp-share-why">
+                            reached from anywhere without router work; valid
+                            while this panel's server stays open
+                          </span>
+                        </li>
+                      </ul>
+                      {/* Windows Firewall judges profiles separately and Block
+                          beats Allow: the same trap that once put ten block
+                          rules on zandronum.exe can hold the punch socket
+                          broken on a Public adapter. The user gets the exact
+                          one-line fix, not a shrug. */}
+                      {punch.firewall && !punch.firewall.ok && (
+                        <p className="mp-warn">
+                          <b>Windows Firewall will block this line.</b>{" "}
+                          Inbound UDP is banned for this app on the{" "}
+                          <i>Public</i> profile by rule{" "}
+                          <code>{punch.firewall.rule || "(unnamed)"}</code>,
+                          and a block rule outranks every allow. Clear it in an
+                          <b>administrator</b> PowerShell with:{" "}
+                          <code>Remove-NetFirewallRule -DisplayName "{punch.firewall.rule}"
+                          </code> — or host over Tailscale instead.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <h3>Joining through the punch</h3>
+                      <p className="mp-hint">
+                        The game connects through a local socket DoomNite keeps
+                        open toward <code>{punch.host}</code>, so no VPN and no
+                        router work is needed on your side. Leave this window's
+                        server running for the path to stay alive.
+                      </p>
+                    </>
+                  )}
+                </section>
+              )}
+
               {sharing && (
                 <section className="mp-section">
-                  <h3>Share this address</h3>
+                  <h3>{punch ? "Share a direct address (LAN / VPN)" : "Share this address"}</h3>
                   <ul className="mp-share">
                     {(sharing.addresses || []).map((a) => {
                       const line =
@@ -421,14 +515,19 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       into their router. The owner asked exactly this question
                       ("does the friend need to forward a port too?"), which is
                       why it is stated plainly here rather than implied. */}
-                  {(sharing.addresses || []).some(
-                    (a) => a.kind === "cgnat-tailscale" || a.kind === "public"
-                  ) && (
+                  {/* Suppressed once the punch tier is on: then the internet
+                      ANSWER IS the internet line above, and forwarding is the
+                      thing the user no longer has to be told about. */}
+                  {!punch &&
+                    (sharing.addresses || []).some(
+                      (a) => a.kind === "cgnat-tailscale" || a.kind === "public"
+                    ) && (
                     <p className="mp-hint">
                       To play from <i>outside</i> your network, you (the host)
                       must forward port {sharing.port} on your router. If your
-                      router cannot do that, put them on your VPN instead — the
-                      address marked above then works with no router changes.
+                      router cannot do that, use "Host over the internet" —
+                      or put them on your VPN, and the address marked above
+                      then works with no router changes.
                     </p>
                   )}
                 </section>
