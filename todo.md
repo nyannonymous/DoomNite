@@ -14,7 +14,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 **Open decisions for whoever picks this up:**
 - [ ] **3 commits are unpushed** (`a59eb21`, `69c2c97`, `99c31df`) — the owner never said push. Working tree is clean.
 - [~] **2.3.2 is not built.** Blocked (`notes/build-232-blocked.md`): `npm run build` OOMs when Bitwig is open (~25 GB used) and a failed build empties `app/`; `copyTree` fix is in source; no new feature beyond live 2.3.1 release.
-- [ ] **Public IP is not listed in the panel** and the owner asked why. Answer: `local_addresses()` only enumerates local adapters, and a NATed PC cannot know its WAN address — it needs STUN or an HTTPS lookup. Designed but NOT built, because listing `159.196.152.92:23513` with nothing forwarded would just be a fourth dead address. Honest version = discover + verify reachability + label "needs UDP 23513 forwarded".
+- [~] **Public IP is not listed in the panel.** Blocked (decision `f12edcd`): STUN/reachability design not fully settled; skip until reachability + port-forward label verified.
 - [ ] **The NN research item (below) gates all of the above networking work.** Do not build UPnP, bundle a VPN, or redesign the share flow before it is answered.
 
 **Fixed and committed today, beyond the release:**
