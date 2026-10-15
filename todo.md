@@ -526,6 +526,10 @@ Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. 
   Undo: `tools/mp_session.py` and `tools/mp_http.py` are standalone; delete them and the two UI files' multiplayer wiring to return to the old panel.
 
 Made by a worker on 2026-10-07 with nobody awake. Each is reversible; the undo is named.
+- **2026-10-16 (this run) — skip public IP listing (L17).** Checkpoint SHA `f12edcd`.
+  Question: implement the STUN/reachability public-IP display?
+  Options: (a) build now from STUN result; (b) skip (needs full reachability verification + port-forward design + owner confirmation of label text).
+  Chose **(b)** — the label must say "needs UDP 23513 forwarded" and the reachability test must pass; building only the STUN lookup without the verification would produce a misleading display. Undo: `git revert f12edcd` + delete any added file.
 - **2026-10-16 (this run) — leave 5 unpushed commits unpushed.** Checkpoint SHA `37e444d`.
   Question: push 5 commits (a59eb21, 69c2c97, 99c31df, 084e350, cd93c13) when owner recorded "never said push"?
   Options: (a) push (settings `push:true`); (b) leave unpushed (owner explicitly did not approve).
