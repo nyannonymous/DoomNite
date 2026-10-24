@@ -34,7 +34,7 @@ This file is a notes-style log. The checklist below is the quick index of what i
 - [x] Finish `ui/src/Panel.jsx`: already has Typed readout, TermRow, BootBar, DataStreams, .play-glow button; npm run build clean (nitesesh 2026-10-06; visual check is the owner's, verify.mjs needs the server running)
 - [x] Fix the `make_sources.py` wart: re-running it while DOOM2.WAD is absent deletes that entry and `base_url` from `sources.json` (section 4) — verified fixed 2026-10-06 (68/68 entries kept, `base_url` intact)
 - [x] Delete `mods/bdbe-3-38/` (already gone on disk, nothing references it) (191.5 MB of dead weight, nothing references it; `build.py` uses `mods/bdbe-v3-38/`) (section 4)
-- [!] Launch BDBE by hand and confirm it is not plain Brutal Doom; if it is, capture `-stdout` + a logfile (section 3)
+- [x] **Launch BDBE by hand and confirm it is not plain Brutal Doom — ENGINE-LOG HALF DONE (2026-10-18); the visual half is the owner's.** Ran the exact command the shipped launcher builds (`launchers/brutal-doom-black-edition--enhanced-episode-1.bat`) with `-stdout +logfile` and `+quit`, so the engine said it rather than me inferring. Every file it names loads with **zero errors**: `BDBE_v3.38.pk3` **12,286 lumps** plus its embedded `besounds.wad` (816), `terrain.wad` (266) and `xhairs.wad` (94); `BD_Black_NeuralUpscale.pk3` 1,247; `DoomHDTextures.pk3` 3,489; `BD_Black_Editionv3.35_WeaponSounds.pk3` 47; `DoomMetalVol5_44100.wad` 80; `enh_e1v1.8c.wad` 53. Load order is gzdoom.pk3 → game_support.pk3 → DOOM.WAD (IWAD) → widescreen → BDBE → neuralupscale → HD textures → weaponsounds → music → episode wad. Exit 0. **What this does NOT prove:** that it *plays* as Black Edition — that is a rendered-pixels judgement and needs the owner. `BDBE_v3.38.pk3` (199,089,708 bytes) IS present in the pack, so nothing is missing on that side. §3's older description of this config was stale and is corrected below (section 3).
 - [!] Look at the new UI: per-mod REMOVE FROM PACK sidebar, flush-left card names, ctrl+wheel zoom at 300% (sections 1, 1b, 1c are all "UNVERIFIED")
 - [!] "Add a mod" flow (paste URL / upload pk3): **step 1 built 2026-10-07** — `tools/add_mod.py` reads a candidate file and derives the IWAD from its map lumps, flags an IWAD-instead-of-a-mod, and detects a duplicate the pack already has (28 checks). **PARKED by the owner 2026-10-08** — a previous worker read "RECOMMENDED" in this line as licence to build the UI surface unprompted, and shipped an Add-mod button and a file-upload endpoint that the owner rejected. The UI surface and the copy+manifest step are NOT wanted. Do not build them without asking. `serve.py` had no `/api/addmod` route in git and the upload handler is reverted; verify with `git log -- serve.py` before touching anything here.
 - [x] **Duke3D / eduke32 — INSTALLED and verified (2026-10-18).** EDuke32 r10652 (built Nov 2025) is at `Z:\GAMES\Duke3d\eduke32.exe`; `-?` runs clean (rc 0). Base data `duke3d.grp` is present there and at the repo root, both 44,356,548 bytes, and the engine log shows it loaded as the main data file (checksum `0xfd3dcff1`) with a full play session recorded. The old "not installed" blocker was stale. **Still open, owner decision:** whether Duke3D goes into the pack's launcher list. `duke3d.grp` is copyrighted and gitignored, so it cannot ride the public R2 bucket the way Doom IWADs do. Friends would have to supply their own copy, the same way the Hexen IWAD is hand-placed. Recommendation: list Duke3D as a "bring your own duke3d.grp" entry, not a bucket download.
@@ -257,21 +257,29 @@ whether the CRT overlay is too strong.
 
 ---
 
-## 3. Launch BDBE — the one real verification left on the pack
+## 3. Launch BDBE — the engine-log half is DONE, the eyeball half is yours
 
-Fixed but never launched by a human. `BDBE_v3.38.pk3` (199 MB) was never copied
-into the pack; Black Edition is a game-support pk3 with **zero map lumps**
-(12,525 entries, one `MAPINFO` with `AddDefaultMap`, no `MAPxx`), so it
-inherits maps from the Brutal Doom base. Both entries were also pinned to the
-wrong IWAD — Enhanced E1 → DOOM, HontE → DOOM 2. Load order is now
-1. `brutal22test6.pk3` 2. `BDBE_v3.38.pk3` 3. episode wad via `-file`.
+**Corrected 2026-10-18 against the shipped launcher, which this section had drifted from.** The section used to say `BDBE_v3.38.pk3` "was never copied into the pack" and that the load order was "1. `brutal22test6.pk3` 2. `BDBE_v3.38.pk3` 3. episode wad". Neither is true of what ships now:
 
-If it still looks like plain Brutal Doom, the next step is `-stdout` +
-logfile capture so the engine tells us instead of me inferring.
+- `BDBE_v3.38.pk3` **is** in the pack — `mods/bdbe-v3-38/BDBE_v3.38.pk3`, **199,089,708 bytes**.
+- The shipped `launchers/brutal-doom-black-edition--enhanced-episode-1.bat` does **not** load `brutal22test6.pk3` at all. BDBE v3.38 is a full build with its own maps (12,286 lumps), so it does not need the Brutal Doom base.
+- It **does** load the HD textures and the neural upscale this section listed as "deliberately not loaded" — its own last line says "HD by default".
 
-Deliberately not loaded: HD textures (359 MB), neural upscale, music, visor,
-terrain splashes. All present in RaZZoR's `addons/` if you want them as extra
-config variants.
+The real load order, read out of the engine rather than out of this file:
+
+    gzdoom.pk3 -> game_support.pk3 -> DOOM.WAD (IWAD) -> game_widescreen_gfx.pk3
+      -> BDBE_v3.38.pk3 (12,286 lumps, + besounds 816 / terrain 266 / xhairs 94)
+      -> BD_Black_NeuralUpscale.pk3 (1,247)
+      -> DoomHDTextures.pk3 (3,489)
+      -> BD_Black_Editionv3.35_WeaponSounds.pk3 (47)
+      -> DoomMetalVol5_44100.wad (80)
+      -> enh_e1v1.8c.wad (53)
+
+Captured with `-stdout +logfile ... +quit` on 2026-10-18, exit 0, **zero errors and zero missing files**. So BDBE is genuinely loading — it is not silently falling back to plain Brutal Doom.
+
+**What is still unproven:** that it *plays* as Black Edition. That is a rendered-pixels judgement, and no engine log can make it for you. If it still looks like plain Brutal Doom, the next step is a full `-stdout` capture of a real session rather than a startup log.
+
+Deliberately not loaded: visor, terrain splashes. All present in RaZZoR's `addons/` if you want them as extra config variants.
 
 ---
 
@@ -360,7 +368,7 @@ Facts: NN 0.6.5 is a **portable** build at `~\Desktop\NUKEMNET` — its config l
 - [x] **`verify-mp-button.mjs` hung on success (2026-10-14).** Its last line was `if (fail) process.exit(1);`, so a fully PASSING run fell off the end of the script and stayed alive indefinitely on a keep-alive socket from the forwarded fetch — the exit status a caller reads never came back (this is what made a `npm run build && node verify-mp-button.mjs` command time out at 300 s while the build had in fact finished). Now `process.exit(fail ? 1 : 0);`, as `verify.mjs` already did. Both harnesses also accept `DOOMNITE_BASE` so they can run against a second server on another port without disturbing the one serving the pack. Verified against a fresh server on 8766 and the rebuilt bundle: `verify-mp-button.mjs` **32/32**, `verify.mjs` **21/21**, both exit 0, plus `selftest_mp.py` **125/125**.
 - [x] **`MULTIPLAYER-FIX-HANDOFF.md` (2026-10-14).** A self-contained sheet for a second copy of the pack (the owner's mate), written on request: symptom, the four causes, the exact edits with code, how to verify each one, and the things that look like the bug but are not (the clipped dialog is Zandronum's own; do not gate anything on NukemNet; do not fix it by copying WADs or editing the engine `.ini`, which the pack strips on purpose). Updated for the packaging guards: the handoff's "future build" section points at `tools/check_mp_command.py` (run by stage-pack.js on every packaged build, 10 checks) and preflight's new playable-manifest requirement, so a second copy's agent can re-derive both.
 - [x] **FIXED (2026-10-18): the NukemNet junction step reported cmd's message.** `make_link()` now checks that NN's Zandronum folder exists and says "NukemNet's Zandronum folder does not exist" instead of passing through "cannot find the path". Pinned by a new check in `tools/selftest_nn_preset.py` (all passing) and `selftest_mp.py` 129/129. Original report follows.
-- [!] (original report) **the NukemNet junction step fails on this machine.** `%LOCALAPPDATA%\Zandronum` no longer exists (there is a `Zandronum.bak`), but NN's `Settings.json` still points at it, so `nn_preset.make_link()` runs `mklink /J` inside a folder that is gone, gets "The system cannot find the path specified", and reports `the link was not created`. It is harmless to multiplayer now (nothing gates on it, and that is why this showed up as a `false` instead of a failure), but `make_link()` should say "NN's Zandronum folder does not exist" rather than passing cmd's message through. Only affects NukemNet's own Play button.
+- [x] (superseded 2026-10-18 — the fix above is in and verified; this is the original report, kept only for context) **the NukemNet junction step fails on this machine.** `%LOCALAPPDATA%\Zandronum` no longer exists (there is a `Zandronum.bak`), but NN's `Settings.json` still points at it, so `nn_preset.make_link()` runs `mklink /J` inside a folder that is gone, gets "The system cannot find the path specified", and reports `the link was not created`. It is harmless to multiplayer now (nothing gates on it, and that is why this showed up as a `false` instead of a failure), but `make_link()` should say "NN's Zandronum folder does not exist" rather than passing cmd's message through. Only affects NukemNet's own Play button. **Re-checked 2026-10-18: `make_link()` now checks the folder first and says so; `selftest_nn_preset.py` passes.**
 - [!] **STILL NEEDS A HUMAN: a real two-MACHINE session.** The owner's test proved two processes on one machine connect to each other (and that the junctions work). It did NOT prove two machines on a network, which is the case that matters and the one the room-list feature exists for. Two PCs, or one PC plus a phone on the same Wi-Fi.
 - [x] **Mod-mismatch fingerprint (2026-10-08).** The owner's host+join test passed because both ends were the same machine with the same files, which proves the arguments are right but hides the commonest multiplayer failure: two people running different versions of the same mod connect fine and then the game is subtly broken. The host's share line now carries an 8-character fingerprint of the entry's actual file contents (`ip:port CODE`), the joiner pastes the whole line, and a mismatch warns WITHOUT blocking the connect. No protocol change was needed -- the code rides in the string we already hand them. Uses Crockford base32 (32 symbols by construction; I/L/O/U are excluded from output but folded on input, so a code read aloud over voice chat still matches). Verified: all 30 real fingerprints round-trip the address parser, `selftest_mp.py` 80/80 (three of those checks exist because I got the rule wrong twice -- see below).
 - [x] **Why a remote mate could not connect (2026-10-15) — it was never the launcher.** Owner's mate sat on endless `CONNECTING TO 192.168.0.226:23513`. Three separate causes, found in this order:
