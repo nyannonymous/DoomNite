@@ -226,6 +226,20 @@ with tempfile.TemporaryDirectory() as root:
             print("  SKIP  could not create a junction to test against "
                   "(mklink refused in this environment)")
 
+    # NN's Zandronum folder can be gone (the owner's %LOCALAPPDATA%\Zandronum was
+    # renamed to .bak) while NN's settings still point at it. The report must say
+    # so, not pass cmd's "cannot find the path" through.
+    import contextlib, io, shutil
+    with tempfile.TemporaryDirectory() as t3:
+        _u, gone = build_layout(t3)
+        shutil.rmtree(gone)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc_gone = nn.make_link(gone, True)
+        check("a missing NN folder is refused", rc_gone, 1)
+        check("and it is named as the problem",
+              "does not exist" in buf.getvalue() and "cannot find" not in buf.getvalue(), True)
+
 print()
 if FAILED:
     print(f"FAILED ({len(FAILED)}): " + "; ".join(FAILED))

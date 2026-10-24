@@ -218,6 +218,13 @@ def make_link(zan_dir, apply_it):
             print(f"  {mask(target)} does not exist, so there is nothing to link.")
             rc = 1
             continue
+        if not os.path.isdir(zan_dir):
+            # mklink needs the parent folder to exist; without this check cmd's
+            # own "cannot find the path" is all the user sees.
+            print(f"  NukemNet's Zandronum folder does not exist ({mask(zan_dir)}).")
+            print("  Nothing to link into. Start Zandronum once, or fix the path in NukemNet's settings.")
+            rc = 1
+            continue
         p = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
                            capture_output=True, text=True)
         print("  " + (p.stdout + p.stderr).strip())
