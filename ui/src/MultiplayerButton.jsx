@@ -493,6 +493,8 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                               ? "only works if they are on your VPN"
                               : a.kind === "link-local"
                               ? "this computer only"
+                              : a.kind === "public"
+                              ? `needs UDP ${sharing.port} forwarded on your router`
                               : ""}
                           </span>
                         </li>
@@ -528,6 +530,21 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       router cannot do that, use "Host over the internet" —
                       or put them on your VPN, and the address marked above
                       then works with no router changes.
+                    </p>
+                  )}
+                  {/* The withheld case, stated rather than left as an absence.
+                      When STUN reports a CGNAT mapping there is no internet
+                      line above on purpose: the address a lookup service would
+                      print is one their ISP is already NATing, so forwarding
+                      the port to it cannot work and printing it would send
+                      someone into their router settings for nothing. Saying so
+                      is the honest version of an empty list. */}
+                  {!punch && sharing.public?.kind === "cgnat" && (
+                    <p className="mp-hint">
+                      No internet address is listed because your connection
+                      sits behind your ISP's own NAT — forwarding the port on
+                      your router cannot make it reachable. Use "Host over the
+                      internet", or put them on your VPN.
                     </p>
                   )}
                 </section>

@@ -299,6 +299,40 @@ def _launch(handler, resolve, mode):
         return 500, {"error": str(e)}
 
     import mp_session
+
+    # Only a host has something to share; a joiner has nothing to hand on. The
+    # fingerprint rides along so the joiner can check they are running the same
+    # bytes before connecting.
+    #
+    # Built here rather than inline so the STUN probe only runs for a host: an
+    # expression inside the return dict would pay its round trip on the join
+    # path too, where nothing is ever shown.
+    sharing = None
+    if mode == "host":
+        # The one address a friend OUTSIDE the network can use, which
+        # shareable_addresses() can never produce because it only ever
+        # describes a local adapter. Appended only when STUN reports a
+        # globally routable mapping: a CGNAT mapping is withheld, because
+        # telling someone to forward a port to an address their ISP is
+        # already NATing is worse than saying nothing.
+        pub = mp_session.public_endpoint()
+        addresses = [{"ip": ip, "kind": kind}
+                     for ip, kind in mp_session.shareable_addresses()]
+        if pub.get("kind") == "public":
+            addresses.append({"ip": pub["ip"], "kind": "public"})
+        sharing = {
+            "port": port,
+            # (ip, kind) pairs, best-first, so the UI can label a Tailscale
+            # address as "only works if they are on my VPN" instead of
+            # offering it like a LAN address.
+            "addresses": addresses,
+            # The verdict itself, so the panel can explain a WITHHELD address
+            # instead of leaving the user wondering why there is no internet
+            # line at all.
+            "public": pub,
+            "fingerprint": ours,
+        }
+
     return 200, {
         "ok": True,
         "label": entry.get("label", ""),
@@ -307,19 +341,7 @@ def _launch(handler, resolve, mode):
         # None when nothing was pasted to compare, True on a match, False on a
         # mismatch. The UI must only warn -- never block -- on False.
         "mod_match": fp_state,
-        # Only a host has something to share; a joiner has nothing to hand on.
-        # The fingerprint rides along so the joiner can check they are running
-        # the same bytes before connecting.
-        "sharing": ({"port": port,
-                     # (ip, kind) pairs, best-first, so the UI can label a
-                     # Tailscale address as "only works if they are on my VPN"
-                     # instead of offering it like a LAN address.
-                     "addresses": [
-                         {"ip": ip, "kind": kind}
-                         for ip, kind in mp_session.shareable_addresses()
-                     ],
-                     "fingerprint": ours}
-                    if mode == "host" else None),
+        "sharing": sharing,
         # Present when this launch ran the punch path; the key is simply
         # absent otherwise, so the UI reacts to its presence alone.
         **({"punch": punch_payload} if punch_payload else {}),

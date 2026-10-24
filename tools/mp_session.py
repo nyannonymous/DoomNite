@@ -526,6 +526,81 @@ def shareable_addresses():
     return out
 
 
+# --------------------------------------------------------------- public IP
+#
+# shareable_addresses() above can only ever describe a LOCAL adapter. Its
+# "public" branch fires for a non-private adapter address, which on a home
+# machine never happens, so before this the panel had no way to show the one
+# address a friend outside the network actually needs. The UI was already
+# ready for it -- MultiplayerButton.jsx gates its "forward port N on your
+# router" hint on kind "public" -- and that hint had never once been rendered.
+#
+# The measurement is a STUN binding request, which is what the punch tier
+# already uses (tools/stun.py). No new dependency and no "what is my IP" HTTP
+# service: STUN answers the question the panel needs, and it answers a second
+# one a lookup service cannot -- whether a forward would work at all.
+_PUBLIC_CACHE = {"at": 0.0, "ip": None, "kind": "unknown", "detail": None}
+PUBLIC_TTL = 300.0
+
+
+def public_endpoint(force=False, ttl=PUBLIC_TTL, timeout=1.2):
+    """How the internet sees this machine: {"ip", "kind", "detail"}.
+
+    kind is one of exactly three things, and the panel must not blur them:
+
+      "public"  -- a globally routable mapping. A UDP forward of the game port
+                   to this machine makes the address work for a remote peer.
+      "cgnat"   -- the mapping sits in CGNAT or private space, i.e. something
+                   else is NATing us as well. NO forward can help, so the
+                   address is withheld rather than offered: this is the
+                   misleading display the 2026-10-16 decision was guarding
+                   against.
+      "unknown" -- no STUN server answered (offline, or UDP out blocked).
+
+    The mapped PORT is deliberately not returned. It belongs to the throwaway
+    socket this probe used, NOT to the port the game binds, so publishing it
+    would hand the user a number that is wrong in the one place it is shown.
+    Only the address is reusable; the port always comes from sharing["port"].
+
+    Cached in-process for PUBLIC_TTL: the host flow can be retried while the
+    user dithers over the invitation, and re-probing costs a round trip each
+    time. A failure is cached too, so an offline machine does not pay the
+    timeout on every attempt.
+    """
+    import time as _time
+    now = _time.time()
+    if not force and (now - _PUBLIC_CACHE["at"]) < ttl:
+        return dict(_PUBLIC_CACHE, at=None)
+
+    out = {"ip": None, "kind": "unknown", "detail": "no STUN server answered"}
+    try:
+        import socket as _socket
+        import stun as _stun
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        try:
+            # limit=2: a panel must not block on four servers when one answer
+            # settles it, and probe() shuffles, so a dead first entry does not
+            # always cost the same timeout.
+            results = _stun.probe(s, timeout=timeout, limit=2)
+        finally:
+            s.close()
+        best = _stun.best_mapping([m for _srv, m in results])
+        if best is not None:
+            ip = best[0]
+            kind = "public" if _classify_ip(ip) == "public" else "cgnat"
+            out = {"ip": ip, "kind": kind,
+                   "detail": None if kind == "public" else
+                   "this address is behind another NAT (CGNAT), so forwarding "
+                   "the port cannot make it reachable"}
+    except Exception as e:          # offline, no UDP, DNS down: all "unknown"
+        out = {"ip": None, "kind": "unknown",
+               "detail": f"{type(e).__name__}: {e}"}
+
+    _PUBLIC_CACHE.update(out)
+    _PUBLIC_CACHE["at"] = now
+    return out
+
+
 def _is_wifi_like(ip):
     """Best-effort: is this the Wi-Fi adapter? On the owner's machine the Wi-Fi
     address is the one on the default route, so probe the routing table rather

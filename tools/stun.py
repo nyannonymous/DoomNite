@@ -159,16 +159,26 @@ def query(sock: socket.socket, server: tuple[str, int],
 
 
 def probe(sock: socket.socket, servers: tuple = SERVERS,
-          timeout: float = DEFAULT_TIMEOUT) -> list[tuple[tuple[str, int],
-          tuple[str, int] | None]]:
+          timeout: float = DEFAULT_TIMEOUT, limit: int | None = None
+          ) -> list[tuple[tuple[str, int], tuple[str, int] | None]]:
     """Every (server, mapping) the servers can be talked into telling us.
 
     Failure tolerant by construction: a server that is down, DNS-dead, or
     behind a filtering middlebox simply contributes nothing.
+
+    `limit` caps how many servers are asked, for callers that only need a
+    quick answer rather than a NAT verdict (mp_session.public_endpoint asks
+    two: it wants the mapped address, not the port comparison that needs a
+    second opinion). The sample is still shuffled, so the servers asked vary
+    between calls instead of one dead entry always costing the same timeout.
     """
     import random as _random
     results: list[tuple[tuple[str, int], tuple[str, int] | None]] = []
-    for srv in _random.sample(list(servers), k=len(list(servers))):
+    pool = list(servers)
+    _random.shuffle(pool)
+    if limit is not None and limit > 0:
+        pool = pool[:limit]
+    for srv in pool:
         results.append((srv, query(sock, srv, timeout)))
     return results
 

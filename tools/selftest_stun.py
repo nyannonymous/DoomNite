@@ -403,6 +403,78 @@ check("firewall advisory is verdict-shaped",
       isinstance(fw, dict) and "ok" in fw and "rule" in fw and "why" in fw,
       str(fw))
 
+# ---------------------------------------------------- public address (L17)
+# The panel could never list this machine's public IP: shareable_addresses()
+# only ever describes a LOCAL adapter, and its "public" branch is unreachable
+# on a home machine. _launch now appends one from a STUN answer, and this is
+# the payload contract the UI reads. Stubbed, because a test that needs a live
+# STUN server fails on a plane; the classification itself is pinned in
+# tools/selftest_mp.py.
+import subprocess as _subprocess2
+_real_popen2 = _subprocess2.Popen
+_spawned2 = []
+_subprocess2.Popen = lambda argv, **kw: (_spawned2.append(argv), None)[1]
+_real_host2, _real_join2 = _m.host_argv, _m.join_argv
+_real_pub = _m.public_endpoint
+_pub_calls = []
+try:
+    _m.host_argv = lambda *a, **k: ["ZANDRA.EXE"]
+    _m.join_argv = lambda *a, **k: ["ZANDRA.EXE", "+Connect", "1.2.3.4:23513"]
+    _m._fingerprint_cached = lambda idx: "STUBFING"
+    _m.compare_fingerprint = lambda idx, given: (None, "STUBFING")
+
+    def _stub_pub(kind, ip=None):
+        def f(**kw):
+            _pub_calls.append(kind)
+            return {"ip": ip, "kind": kind,
+                    "detail": None if kind == "public"
+                    else "this address is behind another NAT (CGNAT)"}
+        return f
+
+    _m.public_endpoint = _stub_pub("public", "159.196.152.92")
+    status, body = H.host(_FakeHandler({"index": 0}), resolve)
+    sh = body.get("sharing") or {}
+    addrs = sh.get("addresses") or []
+    pub = [a for a in addrs if a.get("kind") == "public"]
+    check("a host lists the public address the panel could never show",
+          status == 200 and len(pub) == 1
+          and pub[0].get("ip") == "159.196.152.92", str(addrs))
+    check("the public address is the LAST entry, after the local ones",
+          addrs and addrs[-1].get("kind") == "public", str(addrs))
+    check("the public verdict rides in the payload for the label",
+          sh.get("public", {}).get("kind") == "public", str(sh.get("public")))
+    check("the public entry carries no port of its own",
+          set(pub[0]) == {"ip", "kind"}, str(pub[0]))
+    check("the share line still uses the game's own port",
+          sh.get("port") == 23513, str(sh.get("port")))
+
+    # A CGNAT answer must WITHHOLD the address, not offer it with a caveat:
+    # forwarding a port to an address the ISP is already NATing cannot work.
+    _pub_calls.clear()
+    _m.public_endpoint = _stub_pub("cgnat")
+    status, body = H.host(_FakeHandler({"index": 0}), resolve)
+    sh = body.get("sharing") or {}
+    addrs = sh.get("addresses") or []
+    check("a CGNAT host lists no public address at all",
+          not [a for a in addrs if a.get("kind") == "public"], str(addrs))
+    check("a CGNAT host still reports the verdict, so the panel can explain",
+          sh.get("public", {}).get("kind") == "cgnat", str(sh.get("public")))
+
+    # A joiner has nothing to hand on, and must not pay a STUN round trip for
+    # a panel it never renders.
+    _pub_calls.clear()
+    status, body = H.join(_FakeHandler({"index": 0,
+                                        "addr": "5.6.7.8:12345"}), resolve)
+    check("a joiner's payload carries no sharing block",
+          body.get("sharing") is None, str(body.get("sharing")))
+    check("a join never probes for a public address",
+          _pub_calls == [], str(_pub_calls))
+finally:
+    _subprocess2.Popen = _real_popen2
+    _m.host_argv, _m.join_argv = _real_host2, _real_join2
+    _m.public_endpoint = _real_pub
+    _spawned2.clear()
+
 # ------------------------------------------------------------------
 print()
 print(f"{len(PASS)} passed, {len(FAIL)} failed")

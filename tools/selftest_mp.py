@@ -558,5 +558,79 @@ check("shareable_addresses is ordered best-first",
 check("every shareable address has a kind",
       all(k for _ip, k in pairs), str(pairs))
 
+# ------------------------------------------------------------ public address
+# L17. shareable_addresses() above can only ever describe a LOCAL adapter, so
+# the panel had no way to show the one address a friend outside the network
+# needs. public_endpoint() asks a STUN server instead. The classification is
+# what matters and it is pinned here with an injected mapping, because a test
+# that needs a live STUN server is a test that fails on a plane.
+import stun as _stun      # noqa: E402
+
+_real_probe = _stun.probe
+_probe_calls = []
+
+
+def _stub_probe(mappings):
+    def f(sock, servers=(), timeout=None, limit=None):
+        _probe_calls.append(limit)
+        return [(("stub.invalid", 1), m) for m in mappings]
+    return f
+
+
+try:
+    # A globally routable mapping IS the address to hand out.
+    _stun.probe = _stub_probe([("159.196.152.92", 52238)])
+    M._PUBLIC_CACHE["at"] = 0.0
+    r = M.public_endpoint(force=True)
+    check("a routable STUN mapping is offered as a public address",
+          r["kind"] == "public" and r["ip"] == "159.196.152.92", str(r))
+    # The probe's mapped port belongs to a throwaway socket, NOT to the port
+    # the game binds, so publishing it would be wrong in the one place it shows.
+    check("the public result carries no port, only the address",
+          set(r) == {"ip", "kind", "detail"}, str(sorted(r)))
+    check("a routable mapping needs no explanation",
+          r["detail"] is None, str(r["detail"]))
+
+    # CGNAT: the ISP is NATing us as well, so a router forward cannot help and
+    # the address must be WITHHELD rather than offered with a caveat.
+    _stun.probe = _stub_probe([("100.95.67.84", 52238)])
+    M._PUBLIC_CACHE["at"] = 0.0
+    r = M.public_endpoint(force=True)
+    check("a CGNAT mapping is classified cgnat, not public",
+          r["kind"] == "cgnat", str(r))
+    check("a CGNAT result explains why the address is withheld",
+          "NAT" in (r["detail"] or ""), str(r["detail"]))
+
+    _stun.probe = _stub_probe([("192.168.0.5", 52238)])
+    M._PUBLIC_CACHE["at"] = 0.0
+    check("a private mapping is cgnat, not public",
+          M.public_endpoint(force=True)["kind"] == "cgnat")
+
+    # Offline, or UDP out blocked: say so, do not invent an address.
+    _stun.probe = _stub_probe([])
+    M._PUBLIC_CACHE["at"] = 0.0
+    r = M.public_endpoint(force=True)
+    check("no STUN answer reports unknown with no address",
+          r["kind"] == "unknown" and r["ip"] is None, str(r))
+
+    # A failure is cached too, so an offline machine does not pay the timeout
+    # again on every retry of the host flow.
+    _stun.probe = _stub_probe([("159.196.152.92", 52238)])
+    M._PUBLIC_CACHE["at"] = 0.0
+    _probe_calls.clear()
+    first = M.public_endpoint(force=True)
+    second = M.public_endpoint()
+    check("a second call is served from the cache, not re-probed",
+          len(_probe_calls) == 1 and second == first,
+          f"probes={len(_probe_calls)}")
+    M.public_endpoint(force=True)
+    check("force re-probes", len(_probe_calls) == 2, f"probes={len(_probe_calls)}")
+    # A panel must not block on four servers when one answer settles it.
+    check("the probe asks two servers, not the whole pool",
+          _probe_calls[-1] == 2, str(_probe_calls[-1]))
+finally:
+    _stun.probe = _real_probe
+    M._PUBLIC_CACHE["at"] = 0.0
+
 print(f"\n{len(PASS)}/{len(PASS) + len(FAIL)} checks passed")
 sys.exit(1 if FAIL else 0)
