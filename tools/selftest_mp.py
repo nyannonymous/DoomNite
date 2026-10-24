@@ -621,8 +621,15 @@ try:
     first = M.public_endpoint(force=True)
     second = M.public_endpoint()
     check("a second call is served from the cache, not re-probed",
-          len(_probe_calls) == 1 and second == first,
-          f"probes={len(_probe_calls)}")
+          len(_probe_calls) == 1, f"probes={len(_probe_calls)}")
+    # The two branches must return the SAME shape. The first version returned
+    # dict(_PUBLIC_CACHE, at=None) from the cached branch, so a cached answer
+    # carried a stray `at` key the fresh one did not -- a payload field that
+    # appeared only sometimes, which is the kind of thing that shows up as a
+    # mystery in the UI rather than as a failure here.
+    check("a cached answer has exactly the same shape as a fresh one",
+          second == first and set(second) == {"ip", "kind", "detail"},
+          f"{first} vs {second}")
     M.public_endpoint(force=True)
     check("force re-probes", len(_probe_calls) == 2, f"probes={len(_probe_calls)}")
     # A panel must not block on four servers when one answer settles it.

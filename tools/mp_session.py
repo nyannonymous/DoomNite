@@ -540,6 +540,11 @@ def shareable_addresses():
 # service: STUN answers the question the panel needs, and it answers a second
 # one a lookup service cannot -- whether a forward would work at all.
 _PUBLIC_CACHE = {"at": 0.0, "ip": None, "kind": "unknown", "detail": None}
+# What a caller may see. `at` is bookkeeping and must not reach the payload:
+# the first version returned dict(_PUBLIC_CACHE, at=None) from the cached
+# branch, so a cached answer carried a stray key that a fresh one did not, and
+# the selftest caught the two shapes disagreeing.
+_PUBLIC_FIELDS = ("ip", "kind", "detail")
 PUBLIC_TTL = 300.0
 
 
@@ -570,7 +575,7 @@ def public_endpoint(force=False, ttl=PUBLIC_TTL, timeout=1.2):
     import time as _time
     now = _time.time()
     if not force and (now - _PUBLIC_CACHE["at"]) < ttl:
-        return dict(_PUBLIC_CACHE, at=None)
+        return {k: _PUBLIC_CACHE[k] for k in _PUBLIC_FIELDS}
 
     out = {"ip": None, "kind": "unknown", "detail": "no STUN server answered"}
     try:
