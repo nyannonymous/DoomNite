@@ -139,8 +139,9 @@ fetcher.py          the asset fetcher and hash verifier
 sources.json        68 entries, sizes + sha256, and the base_url
 config.json         settings
 art/                game art used by the UI
-dist/               built UI, committed so the server runs without npm
-ui/                 React + Vite + Tailwind source for dist/
+app/                built launcher UI, committed so the server runs without npm
+dist/               copy of the DOWNLOAD PAGE, not the launcher -- see the note below
+ui/                 React + Vite + Tailwind source for app/
 tools/build.py      the game table — the one file you edit to add games
 tools/make_menu.py  generate the batch menu from the manifest
 tools/selftest_live.py  prove a bare clone fetches from the live bucket
@@ -148,6 +149,13 @@ runtime/            uzdoom.exe + DLLs        (fetched)
 iwads/              DOOM.WAD                 (fetched)
 mods/               one folder per mod        (fetched)
 ```
+
+`ui/vite.config.js` writes the built UI to **`app/`**, not `dist/` — `dist/`
+holds a copy of `site/index.html`, the download page, written by
+`ui/copy-download-page.mjs`. `wrangler.jsonc` publishes **`site/`**, so neither
+`dist/` nor `app/` is what the public URL serves; `app/` is what `serve.py`
+serves locally, and `dist/` is only there so the copy step has somewhere to
+write. Two files used to describe this differently and both were wrong.
 
 `tools/build.py` is the only file you edit to change the game list. Its `GAMES`
 table maps each entry to mod files and an IWAD. Everything else reads the
@@ -166,13 +174,23 @@ python tools/selftest_nn_preset.py         # NukemNet preset writer output
 python tools/selftest_mp.py                # multiplayer: address parsing, index mapping, arg order
 python tools/check_bucket.py              # is every file in sources.json really on the bucket?
 python tools/selftest_add_mod.py           # add-a-mod inspector (IWAD guess, duplicates)
+python tools/selftest_stun.py              # STUN punch tier: parser, NAT verdict, relay, payload
+python tools/check_mp_command.py           # the multiplayer command shape a build must not ship broken
 python legacy/playnite-launcher/tools/selftest_settle.py   # probe settle window scales with asset size
+node ui/verify.mjs ../app/assets/<bundle>.js             # the launcher UI: cards, filters, launch path
 node ui/verify-watch.mjs                   # browser check of the folder watch (needs serve.py running)
 node ui/verify-mp-button.mjs ../app/assets/<bundle>.js   # multiplayer panel shape + request contract
 node ui/measure-header.mjs ../app/assets/<bundle>.js     # REAL layout + dialog geometry, in Chromium
 ```
 
-All of these are offline and never start a game. **Do launch real games:**
+The four `node` harnesses and `selftest_stun.py`/`check_mp_command.py` all need
+a `serve.py` running on `127.0.0.1:8765` (the harnesses accept `DOOMNITE_BASE`
+for a second server on another port). Two more are safe but **do** use the
+network: `python tools/selftest_packmod_fetch.py` really downloads ~37 MB from
+the bucket to prove a fresh install can restore a game, and
+`python tools/check_bucket.py` reads the bucket's headers.
+
+None of these start a game. **Do launch real games:**
 `legacy/playnite-launcher/tools/qa_mp_probe.py` (27 entries, one at a time) - don't run it unattended.
 
 `--dryrun` logs the command line it *would* execute instead of running it.

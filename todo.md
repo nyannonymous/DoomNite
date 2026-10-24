@@ -503,6 +503,23 @@ Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. 
   Done when: the message lists each match as `<index> <label>` and says to pass one of those indexes.
   Hints: `tools/nn_preset.py` `resolve_entry()`; the same listing is already printed by `--list`.
 
+Found by a worker on 2026-10-18 (code audit + missing tests + dependency health). Nothing here is started.
+
+- [ ] **`tools/build.py` silently shrinks the pack when the operator's source drive is gone** [P1] [code audit] [size:M]
+  Why: measured this run. `Z:\GAMES\BRUTAL_DOOM (uwu)` is now **empty**, and one `python tools/build.py` rewrote `pack-manifest.json` from **16 games to 4**, `launchers/` from **31 scripts to 5**, and the tracked `tools/run_standalone.cmd` down to one entry. Nothing warned; the only reason it was recoverable is that `desktop/build/pack/` held a staged copy from the 2.3.1 build, because `pack-manifest.json` and `launchers/` are **gitignored** — there is no `git checkout` for them. `build.py --check` afterwards said "launcher count: script implies 31, manifest has 5" and still exited 0, so the shrink is not even a failure. A worker who ran `build.py` before checking the source drive would destroy the pack's game list with no way back.
+  Done when: `build.py` refuses to overwrite an existing manifest with fewer games (or fewer launchers) than it already lists unless `--force`, names the source root it could not read, and never rewrites `run_standalone.cmd` from a drive it could not scan.
+  Hints: `tools/build.py`; the recovery this time was `cp desktop/build/pack/pack-manifest.json .` and `cp -r desktop/build/pack/launchers/. launchers/`. Consider staging a copy of both into `desktop/build/pack/` on every successful build so this is always recoverable.
+
+- [ ] **`remove_pack_mod()`'s shared-slug protection is asserted nowhere** [P2] [missing tests] [size:S]
+  Why: this is the only function in the pack that deletes folders, and the whole reason it is not a one-liner is that a slug shared between two games (BDBE's `bdbe-v3-38` is shared by "Enhanced Episode 1" and "HontE Remastered") must be **skipped, not deleted** — uninstalling one game must never break another that still loads the same file. `selftest_serve.py` pins only the refusal paths (unknown name 404, `..%5C..%5Cwindows` 404). Delete the `len(owners.get(f, ())) > 1` guard and every test still passes while the pack starts eating other games' files.
+  Done when: a check builds a two-game shared slug in a temp pack root, calls `remove_pack_mod()` on one of them, and asserts the shared folder is still on disk and reported under `skipped` — plus the exclusive folder beside it is gone and counted in `freed`.
+  Hints: `installer.remove_pack_mod()`; `installer.PACK` and `installer.MANIFEST` are module constants, so point them at a temp root the way `selftest_watch.py` does.
+
+- [ ] **A baked-in game's INSTALL fetch is one blocking request with no progress and no resume** [P2] [UX/robustness] [size:M]
+  Why: `POST /api/packmods/<name>` calls `installer.download_pack_mod()` inline and returns only when every file is fetched. That is fine for QuakinDoom (18 MB, 3 s — measured) and not fine for Brutal Doom v22 + BDBE + its episode wads, which is hundreds of MB on one request with nothing but a spinner. The two on-demand total conversions do it properly: `installer.start()` returns **202** immediately, runs in a worker thread, and the UI polls `/api/install` for `received`/`total`. The pack-mod path has the polling machinery already built for it (`/api/packmods` is polled every 4 s) but publishes no byte counts, so a long download looks identical to a hung one and a dropped connection leaves no way to see how far it got.
+  Done when: the pack-mod fetch reports per-file progress through the payload the panel already polls, or runs on a worker with a job record like `installer._jobs` — and a cancelled or failed fetch leaves the partial files as `.part` rather than looking installed.
+  Hints: `installer.download_pack_mod()` is already per-file (`fetcher.fetch_one` returns after each), so a job record is a small change; `ui/src/Panel.jsx` `downloadMods()` and its `dlBusy` flag are the UI half. `fetcher.fetch_one` already writes `.part` and verifies sha256 before the rename, so the safety property is there — only the reporting is missing.
+
 ---
 
 ## Decisions made (review me)

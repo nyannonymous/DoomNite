@@ -1,5 +1,10 @@
-// Post-build: put the download page at dist/index.html, which is the file
-// Cloudflare Pages serves at the root.
+// Post-build: put the download page at dist/index.html.
+//
+// READ THIS BEFORE TRUSTING THE PATH. Cloudflare Pages publishes **site/**,
+// not dist/ -- see wrangler.jsonc, which says so explicitly. This script's job
+// is to keep a second copy at dist/ for the build to check, NOT to publish it;
+// an earlier version of this comment claimed dist/index.html was what Pages
+// serves at the root, which was wrong and cost someone a confused afternoon.
 //
 // The deploy used to serve dist/ directly, and dist/index.html was the launcher
 // shell -- so the public site was a React app that immediately failed to fetch
@@ -8,7 +13,8 @@
 //
 // Layout after a build:
 //
-//   dist/index.html   download page -> published at /
+//   site/index.html   download page -> published at /   (wrangler.jsonc)
+//   dist/index.html   the same page, copied here and checked
 //   app/index.html    launcher UI   -> served by serve.py, never published
 //
 // The launcher deliberately lives outside dist/. It needs /api/entries and
