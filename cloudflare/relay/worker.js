@@ -99,9 +99,94 @@ export class UdpRoom {
   }
 }
 
-const json = (o) =>
+// The lobby: a public list of open rooms, so joining is "click a name" not
+// "paste a code someone read out over Discord". One well-known Durable
+// Object (idFromName('global')) holds the whole directory in its own
+// storage -- small enough that sharding would be pure overhead, and a
+// single object gives trivially consistent reads (no two requests ever see
+// a different room list out of order).
+//
+// A room's entry has a TTL, not an explicit "I'm leaving" requirement: the
+// Python side (tools/lobby.py) re-announces every HEARTBEAT_MS while the
+// host's tunnel is alive, and list() drops anything older than STALE_MS
+// lazily, at read time. This means a crashed host's game silently falls out
+// of the list within ~45s instead of leaving a dead "join me" entry that a
+// friend could click forever -- no cron, no alarm needed for this part,
+// list() already has to walk every entry to answer the request.
+const STALE_MS = 45 * 1000;
+
+export class Lobby {
+  constructor(ctx) {
+    this.ctx = ctx;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/lobby/list') {
+      return json({ rooms: await this._live() });
+    }
+    if (request.method !== 'POST') return json({ error: 'method not allowed' });
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'bad json' });
+    }
+    const room = String(body?.room || '').replace(/[^\w-]/g, '').slice(0, 32);
+    if (!room) return json({ error: 'room required' });
+
+    if (url.pathname === '/lobby/announce' || url.pathname === '/lobby/heartbeat') {
+      const existing = (await this.ctx.storage.get('r:' + room)) || {};
+      const entry = {
+        room,
+        // label/mode only ever SET on announce, so a heartbeat (which the
+        // Python side sends with no label) cannot blank out what the room
+        // is actually called.
+        label: url.pathname === '/lobby/announce' ? String(body?.label || '').slice(0, 80) : existing.label || '',
+        mode: url.pathname === '/lobby/announce' ? String(body?.mode || '').slice(0, 40) : existing.mode || '',
+        players: Math.max(0, Math.min(99, Number(body?.players) || existing.players || 1)),
+        ts: Date.now(),
+      };
+      await this.ctx.storage.put('r:' + room, entry);
+      return json({ ok: true });
+    }
+
+    if (url.pathname === '/lobby/remove') {
+      await this.ctx.storage.delete('r:' + room);
+      return json({ ok: true });
+    }
+
+    return json({ error: 'not found' }, 404);
+  }
+
+  async _live() {
+    const all = await this.ctx.storage.list({ prefix: 'r:' });
+    const now = Date.now();
+    const fresh = [];
+    for (const [key, entry] of all) {
+      if (now - (entry.ts || 0) > STALE_MS) {
+        this.ctx.storage.delete(key).catch(() => {}); // lazy GC, not awaited
+        continue;
+      }
+      fresh.push(entry);
+    }
+    fresh.sort((a, b) => b.ts - a.ts); // newest room first
+    return fresh;
+  }
+}
+
+const json = (o, status = 200) =>
   new Response(JSON.stringify(o), {
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      // The pack's UI may one day fetch this directly from a browser
+      // context (not just mp_http.py server-to-server); harmless either
+      // way since this endpoint carries no auth and no secrets.
+      'Access-Control-Allow-Origin': '*',
+    },
   });
 
 export default {
@@ -111,6 +196,9 @@ export default {
       const room = (url.searchParams.get('room') || '').replace(/[^\w-]/g, '').slice(0, 32);
       if (!room) return json({ error: 'room required' });
       return env.ROOMS.get(env.ROOMS.idFromName(room)).fetch(request);
+    }
+    if (url.pathname.startsWith('/lobby/')) {
+      return env.LOBBY.get(env.LOBBY.idFromName('global')).fetch(request);
     }
     if (url.pathname === '/health') return json({ ok: true });
     return new Response('doomnite relay', { status: 200 });

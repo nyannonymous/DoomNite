@@ -492,3 +492,55 @@
 .mp-addrfield .mp-hint {
   margin-top: 6px;
 }
+
+/* -- lobby: open games list ------------------------------------------
+   The easy path. Leads the panel (rendered before .mp-choose), so the
+   first thing anyone sees after the status line is a list of games to
+   click into, not an address field. */
+.mp-lobby-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mp-lobby-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(92, 255, 168, 0.05);
+  border: 1px solid rgba(92, 255, 168, 0.2);
+  border-radius: var(--radius);
+}
+.mp-lobby-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mp-lobby-players {
+  flex: none;
+  font-size: 11px;
+  color: var(--fg-faint);
+  font-family: var(--d-mono);
+}
+.mp-lobby-row .mp-action {
+  flex: none;
+  padding: 5px 14px;
+}
+.mp-lobby-host {
+  width: 100%;
+}
+.mp-lobby-code {
+  margin-top: 10px;
+  align-items: stretch;
+}
+.mp-lobby-code .mp-input {
+  flex: 1 1 auto;
+  font-family: var(--d-mono);
+}

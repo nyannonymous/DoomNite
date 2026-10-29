@@ -349,6 +349,17 @@ def _launch(handler, resolve, mode):
     except OSError as e:
         return 500, {"error": str(e)}
 
+    if want_relay and mode == "host":
+        # Only now -- the engine actually launched. An entry announced
+        # before this point could outlive a launch that silently failed,
+        # advertising a room nobody could ever join. The heartbeat thread
+        # removes itself when tunnel.alive() goes false (the tunnel is
+        # stopped the same way a fresh host/join request always stops the
+        # previous one -- see start_tunnel()), so a crashed or replaced
+        # tunnel falls out of the lobby within one heartbeat interval.
+        import lobby as _lobby
+        _lobby.keep_announced(tunnel.room, entry.get("label", ""), "doom", tunnel.alive)
+
     import mp_session
 
     # Only a host has something to share; a joiner has nothing to hand on. The
@@ -468,12 +479,25 @@ def _firewall_advisory():
     return out
 
 
+def lobby_list(handler, resolve):
+    """POST /api/multiplayer/lobby -- the open-rooms list, proxied server
+    side rather than fetched by the browser/renderer directly, so the UI
+    never needs CORS or to know the relay Worker's URL at all; it is just
+    another same-origin call to the pack's own local server, like every
+    other /api/ route. Body is ignored (no filters yet); accepts POST only
+    to match this file's one route shape (serve.py's table is POST-only).
+    """
+    import lobby as _lobby
+    return 200, {"ok": True, "rooms": _lobby.list_rooms()}
+
+
 # The path -> (method, handler) table serve.py consults. Keeping it explicit
 # means an unknown multiplayer path 404s like every other unknown path.
 ROUTES = {
     "/api/multiplayer/setup": setup,
     "/api/multiplayer/host": host,
     "/api/multiplayer/join": join,
+    "/api/multiplayer/lobby": lobby_list,
 }
 
 

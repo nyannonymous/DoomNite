@@ -52,14 +52,27 @@ class _FakeTunnel:
     def stop(self):
         self.stopped = True
 
+    def alive(self):
+        return not self.stopped
+
+
+import lobby as L             # noqa: E402
 
 _real_popen = _subprocess.Popen
 _real_host_argv, _real_join_argv = _m.host_argv, _m.join_argv
 _real_fp, _real_cmp = _m._fingerprint_cached, _m.compare_fingerprint
 _real_start_tunnel = W.start_tunnel
+_real_keep_announced = L.keep_announced
 
 _argv_calls = []
 _spawned = []
+_lobby_calls = []
+
+
+def _stub_keep_announced(room, label, mode, is_alive):
+    # No real network, no background thread: record what mp_http.py would
+    # have announced, same spirit as the argv/Popen stubs above.
+    _lobby_calls.append((room, label, mode))
 
 
 def _stub_host_argv(idx, port, **kw):
@@ -92,6 +105,7 @@ try:
     _m.compare_fingerprint = lambda idx, given: (None, "STUBFING")
     W.start_tunnel = _stub_start_tunnel
     W.TUNNELS.clear()
+    L.keep_announced = _stub_keep_announced
 
     # ---- relay and stun together are refused
     status, body = H.host(_FakeHandler({"index": 0, "relay": True, "stun": True}), resolve)
@@ -111,6 +125,9 @@ try:
           tunnel.engine_target == ("127.0.0.1", 23513), str(tunnel.engine_target))
     check("relay host's argv used the real engine port, not the tunnel port",
           _argv_calls[-1][2] == 23513, str(_argv_calls[-1]))
+    check("a successful relay host announces itself to the lobby",
+          _lobby_calls and _lobby_calls[-1][0] == rp.get("room") and _lobby_calls[-1][1] == "Stub",
+          str(_lobby_calls))
 
     # ---- host with an explicit room: reused, not replaced
     status, body = H.host(_FakeHandler({"index": 0, "relay": True, "room": "myroom"}), resolve)
@@ -133,6 +150,8 @@ try:
           _argv_calls[-1][2] == "127.0.0.1:34567", str(_argv_calls[-1]))
     mode, tunnel = _created_tunnels[-1]
     check("relay join used a tunnel registered as join", mode == "join", mode)
+    check("a join never announces itself to the lobby (only the host owns the room)",
+          len(_lobby_calls) == 2, str(_lobby_calls))  # the two host launches above, nothing from this join
 
     check("the stubbed launch for the last join carried the tunnel's loopback address",
           _spawned[-1][-1] == "127.0.0.1:34567", str(_spawned[-1]))
@@ -142,6 +161,7 @@ finally:
     _m._fingerprint_cached, _m.compare_fingerprint = _real_fp, _real_cmp
     W.start_tunnel = _real_start_tunnel
     W.TUNNELS.clear()
+    L.keep_announced = _real_keep_announced
 
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
 raise SystemExit(1 if FAIL else 0)

@@ -5,11 +5,21 @@
   // shuttles two players' raw Zandronum UDP traffic past NAT/firewalls
   // neither of them can otherwise get through. Deploy with:
   //   cd cloudflare/relay && npx wrangler deploy
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "doomnite-relay",
   "main": "worker.js",
   "compatibility_date": "2026-10-02",
-  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "UdpRoom" }] },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UdpRoom"] }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "UdpRoom" },
+      { "name": "LOBBY", "class_name": "Lobby" }
+    ]
+  },
+  // v2 adds Lobby as its own migration tag -- v1 (UdpRoom) already shipped,
+  // and a new DO class needs a new tag, not an edit to the old one.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["UdpRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["Lobby"] }
+  ],
   "observability": { "enabled": true }
 }

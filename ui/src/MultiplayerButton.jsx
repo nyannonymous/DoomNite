@@ -66,8 +66,17 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   const [busy, setBusy] = useState(false);
   const [sharing, setSharing] = useState(null); // what to hand to a friend
   const [punch, setPunch] = useState(null);     // survives only for the STUN tier
+  const [relayInfo, setRelayInfo] = useState(null); // survives only for the relay tier
   const [mismatch, setMismatch] = useState(null); // mod differs from the host
   const [err, setErr] = useState(null);
+  // The lobby: open relay rooms, polled while the panel is open. A fetch
+  // failure here must never surface as the panel's main error -- it just
+  // means the list stays empty (or stale), same as any other "can't reach
+  // the internet right now" degradation. roomCode is the manual fallback
+  // for the one case polling can't cover: the host's room not showing up
+  // yet (network hiccup, or they only just announced it).
+  const [lobbyRooms, setLobbyRooms] = useState([]);
+  const [roomCode, setRoomCode] = useState("");
 
   /* Which entries can be played online.
 
@@ -106,6 +115,38 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
       /* non-fatal */
     }
   }, [name]);
+
+  // Poll the open-rooms list while the panel is actually open. Silent on
+  // failure -- the verify harness refuses every multiplayer POST except
+  // /setup with a fake 418, and that refusal must read as "no rooms right
+  // now", not as a panel-breaking error.
+  useEffect(() => {
+    if (!open) {
+      setLobbyRooms([]);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/multiplayer/lobby", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!cancelled) setLobbyRooms(Array.isArray(d.rooms) ? d.rooms : []);
+      } catch {
+        /* a dropped lobby fetch should not clear what was already shown */
+      }
+    };
+    poll();
+    const id = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [open]);
 
   /* One call does the hidden setup: junctions + preset. Runs every time the
      panel opens, because it is idempotent and because the alternative is the
@@ -147,17 +188,24 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   }, [chosen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const start = useCallback(
-    async (which, stunMode = false) => {
+    // opts: { stun?: bool, relay?: bool, room?: string }. `room` is only
+    // meaningful with relay: true on a join -- it comes from a lobby click
+    // or the manual code field, never from `addr`.
+    async (which, opts = {}) => {
       if (!chosen) return;
       setBusy(true);
       setErr(null);
       setSharing(null);
       setPunch(null);
+      setRelayInfo(null);
       try {
         const body = { index: chosen._idx, port: 23513, name };
-        if (stunMode) body.stun = true;
+        if (opts.stun) body.stun = true;
+        if (opts.relay) body.relay = true;
         if (which === "host") {
           body.deathmatch = dm;
+        } else if (opts.relay) {
+          body.room = opts.room;
         } else {
           // The whole line is sent, code included -- the server splits it, so
           // the user pastes exactly what the host handed them.
@@ -174,14 +222,18 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
             if (which === "host") {
           setSharing(d.sharing);
           setPunch(d.punch || null);
+          setRelayInfo(d.relay || null);
           setMismatch(null);
           toast(
-            stunMode
+            opts.relay
+              ? `Hosting ${d.label} — it's now listed above for anyone to join.`
+              : opts.stun
               ? `Punched an internet path for ${d.label}. Send the internet line to your friend.`
               : `Hosting ${d.label}. Share the address with your friends.`
           );
         } else {
-          if (stunMode) setPunch(d.punch || null);
+          if (opts.stun) setPunch(d.punch || null);
+          if (opts.relay) setRelayInfo(d.relay || null);
           // mod_match is true / false / null (nothing was pasted to check).
           // A mismatch WARNS and still connects: a slightly different build is
           // often still worth trying, and blocking would leave someone stuck
@@ -300,6 +352,83 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                 </p>
               )}
 
+              {/* THE EASY PATH. Everything below this (addresses, STUN
+                  lines, codes) exists because the engine's own networking
+                  needs it -- this section exists so a normal person never
+                  has to see any of that. Hosting here lists the game for
+                  anyone with DoomNite open; joining is one click. No
+                  address, no port, no VPN, on either side. */}
+              {phase === "ready" && (
+                <section className="mp-section mp-lobby">
+                  <h3>Open games</h3>
+                  {lobbyRooms.length === 0 ? (
+                    <p className="mp-hint">
+                      No one's hosting right now — be the first.
+                    </p>
+                  ) : (
+                    <ul className="mp-lobby-list">
+                      {lobbyRooms.map((r) => (
+                        <li key={r.room} className="mp-lobby-row">
+                          <span className="mp-lobby-label">{r.label || "Doom"}</span>
+                          <span className="mp-lobby-players">
+                            {r.players || 1} player{(r.players || 1) === 1 ? "" : "s"}
+                          </span>
+                          <button
+                            className="mp-action mp-action--primary"
+                            onClick={() => start("join", { relay: true, room: r.room })}
+                            disabled={busy || !chosen}
+                          >
+                            Join
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    className="mp-action mp-action--primary mp-lobby-host"
+                    onClick={() => start("host", { relay: true })}
+                    disabled={busy || !chosen}
+                  >
+                    Host — let anyone find it
+                  </button>
+                  {relayInfo && relayInfo.room && !relayInfo.connect && (
+                    <p className="mp-hint">
+                      Your game is listed above now. If a friend's list is
+                      slow to update, they can also join by typing this
+                      code: <code>{relayInfo.room}</code>
+                    </p>
+                  )}
+                  {/* Fallback for the one gap polling can't cover: a room
+                      that hasn't shown up yet. Not the primary path -- the
+                      list above is -- so it is small and out of the way. */}
+                  <div className="mp-row mp-lobby-code">
+                    <input
+                      className="mp-input"
+                      value={roomCode}
+                      onChange={(e) => setRoomCode(e.target.value)}
+                      placeholder="Or type a room code"
+                      spellCheck={false}
+                      autoComplete="off"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && roomCode.trim()) {
+                          start("join", { relay: true, room: roomCode.trim() });
+                        }
+                      }}
+                    />
+                    <button
+                      className="mp-action"
+                      onClick={() => {
+                        if (!roomCode.trim()) return;
+                        start("join", { relay: true, room: roomCode.trim() });
+                      }}
+                      disabled={busy || !chosen || !roomCode.trim()}
+                    >
+                      Join by code
+                    </button>
+                  </div>
+                </section>
+              )}
+
               {phase === "ready" && (
                 <section className="mp-section mp-choose">
                   {/* The address field is the first control, not a second
@@ -362,7 +491,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   <div className="mp-row mp-choice mp-internet">
                     <button
                       className="mp-action"
-                      onClick={() => start("host", true)}
+                      onClick={() => start("host", { stun: true })}
                       disabled={busy || !chosen}
                     >
                       Host over the internet
@@ -374,7 +503,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                           setErr("Paste the internet line they gave you -- it works exactly like an address here.");
                           return;
                         }
-                        start("join", true);
+                        start("join", { stun: true });
                       }}
                       disabled={busy || !chosen}
                     >
