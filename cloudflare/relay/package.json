@@ -1,0 +1,13 @@
+{
+  "name": "doomnite-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The relay Worker only (worker.js + wrangler.jsonc). Its own package.json so `npm install` here stays scoped to cloudflare/relay/node_modules instead of walking up to the pack's root package.json.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.155.0"
+  }
+}

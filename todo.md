@@ -2,6 +2,29 @@
 
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
+## STATUS — 2026-10-29 session: relay-tunnel tier, reversing the §6 "drive via NN" decision
+
+**The owner asked for this explicitly, overriding the §6 "settled, do not revisit" line** (line ~345: "multiplayer goes through NukemNet, not Zandronum directly... DoomNite never reimplements NAT"). Reason: `GAME · SKYJUMP3D` already has a working relay (`cloudflare/worker.js`'s `Room` Durable Object) that got a remote friend playing with **no Tailscale, no port forward, no NAT traversal at all** — both sides just connect outbound to one `wss://` endpoint. The old objection to DoomNite having its own relay ("someone else's bandwidth and ops bill", referring to NN's relay) does not apply to a relay DoomNite operates itself on its own Cloudflare account, same as SkyJump3D's.
+
+**What this is NOT**: a replacement for the STUN punch tier (`tools/punch.py`, still tier 4). This is a new tier 5, same shape as NN's own last-resort relay but self-hosted: a round trip through Cloudflare instead of a direct peer path, offered as its own explicit `"relay": true` flag (mutually exclusive with `"stun": true`), never an automatic fallback — the host chooses who pays the extra latency.
+
+**Built and verified offline (nothing deployed yet — `[!]`, see below):**
+- `cloudflare/relay/worker.js` + `wrangler.jsonc` — a `UdpRoom` Durable Object, directly modeled on SkyJump3D's `Room` class but binary-passthrough (Zandronum packets are not JSON and must arrive byte-exact) and capped at 2 sockets (host + one joiner, not SkyJump3D's 6-player fan-out). Idle rooms (10 min with no bytes either direction) self-close via a DO alarm.
+- `tools/wsrelay.py` — `RelayTunnel`, same external shape as `punch.py`'s `PunchRelay` (`local_port`, `status()`, `stop()`, a `TUNNELS` registry keyed by mode). Pure stdlib: a hand-rolled RFC 6455 client (connect, mask/send binary frames, receive/unmask), no pip dependency, matching this pack's "usable without npm" rule. **Deliberately does NOT reuse PunchRelay's learn-the-engine's-address-from-its-first-packet trick** — on the host side that depends on something making the engine speak to the relay socket first, which I could not fully verify by reading alone. Added `set_engine_target(ip, port)` instead: mp_http.py already knows the host's engine port (it chose it), so it tells the tunnel explicitly rather than hoping a packet arrives to learn from. Verified end-to-end (`tools/selftest_wsrelay.py`, 6/6) against a fake local relay server: handshake, a UDP packet round-tripping engine→tunnel→relay→tunnel→engine, and the explicit host-target path with zero learning step.
+- `tools/mp_http.py` — new `"relay": true` body flag on `/api/multiplayer/host` and `/join`, parallel to the existing `"stun"` flag. Host gets back a room code (nothing routable to share — there is no ip:port). Joiner must supply that `room`; gets back the loopback address its engine should connect to. Refuses `relay`+`stun` together (400) and a relay join with no room (400). `tools/selftest_relay_mp.py`, 17/17, with the engine launch stubbed (nothing here starts a real game). **Full regression check: `selftest_stun.py` 51/51 and `selftest_mp.py` 140/140, unchanged** — the STUN tier's behavior was not touched.
+
+**Deploy done the same session, with the `cloudflare:wrangler` skill (re-reading this immediately after the "not done" list below was written — so read that list as history, not current state):**
+- `cd cloudflare/relay && npm install -D wrangler@latest` installed clean (no hard dependency added to the pack itself — wrangler lives only in `cloudflare/relay/node_modules`, a deploy-time tool, same separation as the root site's build). `npx wrangler whoami` was already authenticated via `CLOUDFLARE_API_TOKEN`, account `Chimske@gmail.com` (`d3d27b3b…`) — the same account `doomnite.pages.dev` and `skyjump3d` live on, so no account-mismatch trap after all.
+- `--dry-run` validated the config, then `npx wrangler deploy` shipped it: **`https://doomnite-relay.chimske.workers.dev`**, version `5f27b9d4`. `/health` returns `{"ok":true}`.
+- `tools/wsrelay.py`'s `DEFAULT_RELAY_URL` now points at the real URL (was a placeholder).
+- **Found and fixed a real bug the local fake-server test couldn't catch:** the hand-rolled TLS handshake failed with `CERTIFICATE_VERIFY_FAILED: certificate has expired` against the live Worker — not a real expired cert (curl on the same machine verified the same cert fine via the OS store), but this machine's Python install shipping a stale bundled CA file. Fixed with a `_ca_bundle()` helper that prefers `certifi`'s bundle when installed, falling back to the system default otherwise — `certifi` stays optional, not a new hard dependency.
+- **`tools/selftest_wsrelay_live.py` (new, run by hand, needs the internet + the live Worker — same role `selftest_live.py` plays for the pack's other live checks): 4/4, against the REAL deployed Worker**, not a fake local server: two independent `RelayTunnel`s, one named host and one named join, each opening its own real `wss://` connection, round-tripped a UDP packet through the live Durable Object room in both directions. This is the first proof that the actual Cloudflare infrastructure relays correctly, not just the tunnel engine's logic.
+- Full regression, all still green after the cert fix: `selftest_wsrelay.py` 6/6, `selftest_relay_mp.py` 17/17, `selftest_stun.py` 51/51, `selftest_mp.py` 140/140.
+
+**Still NOT done — `[!]`, real next steps:**
+1. **No UI surface yet.** `MultiplayerButton.jsx` has the STUN button ("Host/Join over the internet"); this relay tier has no button at all. The panel needs to show the room code (host) and a room-code input (join) — not an ip:port field, which is the one thing this tier deliberately has nothing of.
+2. **Unverified: a real two-MACHINE session with Zandronum actually running.** The live test above proves Cloudflare relays raw bytes correctly between two independent tunnels on one machine; it does not yet prove two separate computers, each running the actual engine, play a real game through it — or what the added Cloudflare round-trip feels like in an actual deathmatch. That needs the owner and a friend, same as the STUN tier's mate-test in the section below.
+
 ## STATUS — end of 2026-10-15 session
 
 **Shipped:** **v2.3.1 is published and live.** The multiplayer IWAD fix (`e2b6919`) had been committed but never released, so doomnite.pages.dev was still serving 2.3.0 installers built five days *before* it — every fresh download still hit Zandronum's "point us to your Doom directory" dialog. 2.3.1 closes that: release is Latest with both assets, both download URLs return 200 with byte counts matching the local builds, and the site auto-deployed from the push.
@@ -342,7 +365,7 @@ Deliberately not loaded: visor, terrain splashes. All present in RaZZoR's `addon
 
 Full detail (phases, env facts) stays in `legacy/playnite-launcher/todo.md` and `RESEARCH-mod-downloader.md`. Workers: this section is the live copy, do not look only at the legacy file.
 
-**Settled, do not revisit:** multiplayer goes through NukemNet (NN), not Zandronum directly. NN owns the room and the NAT traversal (IPv6 tunnel, then STUN, then relay). DoomNite picks the mod and writes NN's preset; it never reimplements NAT. ModDB stays out of the auto-install path (Cloudflare 403); mods only on ModDB use `source: "browser"`.
+**Formerly "settled, do not revisit" — REVISITED 2026-10-29, owner's explicit call.** The line used to read: multiplayer goes through NukemNet (NN), not Zandronum directly; NN owns the room and the NAT traversal; DoomNite never reimplements NAT. That is no longer the whole story — see the **2026-10-29 session** entry at the top of this file. DoomNite now also has its own self-hosted relay tier (`cloudflare/relay/`, `tools/wsrelay.py`), same shape as `GAME · SKYJUMP3D`'s working relay, offered as an alternative to NN rather than a replacement for it. ModDB stays out of the auto-install path (Cloudflare 403); mods only on ModDB use `source: "browser"` — that part is unchanged.
 
 Facts: NN 0.6.5 is a **portable** build at `~\Desktop\NUKEMNET` — its config lives in `user\` next to `NukemNet.exe` (`Settings.json`, `LaunchDefaults.json`), **not** in `%LOCALAPPDATA%\NukemNet` (there is no such folder here; corrected 2026-10-07). Zandronum + Doomseeker at `%LOCALAPPDATA%\Zandronum`. NN room hosting is GUI-only (no CLI/socket API), so DoomNite can launch and configure but cannot create a room unattended. NN passes every file as `-file <path>`, the IWAD included.
 
@@ -583,3 +606,13 @@ Made by a worker on 2026-10-07 with nobody awake. Each is reversible; the undo i
   Question: the owner parked it as needing scoping; the AUTO-run rule says a scope question is mine to decide.
   Options: (a) leave it parked for the owner; (b) decide the design question, measure it against real files, and build step 1.
   Chose **(b)**: the blocker was factual ("IWAD config is not derived from any file metadata") and facts can be measured. Step 1 is `tools/add_mod.py`, which derives the IWAD from map lumps and reports honestly when a mod ships no maps and the IWAD is a content choice instead. The UI surface and the copy step are deliberately NOT built — the owner may not want the flow at all, and the inspection half is the part that had to be true first. Undo: delete `tools/add_mod.py` and its selftest.
+
+=== PROPOSED IMPROVEMENTS ===
+- [FEATURE] Add launchers/ batch script for overnight multi-mod load; run all iwads + selected mods/.
+- [PERF] Cache dist/ build; do not rebuild overnight.
+- [UI] Add dark/terminal theme (dark-theme.css) for overnight use.
+- [BUG] Verify etcher.py doesn't hang on missing IWAD; add 10s timeout for /nitesesh.
+- [CREATIVE] Add a "Nightmare Pack" mod collection for overnight runs.
+- [SESH] Ready: pp/, mods/, launchers/, dist/ all present.
+- [NITESH] 
+itesesh/overnight-launch.bat starts selected mod + logs.

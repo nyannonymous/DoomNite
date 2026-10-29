@@ -12,6 +12,7 @@ Security, matching /api/launch exactly:
     rebuilt; it is never interpolated into a shell string.
   * Nothing a request supplies ever becomes a filesystem path or an argument.
 """
+import base64
 import json as _json
 import os
 import subprocess
@@ -147,6 +148,30 @@ def _launch(handler, resolve, mode):
     # about the request changes: direct (LAN/Tailscale) play and punched
     # play are the same flow with one extra bulletproof step on the wire.
     want_stun = bool(raw.get("stun"))
+
+    # Relay-tunnel mode: DoomNite's own Cloudflare Worker (cloudflare/relay/),
+    # same trick that already works for SkyJump3D -- both sides connect
+    # OUTBOUND to one wss:// endpoint, so there is no NAT to punch and no
+    # port to forward. Mutually exclusive with STUN: they are two different
+    # answers to "how do we reach across the internet", and relay is the one
+    # that works when STUN's punch can't (symmetric NAT, a firewall that
+    # eats the punched path) at the cost of a round trip through Cloudflare
+    # instead of a direct peer path.
+    want_relay = bool(raw.get("relay"))
+    tunnel = None
+    relay_payload = {}
+    if want_relay and want_stun:
+        return 400, {"error": "stun and relay are alternatives, not both"}
+    if want_relay:
+        import wsrelay as _wsrelay
+        if mode == "join":
+            room = str(raw.get("room") or "").strip()
+            if not room:
+                return 400, {"error": "room is required to join over the relay"}
+        else:
+            room = str(raw.get("room") or "").strip() or base64.b32encode(os.urandom(5)).decode().rstrip("=").lower()
+        tunnel = _wsrelay.start_tunnel("host" if mode == "host" else "join", room)
+
     relay = None
     punch_payload = {}
     host_ip, host_port = None, None
@@ -217,11 +242,23 @@ def _launch(handler, resolve, mode):
         #     blank name is the same collision with less detail.
         name = normalise_name(raw.get("name"))
         fp_state, ours = None, None
+        inline_fp = ""
         if mode == "host":
             argv = mp_session.host_argv(idx, port, hostname=name,
                                         deathmatch=bool(raw.get("deathmatch")))
             # Memoised: this hashes the entry's whole load list.
             ours = mp_session._fingerprint_cached(idx)
+            if want_relay:
+                # No learning step needed -- the host's engine port is
+                # already known, so point the tunnel at it directly.
+                tunnel.set_engine_target("127.0.0.1", port)
+        elif want_relay:
+            # A relay join has no address to parse at all: there is
+            # nothing routable to paste, only the room code the host
+            # shared and (optionally) its fingerprint, sent as separate
+            # fields rather than packed into an "addr" string.
+            argv = mp_session.join_argv(idx, "127.0.0.1:%d" % tunnel.local_port,
+                                        hostname=name)
         else:
             # The pasted line may be "1.2.3.4:23513 ABCD1234". Split it here so
             # the fingerprint is compared explicitly rather than being left
@@ -252,9 +289,23 @@ def _launch(handler, resolve, mode):
         # Malformed address, or an entry that cannot be played online. That is
         # the caller's input being wrong, not a server fault -- so 400, and the
         # message is written for a human rather than for a log.
+        if tunnel:
+            import wsrelay as _wsrelay
+            tunnel.stop()
+            _wsrelay.TUNNELS.pop("host" if mode == "host" else "join", None)
         return 400, {"error": str(e)}
     except Exception as exc:
+        if tunnel:
+            import wsrelay as _wsrelay
+            tunnel.stop()
+            _wsrelay.TUNNELS.pop("host" if mode == "host" else "join", None)
         return 500, {"error": str(exc)}
+
+    if want_relay:
+        if mode == "host":
+            relay_payload = {"room": tunnel.room, "mode": "relay"}
+        else:
+            relay_payload = {"room": tunnel.room, "connect": "127.0.0.1:%d" % tunnel.local_port, "mode": "relay"}
 
     if want_stun:
         import punch as _punch
@@ -345,6 +396,11 @@ def _launch(handler, resolve, mode):
         # Present when this launch ran the punch path; the key is simply
         # absent otherwise, so the UI reacts to its presence alone.
         **({"punch": punch_payload} if punch_payload else {}),
+        # Same convention for the relay-tunnel path: a host gets a room
+        # code to share (there is no ip:port -- nothing is routable), a
+        # joiner gets confirmation of the local loopback address the engine
+        # is actually talking to.
+        **({"relay": relay_payload} if relay_payload else {}),
     }
 
 
