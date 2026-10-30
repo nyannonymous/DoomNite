@@ -352,6 +352,14 @@ def base_argv(idx, hostname="NukemNet"):
         if skip and os.path.normcase(os.path.abspath(f)) == skip:
             continue
         argv += ["-file", f]
+    # Sensible defaults so a fresh Zandronum install does not come up at
+    # 640x480 with the sound and music at full volume. Passed on every
+    # multiplayer launch; the user can still change them in-game.
+    argv += ["-width", "1920", "-height", "1080"]
+    argv += ["+set", "snd_sfxvolume", "0.4",
+             "+set", "snd_musicvolume", "0.25",
+             "+set", "vid_defwidth", "1920",
+             "+set", "vid_defheight", "1080"]
     argv += ["+name", hostname]
     return argv
 

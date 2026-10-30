@@ -293,7 +293,14 @@ def resolve_entry(arg):
     if not hits:
         hits = [e for e in entries if arg.lower() in e["label"].lower()]
     if len(hits) != 1:
-        raise SystemExit(f"{arg!r} matches {len(hits)} entries; be more specific")
+        if not hits:
+            raise SystemExit(f"{arg!r} matches 0 entries")
+        # Show all matches with their indexes so the user can disambiguate
+        lines = [f"  {entries.index(h)}  {h['label']}" for h in hits]
+        raise SystemExit(
+            f"{arg!r} matches {len(hits)} entries; be more specific by passing the index:\n"
+            + "\n".join(lines)
+        )
     return hits[0]
 
 

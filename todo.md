@@ -2,6 +2,18 @@
 
 This file is a notes-style log. The checklist below is the quick index of what is still open; details live in the sections it points to. `[!]` = needs a decision or a human check first.
 
+## STATUS — 2026-10-31 session: v2.4.0 published (relay + lobby finally shipped)
+
+**v2.3.2 was built 2026-10-18 and sat unpublished while the relay tier and lobby landed on top of it (the two sessions above this one) — meaning the live site was still serving v2.3.1, three features behind.** Closed the gap:
+
+- Committed the pending `mp_session.py` (sane default resolution/volume on every MP launch) and `nn_preset.py` (disambiguation now lists indexes) fixes.
+- Bumped `desktop/package.json` to **2.4.0** (STUN punch + relay tier + lobby, all three), built, and verified: `selftest_mp.py` 140/140, `selftest_stun.py` 51/51, `selftest_wsrelay.py` 6/6, `selftest_relay_mp.py` 19/19, `verify.mjs` 21/21, `verify-mp-button.mjs` 32/32, `selftest_packaged.py` against the real new build.
+- **Live-verified the deployed Cloudflare Worker before shipping**, not just the offline logic: `/health` 200, `selftest_wsrelay_live.py` 4/4, `selftest_lobby_live.py` 10/10 — real packets through the real Durable Object, same session.
+- **The packaged v2.4.0 build now reports 33/33 entries playable, 0 missing** — the old "1 missing (SRB2 standalone)" note was stale; per the owner, the WADs that used to need hand-placing are on the Cloudflare bucket now.
+- Published **`v2.4.0`** on `nyannonymous/DoomNite` (installer 143,633,128 B / portable 188,213,251 B, both named per the pack's artifact convention), release notes `desktop/NOTES-2.4.0.md`. `site/index.html` updated to point at it and pushed; `dist/index.html` regenerated from it via `ui/copy-download-page.mjs` (that script is the source of truth for keeping the two in sync — don't hand-edit `dist/index.html` again).
+
+**Still NOT done — `[!]`:** the one thing no amount of self-testing from one machine can prove: an actual two-computer match through the relay+lobby path, with two real friends. Everything up to that boundary (Worker, Python, UI-to-local-API, packaged build) is now verified; that boundary itself isn't.
+
 ## STATUS — 2026-10-29 session: relay-tunnel tier, reversing the §6 "drive via NN" decision
 
 **The owner asked for this explicitly, overriding the §6 "settled, do not revisit" line** (line ~345: "multiplayer goes through NukemNet, not Zandronum directly... DoomNite never reimplements NAT"). Reason: `GAME · SKYJUMP3D` already has a working relay (`cloudflare/worker.js`'s `Room` Durable Object) that got a remote friend playing with **no Tailscale, no port forward, no NAT traversal at all** — both sides just connect outbound to one `wss://` endpoint. The old objection to DoomNite having its own relay ("someone else's bandwidth and ops bill", referring to NN's relay) does not apply to a relay DoomNite operates itself on its own Cloudflare account, same as SkyJump3D's.
@@ -560,7 +572,7 @@ Found by a worker on 2026-10-07, accessibility + dependency-health + docs lens. 
   Done when: a `tools/selftest_serve.py` starts `serve.handler_factory()` on an ephemeral port and asserts 400 for a string index, 400 for `true`, 413 for an oversized body, 404 for an unknown `/api/install/` name and an unknown `/api/packmods/` name, and 200 for a valid `/api/dryrun`.
   Hints: `serve.handler_factory()` + `ThreadingHTTPServer(("127.0.0.1", 0), ...)`; stdlib `urllib.request` is enough; point `serve.PACK` at a temp pack the way `selftest_watch.py` does.
 
-- [ ] **`nn_preset.py --entry <name>` does not say how to disambiguate** [P3] [UX] [size:S]
+- [x] **`nn_preset.py --entry <name>` does not say how to disambiguate** [P3] [UX] [size:S] — **DONE 2026-10-30**: `resolve_entry()` now prints all matching entries as `<index>  <label>` and tells the user to pass one of those indexes. Selftest `tools/selftest_nn_preset.py` still passes (39 checks).
   Why: `--game "Hexen Remade HD"` stops with "matches 2 entries; be more specific", but the two entries differ only by an IWAD tag that the message never shows, and the fix (pass the index) is not stated. The user is left guessing at a tool whose whole point is to remove guesswork.
   Done when: the message lists each match as `<index> <label>` and says to pass one of those indexes.
   Hints: `tools/nn_preset.py` `resolve_entry()`; the same listing is already printed by `--list`.
