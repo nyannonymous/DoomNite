@@ -144,9 +144,13 @@ def main():
         old = existing.get(rel)
         if rec.get("sha256"):  # carried forward, not on disk
             continue
-        if verify_only and old and old.get("sha256"):
-            rec["sha256"] = old["sha256"]
-            continue
+        # --verify's whole job is catching a file that changed on disk since
+        # sources.json was written. Reusing the old hash here (as this used
+        # to do) meant it never recomputed anything for a file that already
+        # had a recorded hash -- which is every file that could possibly have
+        # drifted, so --verify could never report the one thing it exists to
+        # report. Found when a hand-patched BDBE_v3.38.pk3 (stripped a
+        # Zandronum-incompatible cvar attribute) produced zero drift output.
         rec["sha256"] = sha256(os.path.join(PACK, rel.replace("/", os.sep)))
         if old and old.get("sha256") and old["sha256"] != rec["sha256"]:
             drift.append((rel, old["size"], rec["size"]))

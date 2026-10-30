@@ -424,6 +424,51 @@ def slugify(s):
     return "".join(c if c.isalnum() else "-" for c in s.lower()).strip("-")
 
 
+def patch_bdbe_cvarinfo(pk3_path):
+    """Zandronum's CVARINFO parser does not recognize GZDoom's 'cheat'
+    cvar attribute at all -- not a warning, a fatal parse error that
+    aborts the whole engine before the menu:
+        Script error, "BDBE_v3.38.pk3:cvarinfo.txt" line 4:
+        Unknown cvar attribute 'cheat'
+    GZDoom (the singleplayer engine this mod normally runs on) accepts
+    the attribute fine, so this only ever broke multiplayer, where the
+    host launches through Zandronum. Strips the token from the shipped
+    copy so both engines load it; the cvars keep their default values,
+    they just lose a cheat-protection flag that did nothing visible
+    while cheats are blocked by default anyway.
+
+    Called unconditionally on every build, not just when the file is
+    freshly copied -- the copy step above only recopies on a size
+    mismatch, so a rebuild that pulls a fresh, unpatched copy from the
+    operator's source drive would otherwise silently undo this.
+    """
+    import zipfile
+    import re
+    with zipfile.ZipFile(pk3_path, "r") as z:
+        names = {n.lower(): n for n in z.namelist()}
+        real_name = names.get("cvarinfo.txt")
+        if not real_name:
+            return False
+        data = z.read(real_name)
+    text = data.decode("utf-8", errors="surrogateescape")
+    if not re.search(r"\bcheat\b", text):
+        return False  # already patched, or this copy never had it
+    patched = re.sub(r"\bcheat\b\s*", "", text)
+    tmp_path = pk3_path + ".patching"
+    with zipfile.ZipFile(pk3_path, "r") as zin, \
+         zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            payload = zin.read(item.filename)
+            if item.filename == real_name:
+                payload = patched.encode("utf-8", errors="surrogateescape")
+            zi = zipfile.ZipInfo(item.filename, date_time=item.date_time)
+            zi.compress_type = item.compress_type
+            zi.external_attr = item.external_attr
+            zout.writestr(zi, payload)
+    os.replace(tmp_path, pk3_path)
+    return True
+
+
 # Two engines ship in the pack.
 #
 # UZDoom is the default: a 4.14.3 performance fork, stripped down for speed.
@@ -684,6 +729,9 @@ def build():
                 if not (os.path.exists(dest)
                         and os.path.getsize(dest) == os.path.getsize(src)):
                     shutil.copy2(src, dest)
+                if fname == "BDBE_v3.38.pk3" and patch_bdbe_cvarinfo(dest):
+                    print(f"  patched {fname}: stripped Zandronum-incompatible "
+                          "'cheat' cvar attribute (see patch_bdbe_cvarinfo)")
                 mods.append((sub, fname))
             if not ok:
                 continue

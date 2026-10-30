@@ -200,9 +200,41 @@ def test_host_side_explicit_target_no_learning_needed():
     t.join(timeout=2.0)
 
 
+def test_never_connected_timeout_stops_the_tunnel():
+    """A host whose engine crashes before sending a single packet (the real
+    BDBE CVARINFO crash that prompted this) must not keep looking alive for
+    the full RATE_IDLE_STOP window -- that leaves a ghost room in the lobby
+    with nobody able to join or cancel it. RATE_NEVER_CONNECTED is monkey-
+    patched down so the test does not have to wait 3 real minutes."""
+    ready = threading.Event()
+    stop = threading.Event()
+    port_holder: list[int] = []
+    t = threading.Thread(target=_fake_relay_server, args=(ready, stop, port_holder), daemon=True)
+    t.start()
+    ready.wait(3.0)
+    time.sleep(0.05)
+
+    old = wsrelay.RATE_NEVER_CONNECTED
+    wsrelay.RATE_NEVER_CONNECTED = 0.3
+    try:
+        tunnel = wsrelay.RelayTunnel("never-connects", relay_url=f"ws://127.0.0.1:{port_holder[0]}/relay")
+        # No engine ever sends anything -- exactly the crashed-before-any-
+        # traffic case. alive() must go False on its own, with no .stop().
+        deadline = time.time() + 3.0
+        while tunnel.alive() and time.time() < deadline:
+            time.sleep(0.05)
+        check("a host whose engine never sent a packet stops itself", not tunnel.alive())
+    finally:
+        wsrelay.RATE_NEVER_CONNECTED = old
+        tunnel.stop()
+        stop.set()
+        t.join(timeout=2.0)
+
+
 if __name__ == "__main__":
     test_handshake_and_echo()
     test_relay_tunnel_round_trip()
     test_host_side_explicit_target_no_learning_needed()
+    test_never_connected_timeout_stops_the_tunnel()
     print(f"\n{PASS} passed, {FAIL} failed")
     raise SystemExit(1 if FAIL else 0)

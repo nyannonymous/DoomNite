@@ -62,6 +62,15 @@ DEFAULT_RELAY_URL = os.environ.get("DOOMNITE_RELAY_URL", "wss://doomnite-relay.c
 MAX_FRAME = 65535          # Zandronum packets are well under this (~1400B typical)
 IDLE_PING_INTERVAL = 20.0  # keep Cloudflare's own idle timeout from closing us
 RATE_IDLE_STOP = 15 * 60   # no engine traffic in 15 minutes -> give up the socket
+# The engine never sent a single packet -- it crashed or never started. This
+# is a much shorter leash than RATE_IDLE_STOP: a mid-game lull is normal and
+# can legitimately run long, but an engine that never once spoke to its own
+# loopback socket is not playing. Found by a real crash (BDBE's CVARINFO
+# fatal error on Zandronum) that left a "host" announced in the lobby for
+# the full 15 minutes with nobody able to join it or cancel it. 3 minutes
+# comfortably covers the slowest real load time this pack has measured
+# (qa_mp_probe.py's settle window tops out under 90s for the heaviest PK3s).
+RATE_NEVER_CONNECTED = 3 * 60
 
 
 def _is_loopback(ip: str) -> bool:
@@ -286,7 +295,11 @@ class RelayTunnel:
             try:
                 data, src = self.sock.recvfrom(MAX_FRAME)
             except socket.timeout:
-                if time.time() - last_traffic > RATE_IDLE_STOP:
+                now = time.time()
+                if self.engine_src is None:
+                    if now - self.created > RATE_NEVER_CONNECTED:
+                        self.stop()
+                elif now - last_traffic > RATE_IDLE_STOP:
                     self.stop()
                 continue
             except OSError:
