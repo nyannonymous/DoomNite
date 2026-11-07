@@ -373,8 +373,10 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   has to see any of that. Hosting here lists the game for
                   anyone with DoomNite open; joining is one click. No
                   address, no port, no VPN, on either side.
-                  NOT OFFERED for Duke: the relay lobby wraps Zandronum's
-                  port, and EDuke32 has no port to wrap. */}
+                  NOT OFFERED for Duke: the lobby LIST only announces
+                  Zandronum servers; Duke hosts share their relay code by
+                  hand instead. The relay tunnel itself is offered to both
+                  engines further down. */}
               {phase === "ready" && !isDuke && (
                 <section className="mp-section mp-lobby">
                   <h3>Open games</h3>
@@ -472,7 +474,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     />
                     <span className="mp-hint">
                       {isDuke
-                        ? "Leave this empty to host instead. Same network or VPN only — Duke 3D has no internet play."
+                        ? "Leave this empty to host instead. Same network or VPN. For internet play, use the relay below."
                         : "Leave this empty to host instead. The code after the port only checks you have the same version."}
                     </span>
                   </label>
@@ -502,6 +504,68 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       Join a game
                     </button>
                   </div>
+                  {/* The Duke relay tier. EDuke32's netcode has no port
+                      flag and no fingerprint, which used to mean LAN-only.
+                      The join side is solved by a loopback alias: the relay
+                      socket binds 127.0.0.2:23513 -- the engine's hardwired
+                      net port on an address it does not own -- so the
+                      engine dials 127.0.0.2 as a bare IP and its packets
+                      arrive in the tunnel. The tunnel carries them through
+                      DoomNite's Cloudflare worker to the host, exactly the
+                      SkyJump3D/Zandronum relay path. Both sides make only
+                      OUTBOUND connections, so any NAT works. No lobby list
+                      here: the code is handed from host to joiner directly,
+                      which is also why no fingerprint checks exist. */}
+                  {isDuke && (
+                    <>
+                      <div className="mp-row mp-choice mp-internet">
+                        <button
+                          className="mp-action"
+                          onClick={() => start("host", { relay: true })}
+                          disabled={busy || !chosen}
+                        >
+                          Host over the internet
+                        </button>
+                      </div>
+                      <div className="mp-row mp-lobby-code">
+                        <input
+                          className="mp-input"
+                          value={roomCode}
+                          onChange={(e) => setRoomCode(e.target.value)}
+                          placeholder="Room code from your friend"
+                          spellCheck={false}
+                          autoComplete="off"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && roomCode.trim()) {
+                              start("join", { relay: true, room: roomCode.trim() });
+                            }
+                          }}
+                        />
+                        <button
+                          className="mp-action"
+                          onClick={() => {
+                            if (!roomCode.trim()) return;
+                            start("join", { relay: true, room: roomCode.trim() });
+                          }}
+                          disabled={busy || !chosen || !roomCode.trim()}
+                        >
+                          Join by code
+                        </button>
+                      </div>
+                      {relayInfo && relayInfo.room && !relayInfo.connect && (
+                        <p className="mp-hint">
+                          Playing over the internet. Give your friend this
+                          code: <code>{relayInfo.room}</code>
+                        </p>
+                      )}
+                      <p className="mp-hint">
+                        Internet play with no router changes and no VPN: both
+                        engines tunnel through DoomNite's relay server, so any
+                        router works. On the same network, plain Host/Join
+                        above is faster (no relay round trip).
+                      </p>
+                    </>
+                  )}
                   {/* The STUN punch tier: internet play without router work,
                       on the same routes with one body flag. Kept VISIBLE
                       rather than gesture-hidden -- it is the answer to the
@@ -671,8 +735,9 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   {isDuke ? (
                     <p className="mp-hint">
                       Send them the address. They join over the same network
-                      (or your VPN) — Duke 3D has no internet play, so there
-                      is nothing else to set up on either side.
+                      (or your VPN). For internet play, "Host over the
+                      internet" below hands out a room code instead — no
+                      port forwarding on either side.
                     </p>
                   ) : (
                     <>

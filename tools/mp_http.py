@@ -17,6 +17,7 @@ import json as _json
 import os
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACK = os.path.dirname(HERE)
@@ -136,37 +137,135 @@ def join(handler, resolve):
     return _launch(handler, resolve, "join")
 
 
+# EDuke32's net port is hardwired: no -port flag exists and -connect takes a
+# bare host only, so every Duke game lives on this one UDP port. Empirically
+# confirmed on the shipped engine (netstat during a -server run). It happens
+# to be the same port the Zandronum flow uses as DEFAULT_PORT, which is why
+# the punch/relay machinery's assumptions line up.
+DUKE_NET_PORT = 23513
+# The loopback address the JOIN side's relay socket binds. The engine's own
+# socket is a wildcard bind of the same port, and a UDP send to 127.0.0.1:<own
+# port> is delivered back into the engine itself -- a relay on 127.0.0.1 never
+# sees a packet. 127.0.0.2 is a distinct loopback address (all of 127/8 works
+# on Windows), so the engine can dial it as a bare IP and its packets arrive
+# at the tunnel. Verified live before this constant existed.
+DUKE_RELAY_BIND = "127.0.0.2"
+
+
 def _launch_duke(idx, entry, mode, raw):
     """Host/join an EDuke32 game on its own netcode.
 
     EDuke32 has no -port flag and no fingerprint: the share line is a bare
-    address, and joining is -connect <ip>. There is no STUN/relay punch because
-    there is no port to punch and the engine does no NAT traversal of its own --
-    so this is LAN (or a VPN like Tailscale) only, and the response says so.
+    address, and joining is -connect <ip>. Two transports:
+
+    * direct (default): the pasted address is used as-is. LAN, or a VPN like
+      Tailscale, where no NAT stands between the players.
+    * relay ({"relay": true}): both sides connect outbound to the DoomNite
+      Cloudflare worker (the same tunnel SkyJump3D and the Zandronum flow
+      use), so no NAT has to be punched at all. The joiner's engine dials
+      127.0.0.2 -- the tunnel's bind address -- because the engine cannot be
+      told a port, only a host.
     """
     import mp_session
+    want_relay = bool(raw.get("relay"))
+    tunnel = None
+    argv = None
+    # A relay host needs a room before anything else: generated when the
+    # panel didn't send one, same alphabet as the Zandronum flow.
+    room = str(raw.get("room") or "").strip()
     try:
         if mode == "host":
+            if want_relay and not room:
+                import base64
+                room = base64.b32encode(os.urandom(5)).decode().rstrip("=").lower()
             argv = mp_session.duke_host_argv(
                 idx, deathmatch=bool(raw.get("deathmatch")))
+        elif want_relay:
+            room = str(raw.get("room") or "").strip()
+            if not room:
+                return 400, {"error": "Paste the room code they gave you, "
+                                      "or use Host."}
         else:
             addr = str(raw.get("addr") or "").strip()
             if not addr:
                 return 400, {"error": "Paste the address they gave you, "
-                                       "or use Host."}
+                                      "or use Host."}
             argv = mp_session.duke_join_argv(idx, addr)
     except ValueError as e:
         return 400, {"error": str(e)}
     except Exception as exc:
         return 500, {"error": str(exc)}
 
+    relay_payload = {}
+    if want_relay:
+        import wsrelay as _wsrelay
+        if mode == "host":
+            # The engine is already bound to DUKE_NET_PORT by the time this
+            # returns, so the tunnel forwards inbound relay traffic straight
+            # into it. A join request replaces an older tunnel first.
+            tunnel = _wsrelay.start_tunnel("host", room)
+            tunnel.set_engine_target("127.0.0.1", DUKE_NET_PORT)
+            relay_payload = {"room": tunnel.room, "mode": "relay"}
+        else:
+            # The tunnel MUST own the engine's hardwired port on the loopback
+            # alias BEFORE the engine starts: the engine dials 127.0.0.2 (its
+            # -connect target) and every packet it sends must land in the
+            # tunnel, not in its own wildcard socket. Binding 127.0.0.2 while
+            # the engine holds the wildcard works on Windows; verified live.
+            try:
+                tunnel = _wsrelay.start_tunnel(
+                    "join", room, local_port=DUKE_NET_PORT,
+                    bind_ip=DUKE_RELAY_BIND)
+            except OSError as e:
+                return 502, {"error": (
+                    "Could not hold the engine's network port for the relay "
+                    "(another Duke game may already be running): "
+                    + str(e))}
+            argv = mp_session.duke_join_argv(idx, DUKE_RELAY_BIND)
+            relay_payload = {"room": tunnel.room,
+                             "connect": DUKE_RELAY_BIND, "mode": "relay"}
+    if argv is None:
+        # Unreachable by construction -- every mode/transport pair above
+        # either builds argv or returns -- but a None here would Popen a
+        # TypeError instead of an answer, and the panel would hang.
+        if tunnel:
+            tunnel.stop()
+        return 500, {"error": "internal: no command line was built"}
+
     try:
+        # cmd start detaches, so the Popen handle is the launcher, not the
+        # engine -- the engine PID comes from tasklist right after.
         subprocess.Popen(
             ["cmd", "/c", "start", "", "/D", os.path.dirname(argv[0])] + argv,
             cwd=os.path.dirname(argv[0]), env=mp_session.launch_env(),
             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
     except OSError as e:
+        if tunnel:
+            tunnel.stop()
         return 500, {"error": str(e)}
+
+    if tunnel is not None and mode == "host":
+        # The tunnel must forward into the port the engine ACTUALLY bound.
+        # It is 23513 except when that port was taken and the engine fell
+        # back to an ephemeral one -- discover it instead of assuming.
+        engine_pid = None
+        deadline = time.time() + 15
+        while engine_pid is None and time.time() < deadline:
+            out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq eduke32.exe"],
+                                 capture_output=True, text=True).stdout
+            pids = [l.split()[1] for l in out.splitlines()
+                    if "eduke32" in l.lower()]
+            if pids:
+                engine_pid = int(pids[0])
+            else:
+                time.sleep(0.5)
+        port = mp_session.duke_engine_udp_port(engine_pid) if engine_pid else None
+        if port:
+            tunnel.set_engine_target("127.0.0.1", port)
+        else:
+            tunnel.stop()
+            return 500, {"error": "The Duke engine did not open a network "
+                                  "port, so internet hosting cannot start."}
 
     sharing = None
     if mode == "host":
@@ -186,6 +285,7 @@ def _launch_duke(idx, entry, mode, raw):
         "command": " ".join(argv),
         "engine": "eduke32",
         "sharing": sharing,
+        "relay": relay_payload or None,
     }
 
 

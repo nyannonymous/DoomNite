@@ -374,7 +374,45 @@ def duke_host_argv(idx, deathmatch=False):
     """Full command line for hosting a Duke game on EDuke32's netcode."""
     argv = duke_base_argv(idx)
     argv += ["-server", "-c1" if deathmatch else "-c2"]
+    # Boot the host straight into a level. Without a map the host engine
+    # sits at the title screen, and a client that connects there is dropped
+    # immediately: "Connection dropped: No player spawn point available for
+    # this new player" (verified live). E1L1 ships in every Duke GRP and has
+    # multiplayer start spots for both co-op and DM.
+    argv += ["-map", "E1L1.MAP"]
     return argv
+
+
+def duke_engine_udp_port(pid, timeout=12.0):
+    """The UDP port a just-spawned EDuke32 actually bound.
+
+    Normally 23513, but the engine silently falls back to an ephemeral port
+    when that one is taken -- and on a test box (or any machine running a
+    second Duke instance) the relay NEEDS the real number: forwarding relay
+    traffic to 23513 would pour it into a socket nobody answers. Poll
+    netstat for this PID's UDP sockets until one shows up.
+    """
+    import time as _time
+    deadline = _time.time() + timeout
+    while _time.time() < deadline:
+        try:
+            out = subprocess.run(["netstat", "-ano", "-p", "UDP"],
+                                 capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            out = ""
+        ports = []
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 4 and parts[-1] == str(pid) and parts[0] == "UDP":
+                local = parts[1]
+                if local.rsplit(":", 1)[-1].isdigit():
+                    ports.append(int(local.rsplit(":", 1)[-1]))
+        if 23513 in ports:
+            return 23513
+        if ports:
+            return ports[0]
+        _time.sleep(0.5)
+    return None
 
 
 def duke_join_argv(idx, addr):

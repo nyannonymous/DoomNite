@@ -223,12 +223,22 @@ class RelayTunnel:
     punch.py's PunchRelay (local_port / status() / stop() / alive()), so
     mp_http.py's STUN branch and this one wire up the same way."""
 
-    def __init__(self, room: str, relay_url: str = DEFAULT_RELAY_URL, local_port: int | None = None):
+    def __init__(self, room: str, relay_url: str = DEFAULT_RELAY_URL,
+                 local_port: int | None = None, bind_ip: str = "127.0.0.1"):
         self.room = room
         self.relay_url = relay_url.rstrip("/") + f"?room={room}"
 
+        # bind_ip exists for EDuke32 joins: the engine hardwires its net
+        # port (23513), so a relay socket on 127.0.0.1:23513 would collide
+        # with the engine's own wildcard bind and the engine would
+        # loop-short-circuit its own sends. Binding 127.0.0.2 instead gives
+        # the tunnel an address the engine can dial as a bare IP
+        # (-connect 127.0.0.2) whose packets arrive HERE, not back in the
+        # engine's own socket. Verified live: the engine's first join
+        # packet lands on a 127.0.0.2:23513 listener.
+        self.bind_ip = bind_ip
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("127.0.0.1", local_port or 0))
+        self.sock.bind((bind_ip, local_port or 0))
         self.local_port = self.sock.getsockname()[1]
         self.created = time.time()
 
@@ -381,10 +391,11 @@ def get_tunnel(mode: str) -> RelayTunnel | None:
     return TUNNELS.get(mode)
 
 
-def start_tunnel(mode: str, room: str, relay_url: str = DEFAULT_RELAY_URL) -> RelayTunnel:
+def start_tunnel(mode: str, room: str, relay_url: str = DEFAULT_RELAY_URL,
+                 local_port: int | None = None, bind_ip: str = "127.0.0.1") -> RelayTunnel:
     old = TUNNELS.pop(mode, None)
     if old:
         old.stop()
-    t = RelayTunnel(room, relay_url)
+    t = RelayTunnel(room, relay_url, local_port=local_port, bind_ip=bind_ip)
     TUNNELS[mode] = t
     return t
