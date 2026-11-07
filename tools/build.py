@@ -741,9 +741,24 @@ def build():
             mods, ok = [], True
             for src in modsrcs:
                 if not os.path.isfile(src):
-                    manifest["missing"].append(f"{name}: {src}")
-                    ok = False
-                    break
+                    # The pack ships its own copy of every mod under
+                    # mods/<slug>/<basename> -- the same copy the R2 bucket
+                    # serves and the launcher downloads on demand. The
+                    # operator's original folders (BD and friends) are only
+                    # the FIRST source, not the source of truth: they can be
+                    # emptied after a build, and when they are, falling back
+                    # to the pack's copy keeps the game in the manifest
+                    # instead of silently dropping its card.
+                    alt = os.path.join(
+                        PACK, "mods",
+                        slugify(os.path.splitext(os.path.basename(src))[0]),
+                        os.path.basename(src))
+                    if os.path.isfile(alt):
+                        src = alt
+                    else:
+                        manifest["missing"].append(f"{name}: {src}")
+                        ok = False
+                        break
                 fname = os.path.basename(src)
                 sub = slugify(os.path.splitext(fname)[0])
                 dest_dir = os.path.join(PACK, "mods", sub)

@@ -179,10 +179,6 @@
    "sha256": "1898cce1dbaa540d5a20e405ebbcca32ba739fc4738b56de074ee076df332290",
    "size": 6483968
   },
-  "runtime/eduke32/duke3d/eduke32.log": {
-   "sha256": "fcf4130027d8ca7e7c041e820ec5a05aae2307659479512fa3379b2a098fb708",
-   "size": 1728
-  },
   "runtime/eduke32/duke3d/gamecontrollerdb.txt": {
    "sha256": "c70cbc8be2acc164681e18d4cd57886254c8fd4b029b8b920c97676c40cfd0d6",
    "size": 556541
@@ -19863,10 +19859,6 @@
    "sha256": "04337c2e38239f755a22c2364ff166a2812a5e00c21a46740f434958630dba81",
    "size": 6933006
   },
-  "runtime/eduke32/kickass/eduke32.log": {
-   "sha256": "90c1ec47ec974d2ecfe3dfddd3337bab4a1a60e8bbe2f3cb580aa498b35703ee",
-   "size": 1013
-  },
   "runtime/eduke32/kickass/gamecontrollerdb.txt": {
    "sha256": "c70cbc8be2acc164681e18d4cd57886254c8fd4b029b8b920c97676c40cfd0d6",
    "size": 556541
@@ -24638,10 +24630,6 @@
   "runtime/gzdoom.pk3": {
    "sha256": "abbd0c8aaf7038ad4cb1c4ef3d121cf0cf51408c3a4edd3367bcfc69d52ce043",
    "size": 3116198
-  },
-  "runtime/gzdoom/ReShade.log": {
-   "sha256": "bc65d9080983d11bde866e71bef3215e025b5a3d292dbdace4a69eecad6a2688",
-   "size": 6812
   },
   "runtime/gzdoom/Save/doom.id.doom2.commercial/auto01.zds": {
    "sha256": "bd12fa23a5052c38128e918cac9714d8383fc9a573963eea3eeef363c25a16fb",

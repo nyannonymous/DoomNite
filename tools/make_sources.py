@@ -79,6 +79,11 @@ def collect():
         if not os.path.isdir(base):
             continue
         for dirpath, dirnames, filenames in os.walk(base):
+            # Engine logs are runtime artifacts, not content: eduke32.log is
+            # rewritten on every launch, so tracking it meant the manifest
+            # drifted the moment anyone played. The engine recreates its own.
+            filenames = [f for f in filenames
+                         if os.path.splitext(f)[1].lower() != ".log"]
             # SKIP_DIRS names the pack's own folders (downloads cache, built
             # UI, marketing art). Pruning them at ANY depth once swallowed
             # runtime/eduke32/duke64/duke64/art -- 3,545 Duke64 game PNGs --
