@@ -79,7 +79,14 @@ def collect():
         if not os.path.isdir(base):
             continue
         for dirpath, dirnames, filenames in os.walk(base):
-            dirnames[:] = [d for d in sorted(dirnames) if d not in SKIP_DIRS]
+            # SKIP_DIRS names the pack's own folders (downloads cache, built
+            # UI, marketing art). Pruning them at ANY depth once swallowed
+            # runtime/eduke32/duke64/duke64/art -- 3,545 Duke64 game PNGs --
+            # so a name is only skipped when it sits directly under a root;
+            # game folders own their subdirectories outright.
+            top = os.path.normpath(dirpath) == os.path.normpath(base)
+            dirnames[:] = [d for d in sorted(dirnames)
+                           if d not in SKIP_DIRS or not top]
             for name in sorted(filenames):
                 full = os.path.join(dirpath, name)
                 if os.path.islink(full) or not os.path.isfile(full):
