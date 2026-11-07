@@ -164,6 +164,94 @@ Redesign brief: `ui/BRIEF.md` (verbatim, do not lose it).
 
 ---
 
+## ▶ §-1 TOP PRIORITY — Duke games (Duke3D, Duke64, KickAss Duke) into the pack
+
+**Sources on disk (already installed + verified):**
+- `Z:\GAMES\Duke3d` — base Duke3D + EDuke32 r10652 (eduke32.exe works, duke3d.grp checksum 0xfd3dcff1)
+- `Z:\GAMES\DUKE64` — Duke64 (N64 port) with EDuke32 + duke3d.grp
+- `Z:\GAMES\KICKASS DUKE` — KickAss Duke 1.2 HRP mod (full HRP: defs, graphics, music, sounds, levels, CONs)
+
+**Decision needed (owner):**
+- `duke3d.grp` (44 MB) is copyrighted → cannot go to public R2 bucket. Same model as Hexen: list as "bring your own duke3d.grp" entry.
+- Duke64 is a TC that uses the base duke3d.grp + its own `duke64` folder — same BYO grp requirement.
+- KickAss Duke is a full HRP mod (CONs + assets) that also requires the base duke3d.grp.
+
+**Scope:**
+1. Add EDuke32 as a launcher entry (engine = `eduke32.exe` from the Duke3d folder)
+2. Add 3 game entries: Duke3D (base), Duke64 (TC), KickAss Duke (HRP mod)
+3. All three are BYO `duke3d.grp` — launcher should detect/ask for the grp path on first run
+4. ModDB mod list already researched in `notes/duke3d-research.md` (28 mods, 3 initial fetch subset)
+5. No multiplayer for Duke games in v1 (EDuke32 netcode is separate; can be a follow-up)
+
+**Reference:** `notes/duke3d-research.md` (installed/verified 2026-10-18, decision pending)
+
+---
+
+## ▶ §0.5 IN PROGRESS — Multiplayer panel: DoomNite server browser redesign
+
+**Owner feedback (2026-11-06):** "looks nothing like the images i provided tho"
+and "hmm multiplayer screen doesnt look at all liek the images i sent earlier"
+
+The current implementation is a clean modern web UI with subtle styling.
+The reference images show a brutalist Doom aesthetic that the panel does
+not match. The work below is what was attempted; it is **not done**.
+
+**Reference images (copied to `Z:\GITHUB\APP · DOOMNITE-PACK\` and Desktop):**
+- `reference-server-browser.png` — full server browser with "GLOBAL LOBBIES"
+  header, server list table (name | map | players | ping | mode), bottom bar
+  with JOIN GAME / HOST GAME / REFRESH / BACK, footer with server count
+- `reference-lobby.png` — lobby screen with DoomNite branding, "BRUTAL DOOM"
+  red header, game selector dropdown styled as console, "Open Games" section,
+  address field, STUN/port-forward explainer text
+- `reference-mp-setup.png` — multiplayer setup panel with green status line,
+  Host/Join options, connection explanation text
+
+**What the reference shows (visual elements to match):**
+1. **Stone/brick textured background** — dark browns and grays, not a smooth
+   gradient. Subtle grid pattern. Looks like carved stone, not glass.
+2. **"GLOBAL LOBBIES" header** — Chakra Petch, red accents, stone texture
+   background with red bottom border.
+3. **Server browser table** — columns: server name, map, players (X/Y), ping,
+   mode. Server rows with red highlighting on selected. Sharp borders.
+4. **Bottom navigation bar** — JOIN GAME / HOST GAME / REFRESH / BACK buttons
+   in UAC brown/red style, footer with "X servers online" + status indicator.
+5. **"BRUTAL DOOM" / game name header** — large red Chakra Petch text,
+   pixelated doom-style font.
+6. **Skull motifs** — gothic skull decorations, frame elements, border accents.
+7. **Red/black/green color scheme** — blood red (#b71c1c) primary, stone browns
+   (#2a1a12, #1a0f08), green (#5affa8) for player counts, Chakra Petch headers.
+8. **Sharp pixelated borders** — no rounded corners, no soft shadows. Looks
+   like a 90s game UI, not a modern web app.
+
+**What was attempted (partial, needs rework):**
+- `ui/src/MultiplayerButton.jsx`:
+  - Header changed to `mp-brand` DoomNite branding (`DOOMNITE` + `MULTIPLAYER`)
+  - Added bottom bar (`mp-bottombar`) with JOIN/HOST/REFRESH/BACK buttons
+  - Removed small skull SVG
+- `ui/src/MultiplayerButton.css` — rewrote with stone texture, sharp borders,
+  blood-red accents, Chakra Petch. **Still does not visually match the
+  reference images** — needs pixel-art textures, proper stone backgrounds,
+  and the server browser table layout.
+
+**TODO — what still needs to happen:**
+- [ ] Add real stone/brick texture background (not just CSS gradients — a
+      repeating pattern or image asset, low-opacity so text stays readable)
+- [ ] "GLOBAL LOBBIES" header with server table columns (name | map |
+      players | ping | mode) matching `reference-server-browser.png`
+- [ ] Server rows with red highlight on selected, green player counts
+- [ ] "BRUTAL DOOM" game header style (large red Chakra Petch, pixelated)
+- [ ] Skull border/frame decorations matching the gothic screenshots
+- [ ] Bottom bar with server count + status dot matching the reference
+- [ ] Visual verification: screenshot the rendered panel and compare
+      side-by-side with `reference-server-browser.png` before marking done
+
+**Verified (so far):**
+- `npm run build` — clean
+- `node verify-mp-button.mjs` — 32/32 (functional, not visual)
+- `node verify.mjs` — 21/21 (functional, not visual)
+
+---
+
 ## ▶ §0 NEXT — commit the working tree
 
 `main` is level with `nyannonymous/main` at `b6cd40f`, but **13 modified + 3

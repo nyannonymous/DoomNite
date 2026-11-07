@@ -190,11 +190,11 @@ check("the panel never mentions a preset",
 const realEntries = (await (await fetch(`${BASE}/api/entries`)).json()).entries || [];
 const expectPlayable = realEntries
   .map((e, i) => ({ e, i }))
-  .filter(({ e }) => e.kind === "pack" && e.iwad);
+  .filter(({ e }) => (e.kind === "pack" && e.iwad) || e.engine === "eduke32");
 const select = overlay?.querySelector(".mp-select");
 const options = select ? [...select.options].map((o) => o.textContent.trim()) : [];
 check("a game picker renders", !!select);
-check("it lists every pack entry with an IWAD",
+check("it lists every pack entry with an IWAD and every Duke game",
   options.length === expectPlayable.length,
   `${options.length} options vs ${expectPlayable.length} eligible of ${realEntries.length}`);
 

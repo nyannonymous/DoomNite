@@ -420,17 +420,29 @@ def load_entries():
             built[i]["variants"] = variants
             built[i]["primary"] = (i == start)
     for s in man.get("standalone_games", []):
+        # A bundled engine (the Duke games) is recorded RELATIVE to the pack in
+        # the manifest, so the pack stays relocatable; an operator's own install
+        # (SRB2, Doom Half-Life) is an absolute path. Resolve relative paths
+        # against PACK here so `exists`, launch, reveal_folder_for and the
+        # multiplayer path all see one absolute location no matter where
+        # serve.py is run from.
+        exe = s["exe"]
+        if not os.path.isabs(exe):
+            exe = os.path.join(PACK, exe)
+        wdir = s.get("wdir", "")
+        if wdir and not os.path.isabs(wdir):
+            wdir = os.path.join(PACK, wdir)
         built.append({
             "kind": "standalone",
             "label": s["name"],
             "note": s.get("note", ""),
             "iwad": "",
             "mods": [],
-            "exe": s["exe"],
-            "wdir": s["wdir"],
+            "exe": exe,
+            "wdir": wdir,
             # Extra args, if the build gave any (SRB2 needs -window and a size).
             "args": s.get("args", []),
-            "exists": os.path.isfile(s["exe"]),
+            "exists": os.path.isfile(exe),
             # Standalone games have no mods, so the mod-stem art match can
             # never resolve for them. The manifest names the art explicitly;
             # without passing it through here the field was written by
@@ -445,6 +457,10 @@ def load_entries():
             # Same reasoning: a standalone game ships its own exe and has no
             # mods folder to hand-place anything into.
             "manual": None,
+            # The engine tag, so the UI and the multiplayer path can tell an
+            # EDuke32 game -- which plays its OWN native netcode -- from a
+            # Zandronum pack entry. Absent ("") for the older standalone games.
+            "engine": s.get("engine", ""),
         })
     # Single atomic rebind: concurrent readers see either the whole old list or
     # the whole new one, never a partially built one. Safe under the GIL.

@@ -122,6 +122,59 @@ def join(handler, resolve):
     return _launch(handler, resolve, "join")
 
 
+def _launch_duke(idx, entry, mode, raw):
+    """Host/join an EDuke32 game on its own netcode.
+
+    EDuke32 has no -port flag and no fingerprint: the share line is a bare
+    address, and joining is -connect <ip>. There is no STUN/relay punch because
+    there is no port to punch and the engine does no NAT traversal of its own --
+    so this is LAN (or a VPN like Tailscale) only, and the response says so.
+    """
+    import mp_session
+    try:
+        if mode == "host":
+            argv = mp_session.duke_host_argv(
+                idx, deathmatch=bool(raw.get("deathmatch")))
+        else:
+            addr = str(raw.get("addr") or "").strip()
+            if not addr:
+                return 400, {"error": "Paste the address they gave you, "
+                                       "or use Host."}
+            argv = mp_session.duke_join_argv(idx, addr)
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    except Exception as exc:
+        return 500, {"error": str(exc)}
+
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "", "/D", os.path.dirname(argv[0])] + argv,
+            cwd=os.path.dirname(argv[0]), env=mp_session.launch_env(),
+            creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
+    except OSError as e:
+        return 500, {"error": str(e)}
+
+    sharing = None
+    if mode == "host":
+        sharing = {
+            # No port: EDuke32 fixes its own, and the address is bare.
+            "port": None,
+            "addresses": [{"ip": ip, "kind": kind}
+                          for ip, kind in mp_session.shareable_addresses()],
+            "public": {"kind": "unavailable"},
+            "fingerprint": None,
+            "engine": "eduke32",
+        }
+
+    return 200, {
+        "ok": True,
+        "label": entry.get("label", ""),
+        "command": " ".join(argv),
+        "engine": "eduke32",
+        "sharing": sharing,
+    }
+
+
 def _launch(handler, resolve, mode):
     parsed, err = _body(handler)
     if err:
@@ -136,6 +189,12 @@ def _launch(handler, resolve, mode):
     entry = resolve(idx)
     if entry is None:
         return 400, {"error": "no such entry"}
+
+    # EDuke32 games play their own netcode: a bare address, no -port flag, no
+    # fingerprint, no STUN/relay punch. None of the Zandronum machinery below
+    # applies, so divert before any of it runs.
+    if entry.get("engine") == "eduke32":
+        return _launch_duke(idx, entry, mode, raw)
 
     port = raw.get("port", DEFAULT_PORT)
     if isinstance(port, bool) or not isinstance(port, int):

@@ -5,6 +5,7 @@ mods/
 launchers/
 
 # Build outputs
+app/
 pack-manifest.json
 PLAY DOOMNITE.cmd
 dryrun.log

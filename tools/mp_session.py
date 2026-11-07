@@ -267,6 +267,10 @@ def can_play(idx):
     used to raise ValueError out of describe(), which the setup route turned
     into a 500 -- and a 500 is what hides the Host/Join buttons entirely.
     """
+    _ensure_loaded()
+    entry = _serve.resolve(idx)
+    if entry is not None and entry.get("engine") == "eduke32":
+        return duke_can_play(idx)
     try:
         files = files_for_entry(idx)
     except ValueError as e:
@@ -288,6 +292,102 @@ def can_play(idx):
                        "it in the pack's iwads folder, or point the launcher "
                        "at your Doom install.")
     return True, ""
+
+
+# ---------------------------------------------------------------- EDuke32
+# The Duke games ship EDuke32 and play its OWN native netcode, not Zandronum's.
+# Two flags drive it: `-server` (host) and `-connect <host>` (join), with `-c#`
+# choosing the mode (1 = deathmatch, 2 = co-op). There is no -port flag and no
+# NAT traversal of its own, so the share line is a bare IP -- LAN (or a VPN)
+# only. This path exists so the same Host/Join panel works for Duke without
+# pretending the Zandronum-specific machinery (port, fingerprint over -file
+# lists) applies to it.
+
+# A bare IPv4 host for -connect. EDuke32 fixes its own port, so there is no
+# port in the address and none is accepted here.
+_DUKE_ADDR = re.compile(r"^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$")
+
+
+def duke_addr(addr):
+    """A bare IPv4 host for EDuke32 -connect, or raise ValueError."""
+    raw = (addr or "").strip()
+    m = _DUKE_ADDR.match(raw)
+    if not m:
+        raise ValueError(
+            "a Duke game joins by bare address, like 192.168.0.226 -- no port. "
+            "Got: " + repr(addr))
+    octets = [int(x) for x in m.groups()]
+    if any(o > 255 for o in octets):
+        raise ValueError("address has an octet above 255: " + raw)
+    return ".".join(str(o) for o in octets)
+
+
+def duke_exe(idx):
+    """The EDuke32 exe an entry ships, or None.
+
+    The Duke games are standalone entries whose `exe` is the bundled
+    eduke32.exe, one copy per game folder. Reuse that -- the multiplayer path
+    and the single-player launch must run the same binary and the same cwd
+    (their configs live beside the exe, and -usecwd makes the engine honour
+    that).
+    """
+    _ensure_loaded()
+    entry = _serve.resolve(idx)
+    if entry is None or entry.get("engine") != "eduke32":
+        return None
+    exe = entry.get("exe")
+    if not exe or not os.path.isfile(exe):
+        return None
+    return exe
+
+
+def duke_can_play(idx):
+    """(ok, why) -- can this machine host/join a Duke game for this entry?
+
+    Never raises, same contract as can_play(). The two things an EDuke32
+    launch actually needs are the exe and the GRP it loads; both ship inside
+    the pack's gitignored runtime/ tree.
+    """
+    exe = duke_exe(idx)
+    if not exe:
+        return False, "the EDuke32 engine for this game is missing"
+    grp = os.path.join(os.path.dirname(exe), "duke3d.grp")
+    if not os.path.isfile(grp):
+        return False, ("duke3d.grp is missing next to the engine, so the game "
+                       "cannot start")
+    return True, ""
+
+
+def duke_base_argv(idx):
+    """[exe] + the entry's own args (e.g. -usecwd, /gKADuke_Data.zip)."""
+    exe = duke_exe(idx)
+    if not exe:
+        raise ValueError("the EDuke32 engine for this game is missing")
+    _ensure_loaded()
+    entry = _serve.resolve(idx)
+    if entry is None:
+        raise ValueError("the EDuke32 entry for this game is missing")
+    return [exe] + list(entry.get("args") or ())
+
+
+def duke_host_argv(idx, deathmatch=False):
+    """Full command line for hosting a Duke game on EDuke32's netcode."""
+    argv = duke_base_argv(idx)
+    argv += ["-server", "-c1" if deathmatch else "-c2"]
+    return argv
+
+
+def duke_join_argv(idx, addr):
+    """Full command line for joining an EDuke32 game by bare address.
+
+    No -c# here: in EDuke32's netcode the SERVER sets the game mode, and the
+    joiner inherits it on connect. Passing a mode on join would risk a
+    disagreement with whatever the host chose.
+    """
+    host = duke_addr(addr)
+    argv = duke_base_argv(idx)
+    argv += ["-connect", host]
+    return argv
 
 
 def launch_env():
@@ -833,6 +933,7 @@ def describe(idx, port=DEFAULT_PORT):
         "ok": True,
         "index": idx,
         "label": entry.get("label", ""),
+        "engine": entry.get("engine", ""),
         "iwad": iwad_for_entry(idx),
         "port": port,
         "can_play": playable,

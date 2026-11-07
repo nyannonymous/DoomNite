@@ -95,7 +95,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
      through to the position and picking the 12th game launched the wrong one. */
   const playable = entries
     .map((e, i) => ({ ...e, _idx: i }))
-    .filter((e) => e.kind === "pack" && e.iwad);
+    .filter((e) => (e.kind === "pack" && e.iwad) || e.engine === "eduke32");
 
   // Default to the entry the user is actually looking at, else the first.
   useEffect(() => {
@@ -105,6 +105,11 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   }, [selected, playable.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chosen = playable[pick];
+  // A Duke game plays EDuke32's own netcode: a bare address, no port, no
+  // fingerprint, LAN (or VPN) only. Everything the panel shows must branch on
+  // this rather than offering Zandronum-specific machinery (STUN punch, relay
+  // lobby, port forwarding) that EDuke32 does not have.
+  const isDuke = chosen?.engine === "eduke32";
 
   // A standing choice, so it survives a reload -- same reasoning as the pinned
   // game in App.jsx.
@@ -329,7 +334,17 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       that never saw it, and the panel looked unconfigured on a
                       machine where nothing was wrong. NukemNet is not needed to
                       host or join: the engine is started directly. */}
-                  {ready.ready && (!ready.ready.zandronum ? (
+                  {ready.ready && (isDuke ? (
+                    ready.ready.can_play ? (
+                      <p className="mp-ok">
+                        Duke multiplayer is ready. Same network or VPN only.
+                      </p>
+                    ) : ready.ready.can_play === false ? (
+                      <p className="mp-warn">
+                        {ready.ready.why || "This game cannot be started yet."}
+                      </p>
+                    ) : null
+                  ) : (!ready.ready.zandronum ? (
                     <p className="mp-warn">
                       Zandronum was not found on this machine, so a game cannot
                       be started yet.
@@ -342,7 +357,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     <p className="mp-warn">
                       {ready.ready.why || "This game cannot be started yet."}
                     </p>
-                  ) : null)}
+                  ) : null))}
                 </section>
               )}
 
@@ -357,8 +372,10 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   needs it -- this section exists so a normal person never
                   has to see any of that. Hosting here lists the game for
                   anyone with DoomNite open; joining is one click. No
-                  address, no port, no VPN, on either side. */}
-              {phase === "ready" && (
+                  address, no port, no VPN, on either side.
+                  NOT OFFERED for Duke: the relay lobby wraps Zandronum's
+                  port, and EDuke32 has no port to wrap. */}
+              {phase === "ready" && !isDuke && (
                 <section className="mp-section mp-lobby">
                   <h3>Open games</h3>
                   {lobbyRooms.length === 0 ? (
@@ -436,13 +453,17 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       appeared to have no way to join at all. */}
                   <label className="mp-field mp-addrfield">
                     <span className="mp-label">
-                      Their address — paste the whole line here
+                      {isDuke
+                        ? "Their address — the IP they gave you"
+                        : "Their address — paste the whole line here"}
                     </span>
                     <input
                       className="mp-input"
                       value={addr}
                       onChange={(e) => setAddr(e.target.value)}
-                      placeholder="192.168.0.226:23513 ABCD2345"
+                      placeholder={isDuke
+                        ? "192.168.0.226"
+                        : "192.168.0.226:23513 ABCD2345"}
                       spellCheck={false}
                       autoComplete="off"
                       onKeyDown={(e) => {
@@ -450,8 +471,9 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       }}
                     />
                     <span className="mp-hint">
-                      Leave this empty to host instead. The code after the port
-                      only checks you have the same version.
+                      {isDuke
+                        ? "Leave this empty to host instead. Same network or VPN only — Duke 3D has no internet play."
+                        : "Leave this empty to host instead. The code after the port only checks you have the same version."}
                     </span>
                   </label>
 
@@ -487,57 +509,70 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       playing with someone NOT on this network. Cost is real
                       CPU: the host's probe runs first, in place, before the
                       engine can start, and refuses cleanly rather than
-                      silently. */}
-                  <div className="mp-row mp-choice mp-internet">
-                    <button
-                      className="mp-action"
-                      onClick={() => start("host", { stun: true })}
-                      disabled={busy || !chosen}
-                    >
-                      Host over the internet
-                    </button>
-                    <button
-                      className="mp-action"
-                      onClick={() => {
-                        if (!addr.trim()) {
-                          setErr("Paste the internet line they gave you -- it works exactly like an address here.");
-                          return;
-                        }
-                        start("join", { stun: true });
-                      }}
-                      disabled={busy || !chosen}
-                    >
-                      Join over the internet
-                    </button>
-                  </div>
-                  <p className="mp-hint">
-                    Internet play with no router changes and no VPN: DoomNite
-                    asks STUN servers which port the internet sees for THIS
-                    machine, and keeps it open with pings until your friend
-                    arrives through it. A few routers hand every destination a
-                    different port — the panel says so, and "Host" plus your
-                    VPN (or a forwarded port) covers those instead.
-                  </p>
+                      silently. NOT OFFERED for Duke: the punch maps a UDP
+                      port, and EDuke32's netcode exposes no port to map. */}
+                  {!isDuke && (
+                    <div className="mp-row mp-choice mp-internet">
+                      <button
+                        className="mp-action"
+                        onClick={() => start("host", { stun: true })}
+                        disabled={busy || !chosen}
+                      >
+                        Host over the internet
+                      </button>
+                      <button
+                        className="mp-action"
+                        onClick={() => {
+                          if (!addr.trim()) {
+                            setErr("Paste the internet line they gave you -- it works exactly like an address here.");
+                            return;
+                          }
+                          start("join", { stun: true });
+                        }}
+                        disabled={busy || !chosen}
+                      >
+                        Join over the internet
+                      </button>
+                    </div>
+                  )}
+                  {!isDuke && (
+                    <p className="mp-hint">
+                      Internet play with no router changes and no VPN: DoomNite
+                      asks STUN servers which port the internet sees for THIS
+                      machine, and keeps it open with pings until your friend
+                      arrives through it. A few routers hand every destination a
+                      different port — the panel says so, and "Host" plus your
+                      VPN (or a forwarded port) covers those instead.
+                    </p>
+                  )}
 
 
                   {/* Deliberately one line of reassurance, not a report. The
                       junctions and the preset are already handled; the user has
                       no action to take here and no reason to care. */}
-                  <label className="mp-field mp-field--name">
-                    <span className="mp-label">Your name</span>
-                    <input
-                      className="mp-input"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="NukemNet"
-                      maxLength={16}
-                      spellCheck={false}
-                    />
-                  </label>
-                  <p className="mp-hint">
-                    Everyone playing together should use a different one -- the
-                    scoreboard and the connect log identify players by name.
-                  </p>
+                  {/* The name is a Zandronum `+name` flag. EDuke32 has no
+                      name flag -- the player name lives in its own cfg's
+                      [Comm Setup] PlayerName -- so the field is hidden for
+                      Duke rather than shown doing nothing. */}
+                  {!isDuke && (
+                    <label className="mp-field mp-field--name">
+                      <span className="mp-label">Your name</span>
+                      <input
+                        className="mp-input"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="NukemNet"
+                        maxLength={16}
+                        spellCheck={false}
+                      />
+                    </label>
+                  )}
+                  {!isDuke && (
+                    <p className="mp-hint">
+                      Everyone playing together should use a different one -- the
+                      scoreboard and the connect log identify players by name.
+                    </p>
+                  )}
                   <label className="mp-check">
                     <input
                       type="checkbox"
@@ -602,9 +637,12 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   <h3>{punch ? "Share a direct address (LAN / VPN)" : "Share this address"}</h3>
                   <ul className="mp-share">
                     {(sharing.addresses || []).map((a) => {
-                      const line =
-                        `${a.ip}:${sharing.port}` +
-                        (sharing.fingerprint ? " " + sharing.fingerprint : "");
+                      // Duke shares a bare address (EDuke32 has no -port flag
+                      // and no fingerprint); Zandronum shares ip:port + code.
+                      const line = isDuke
+                        ? a.ip
+                        : `${a.ip}:${sharing.port}` +
+                          (sharing.fingerprint ? " " + sharing.fingerprint : "");
                       // Virtual adapters are shown but marked unusable: they
                       // are on the machine, and the user should be able to see
                       // WHY one of their addresses is not in the list rather
@@ -630,16 +668,26 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       );
                     })}
                   </ul>
-                  <p className="mp-hint">
-                    Send them the whole line, code included. It lets them check
-                    they have the same version before connecting — so nobody
-                    joins a game that is quietly desyncing.
-                  </p>
-                  <p className="mp-hint">
-                    <b>They do not need to change anything</b> — no ports, no
-                    settings, no installer. Only the host (you) needs anything
-                    set up, and only for people who are not on your network.
-                  </p>
+                  {isDuke ? (
+                    <p className="mp-hint">
+                      Send them the address. They join over the same network
+                      (or your VPN) — Duke 3D has no internet play, so there
+                      is nothing else to set up on either side.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mp-hint">
+                        Send them the whole line, code included. It lets them check
+                        they have the same version before connecting — so nobody
+                        joins a game that is quietly desyncing.
+                      </p>
+                      <p className="mp-hint">
+                        <b>They do not need to change anything</b> — no ports, no
+                        settings, no installer. Only the host (you) needs anything
+                        set up, and only for people who are not on your network.
+                      </p>
+                    </>
+                  )}
                   {/* Only relevant when a non-LAN address was actually offered.
                       On the same network there is nothing to forward, and
                       saying otherwise is how people end up needlessly logging
@@ -649,7 +697,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   {/* Suppressed once the punch tier is on: then the internet
                       ANSWER IS the internet line above, and forwarding is the
                       thing the user no longer has to be told about. */}
-                  {!punch &&
+                  {!punch && !isDuke &&
                     (sharing.addresses || []).some(
                       (a) => a.kind === "cgnat-tailscale" || a.kind === "public"
                     ) && (

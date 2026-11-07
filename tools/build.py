@@ -365,6 +365,26 @@ STANDALONE = [
     ("Doom Half-Life", "Half-Life 1 in Doom.",
      HL, os.path.join(HL, "hl2doom.exe"),
      "DoomHalfLife.png"),
+    # Duke games, bundled into the pack's gitignored runtime/ rather than
+    # launched in place like the two above, so they are self-contained and work
+    # wherever the pack lives. Their paths are RELATIVE to the pack root and
+    # resolved by serve.py -- unlike the Z:\\GAMES entries, which bake an
+    # absolute path that only this machine has.
+    #
+    # The 7th element tags the engine as "eduke32", which is the one piece the
+    # multiplayer path needs to tell an EDuke32 game from a Zandronum one.
+    ("Duke Nukem 3D", "Duke3D on EDuke32.",
+     os.path.join("runtime", "eduke32", "duke3d"),
+     os.path.join("runtime", "eduke32", "duke3d", "eduke32.exe"),
+     "", ["-usecwd"], "eduke32"),
+    ("Duke Nukem 64", "The N64 port of Duke3D, as a total conversion.",
+     os.path.join("runtime", "eduke32", "duke64"),
+     os.path.join("runtime", "eduke32", "duke64", "eduke32.exe"),
+     "", ["-usecwd"], "eduke32"),
+    ("KickAss Duke", "KickAss Duke 1.2 HRP mod.",
+     os.path.join("runtime", "eduke32", "kickass"),
+     os.path.join("runtime", "eduke32", "kickass", "eduke32.exe"),
+     "", ["/gKADuke_Data.zip", "-usecwd"], "eduke32"),
 ]
 
 
@@ -641,7 +661,12 @@ def build():
         # The player may have pointed the finder at the pack's OWN iwads\
         # directory, in which case src and dest are the same file and copy2
         # fails with a sharing violation. Nothing to do in that case.
-        if os.path.abspath(src) != os.path.abspath(dest):
+        # normcase() is required: config.json stores the path with the case it
+        # was picked with (often "Z:\github\...") while PACK resolves with the
+        # on-disk case ("Z:\GITHUB\..."), and abspath alone keeps both casings,
+        # so a bare != comparison sees two "different" files that are the same.
+        if os.path.normcase(os.path.abspath(src)) != \
+                os.path.normcase(os.path.abspath(dest)):
             shutil.copy2(src, dest)
         manifest["iwads"].append(n)
 
@@ -763,7 +788,14 @@ def build():
             manifest["games"].append(entry)
 
     for name, note, wdir, exe, *rest in STANDALONE:
-        if not os.path.isfile(exe):
+        # A standalone game may live INSIDE the pack (a bundled engine, given
+        # as a path relative to PACK) or outside it (an absolute path to an
+        # operator's pre-existing install). Resolve the existence check against
+        # PACK so a bundled engine works no matter where build.py is run from,
+        # while the manifest keeps the path RELATIVE so the pack stays
+        # relocatable -- serve.py resolves it against PACK at load time.
+        exe_chk = exe if os.path.isabs(exe) else os.path.join(PACK, exe)
+        if not os.path.isfile(exe_chk):
             manifest["missing"].append(f"standalone {name}: {exe}")
             continue
         # Optional 5th element sets the card art.
@@ -776,9 +808,14 @@ def build():
         art_name = rest[0] if rest else ""
         # Optional 6th element is extra command-line arguments.
         args = rest[1] if len(rest) > 1 else []
+        # Optional 7th element tags the engine ("eduke32" for the Duke games).
+        # serve.py passes it through so the multiplayer path can tell an
+        # EDuke32 game -- which plays its own native netcode -- from the
+        # Zandronum pack entries.
+        engine = rest[2] if len(rest) > 2 else ""
         manifest["standalone_games"].append(
             {"name": name, "note": note, "wdir": wdir, "exe": exe,
-             "art": art_name, "args": args})
+             "art": art_name, "args": args, "engine": engine})
 
     with open(os.path.join(PACK, "pack-manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=1)
