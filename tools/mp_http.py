@@ -99,8 +99,22 @@ def setup(handler, resolve):
         # Prep first, THEN describe: `ready.nn.linked` is read off the disk and
         # is meant to report the state after this call, which is how it read
         # before. can_play() does not depend on either step.
-        _prepared, lines = mp_session._ensure_ready()
+        #
+        # EDuke32 entries skip the prep entirely. The NukemNet junction/preset
+        # step is Zandronum machinery: running it for a Duke game printed the
+        # scan of NN's doom/doom2 file lists -- "DOOM2.WAD <- MISSING" and
+        # friends -- into the panel's log for a game that never touches
+        # Zandronum, IWADs or NukemNet. That log read like a failure and
+        # convinced at least one player Duke multiplayer was broken while the
+        # engine was, in fact, about to launch.
         ready = mp_session.describe(idx)
+        if ready.get("engine") == "eduke32":
+            lines = ["EDuke32 LAN multiplayer: the engine ships inside the "
+                     "pack, so there is nothing to set up. Host or join with "
+                     "a plain IP address (LAN or VPN; the engine has no "
+                     "internet matchmaking of its own)."]
+        else:
+            _prepared, lines = mp_session._ensure_ready()
         ok = bool(ready.get("can_play"))
         return 200, {"ok": ok,
                      "error": None if ok else (ready.get("why") or
