@@ -323,6 +323,36 @@ function payloadPresent(root) {
   );
 }
 
+// Does sources.json list anything the pack on disk is missing?
+//
+// payloadPresent() above is what decided "complete" for years, and a pack
+// that has runtime/doom.exe IS complete -- for the manifest it was built
+// against. v2.5.0 grew sources.json by ~6,100 Duke entries and every
+// existing install silently showed the Duke cards with no files behind
+// them, because nothing ever re-fetched into a "complete" pack. The
+// fetcher is idempotent and resumable, so "some manifest entry is absent"
+// is a safe trigger: it downloads exactly the gap and nothing else.
+//
+// no_host files are skipped here, not just ignored: the fetcher will never
+// be able to fetch them (they are upload-vetoed), so counting one as a gap
+// would make needsFetch true on every launch forever, flashing the fetch
+// window each time for a download that can never finish.
+function manifestGaps(root) {
+  let doc;
+  try {
+    doc = JSON.parse(fs.readFileSync(path.join(root, "sources.json"), "utf8"));
+  } catch {
+    return false; // unreadable manifest is not a reason to fetch
+  }
+  const files = doc.files || {};
+  for (const rel of Object.keys(files)) {
+    const rec = files[rel];
+    if (!rec || rec.no_host) continue;
+    if (!fs.existsSync(path.join(root, ...rel.split("/")))) return true;
+  }
+  return false;
+}
+
 // Should this launch fetch?
 //
 // Only a managed pack is ever fetched into: a pack the user pointed at is
@@ -335,7 +365,7 @@ function needsFetch(root, managed) {
     fs.existsSync(path.join(root, "sources.json"));
   if (!canFetch) return false;
   if (process.env.DOOMNITE_FETCH === "1") return true;
-  return managed && !payloadPresent(root);
+  return managed && (!payloadPresent(root) || manifestGaps(root));
 }
 
 // fetcher.py prints for a human -- it is also a tool operators run by hand --
