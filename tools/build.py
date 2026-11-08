@@ -744,6 +744,7 @@ ZSCRIPT_MOD_PATTERNS = (
     "city",                      # Doom City Collision
     "bloom",                     # Bloom: 3D models, voxels and .gl shaders
     "hde",                       # Halo: Doom Evolved, documented GZDoom >= 4.14
+    "totalchaos",                # Total Chaos: ZScript-heavy survival TC, GZDoom-only
 )
 
 
