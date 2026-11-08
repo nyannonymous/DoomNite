@@ -344,12 +344,15 @@ GAMES = [
      [("DOOM2.WAD", BD + r"\DN3DooM.pk3")]),
 ]
 
-# Non-ZDoom games: launched in place, not copied into the pack.
+# Non-ZDoom games: an engine and its own executable rather than an IWAD plus
+# mods. A bundled one lives under runtime\ and is recorded pack-relative; an
+# operator's own install (Doom Half-Life) is an absolute path and only exists
+# on the machine that has it.
 # (name, note, working dir, exe, art filename)
 #
 # The art element is required in practice, not optional: serve.py resolves art
-# by matching filenames against mod stems, and these two have no mods, so
-# without an explicit name they can only ever draw a generated poster.
+# by matching filenames against mod stems, and these have no mods, so without
+# an explicit name they can only ever draw a generated poster.
 # A 5th optional element is extra command-line arguments.
 #
 # SRB2 needs them. Its config.cfg says fullscreen "Yes", but on this machine it
@@ -357,9 +360,17 @@ GAMES = [
 # SDL failing to get a real display mode and silently falling back. Passing
 # -window with an explicit size takes the decision away from it, and -center puts
 # it somewhere deliberate instead of wherever it defaulted.
+#
+# SRB2 USED TO LAUNCH FROM Z:\GAMES\...\SRB2 v2.2, an operator folder that was
+# emptied after v2.4.1. That folder is gone and the game was never in the pack
+# or the bucket, so it dropped out of the launcher entirely. It now ships INSIDE
+# the pack under runtime\srb2 and is fetched from the bucket like the Duke
+# engines, so it works on any machine and survives the source drive being wiped
+# again. Source: the official STJr release, SRB2-v2215-Full.zip.
 STANDALONE = [
-    ("Sonic Robo Blast 2 v2.2", "ZDoom build. Sonic in Doom.",
-     os.path.join(BD, "SRB2 v2.2"), os.path.join(BD, "SRB2 v2.2", "srb2win.exe"),
+    ("Sonic Robo Blast 2 v2.2", "Sonic in Doom. Standalone SRB2 2.2.15 build.",
+     os.path.join("runtime", "srb2"),
+     os.path.join("runtime", "srb2", "srb2win.exe"),
      "SonicRoboBlast2.png",
      ["-window", "-width", "1600", "-height", "900", "-center"]),
     ("Doom Half-Life", "Half-Life 1 in Doom.",
@@ -376,16 +387,220 @@ STANDALONE = [
     ("Duke Nukem 3D", "Duke3D on EDuke32.",
      os.path.join("runtime", "eduke32", "duke3d"),
      os.path.join("runtime", "eduke32", "duke3d", "eduke32.exe"),
-     "", ["-usecwd"], "eduke32"),
+     "DukeNukem3D.png", ["-usecwd"], "eduke32"),
     ("Duke Nukem 64", "The N64 port of Duke3D, as a total conversion.",
      os.path.join("runtime", "eduke32", "duke64"),
      os.path.join("runtime", "eduke32", "duke64", "eduke32.exe"),
-     "", ["-usecwd"], "eduke32"),
+     "DukeNukem64.png", ["-usecwd"], "eduke32"),
     ("KickAss Duke", "KickAss Duke 1.2 HRP mod.",
      os.path.join("runtime", "eduke32", "kickass"),
      os.path.join("runtime", "eduke32", "kickass", "eduke32.exe"),
-     "", ["/gKADuke_Data.zip", "-usecwd"], "eduke32"),
+     "KickAssDuke.png", ["/gKADuke_Data.zip", "-usecwd"], "eduke32"),
+    # Legacy Edition ships its own CUSTOMIZED eduke32.exe (the mod's docs
+    # insist on it) which auto-loads the LegacyE/ directory beside it -- no
+    # -g/-con args needed, verified live: the engine compiles LegacyE's
+    # GAME.CON on boot. It wants the Atomic GRP beside the exe, which the
+    # build copies from the duke3d dir. Multiplayer rides the same
+    # EDuke32 netcode as the other Dukes.
+    ("Duke Nukem 3D: Legacy Edition",
+     "The 2.0.8 overhaul: dashing, challenges, new bosses, high SFX.",
+     os.path.join("runtime", "eduke32", "legacy"),
+     os.path.join("runtime", "eduke32", "legacy", "eduke32.exe"),
+     "LegacyEdition.png", ["-usecwd"], "eduke32"),
+    # Duke Nukem Forever, Gambini and Mikko Sandt's Build-engine take on the
+    # game the 1998 trailer promised. It is a GRP total conversion: DNF.GRP is
+    # the game data and DNFGAME.con is the game CON, both selected by the author's
+    # own DNF.BAT line, so those two switches are the whole launch.
+    #
+    # THE EXE IS THE MOD'S OWN. Its README is emphatic -- "Do NOT replace the
+    # supplied _eduke32.exe with your own as this mod has been optimized for the
+    # included version" -- so this is the one Duke entry that does not use the
+    # pack's eduke32.exe. Verified it runs here: with these args it boots and
+    # reaches DirectDraw init; with no args it boots vanilla Duke3D from
+    # duke3d.grp, which is the failure mode if the switches ever get dropped.
+    #
+    # NEVER add -nosound to this line. That 2013 build (r3717) rejects it and
+    # exits 127 immediately after reading the CON file -- which looks exactly
+    # like a broken mod and is not.
+    #
+    # duke3d.grp (Atomic) has to sit beside the exe; it is copied there from
+    # runtime\eduke32\duke3d, the same BYO-GRP arrangement as Legacy Edition.
+    ("Duke Nukem Forever", "Duke Nukem Forever, Build-engine style, by "
+     "Gambini and Mikko Sandt. Ships its own 2013 EDuke32.",
+     os.path.join("runtime", "eduke32", "dnf"),
+     os.path.join("runtime", "eduke32", "dnf", "_eduke32.exe"),
+     "DukeNukemForever.png",
+     ["-gDNF.GRP", "-xDNFGAME.con"], "eduke32"),
+    # ISODoom is not a Doom mod at all: it is its own engine with an isometric
+    # top-down view, shipped as a Windows build (IsoDoom.exe plus
+    # data_IsoDoom_windows_x86_64\). Bundled under runtime\isodoom like the
+    # Duke engines, so it is relocatable and fetched from the bucket.
+    ("ISODoom", "Isometric top-down remake of Doom. Standalone build.",
+     os.path.join("runtime", "isodoom"),
+     os.path.join("runtime", "isodoom", "IsoDoom.exe"),
+     "ISODoom.png"),
 ]
+
+# Mods that belong in the roster but whose files are NOT in the pack yet.
+#
+# ModDB is their only home and it answers scripted requests with a Cloudflare
+# 403 (measured -- see legacy/playnite-launcher/RESEARCH-mod-downloader.md), so
+# they can be neither fetched nor hosted here. That makes them "browser"-source
+# entries: the card appears now, marked MISSING, and names the folder to drop
+# the download into. Put the file in mods\<slug>\ and re-run tools\build.py --
+# the next build finds it, writes the launcher, and the card becomes playable.
+#
+# Nothing listed here is added to sources.json while its folder is empty: a URL
+# that 404s would make every clone report a corrupt pack.
+#
+# The Ashes saga ships as four separate downloads that play in order, and the
+# cards gave no way to tell which one came first: "Ashes: Blackwater" reads like
+# a continuation of Afterglow when it is a remix side story, and Hard Reset is a
+# prequel numbered before the game it follows. Each Ashes card therefore states
+# its position AND repeats the whole saga, so the panel answers "what order do I
+# play these in?" without leaving the game you are looking at.
+#
+# (slug, display name, role in the saga)
+ASHES_SERIES = [
+    ("ashes-2063", "Ashes 2063", "Episode 1, start here"),
+    ("ashes-afterglow", "Ashes: Afterglow", "Episode 2"),
+    ("ashes-hard-reset", "Ashes: Hard Reset", "Episode 2 prequel, set in 2060"),
+    ("ashes-blackwater", "Ashes: Blackwater", "side story, a 2026 remix"),
+]
+
+_ORDINALS = {1: "First", 2: "Second", 3: "Third", 4: "Fourth"}
+
+
+def ashes_note(slug, lead):
+    """Note for one Ashes card: where it sits, then the whole saga in order.
+
+    Multi-line on purpose -- the panel renders pre-line, and a numbered list is
+    the only form of this that stays readable in a 320px column. Callers that
+    need one line (the .bat comment, the console menu) collapse it themselves.
+    """
+    n = next(i for i, (s, _, _) in enumerate(ASHES_SERIES, 1) if s == slug)
+    rows = [f"{_ORDINALS[n]} of {len(ASHES_SERIES)} Ashes games in this pack. {lead}",
+            "The saga, in play order:"]
+    for i, (s, name, role) in enumerate(ASHES_SERIES, 1):
+        rows.append(f"{'>>' if s == slug else '  '} {i}. {name} - {role}")
+    return "\n".join(rows)
+
+
+# (name, note, slug, iwad, page)
+PENDING = [
+    ("Ashes 2063", ashes_note("ashes-2063",
+     "Episode 1: post-apocalyptic Georgia, 2063, where Walker's story starts."),
+     "ashes-2063", "DOOM2.WAD",
+     "https://www.moddb.com/mods/ashes-2063/downloads"),
+    ("Ashes: Afterglow", ashes_note("ashes-afterglow",
+     "Episode 2: 20 levels and the 2021 Cacoward winner - plays straight after 2063."),
+     "ashes-afterglow", "DOOM2.WAD",
+     "https://www.moddb.com/mods/ashes-2063/downloads"),
+    ("Ashes: Hard Reset", ashes_note("ashes-hard-reset",
+     "Walker and a squad of elites in 2060. Its story precedes Afterglow, but it came out after - play it after."),
+     "ashes-hard-reset", "DOOM2.WAD",
+     "https://www.moddb.com/mods/ashes-2063/downloads"),
+    ("Ashes: Blackwater", ashes_note("ashes-blackwater",
+     "Not an episode: a darker remix of Afterglow's maps by Ykarion. Play it last."),
+     "ashes-blackwater", "DOOM2.WAD",
+     "https://www.moddb.com/mods/ashes-2063/downloads"),
+    ("Zelda TC", "The Legend of Zelda as a Doom total conversion.",
+     "zelda-tc", "DOOM2.WAD", "https://www.moddb.com/mods/zelda-tc"),
+    ("Breach 2", "Sci-fi tactical total conversion.",
+     "breach2", "DOOM2.WAD", "https://www.moddb.com/mods/breach2"),
+    ("Tiberian Fury", "Command & Conquer flavoured total conversion.",
+     "tiberian-fury", "DOOM2.WAD",
+     "https://www.moddb.com/mods/tiberian-fury"),
+    ("Total Chaos", "Survival horror total conversion for GZDoom.",
+     "total-chaos", "DOOM2.WAD", "https://www.moddb.com/mods/total-chaos"),
+    ("Brutal Wolfenstein 3D", "Wolfenstein 3D rebuilt Brutal Doom style.",
+     "brutal-wolfenstein-3d", "DOOM2.WAD",
+     "https://www.moddb.com/mods/brutal-wolfenstein-3d"),
+    ("Recurring Nightmare", "Dream-logic horror total conversion.",
+     "recurring-nightmare", "DOOM2.WAD",
+     "https://www.moddb.com/mods/recurring-nightmare"),
+    ("The Pink Valley", "Surreal, pink-themed total conversion.",
+     "the-pink-valley", "DOOM2.WAD",
+     "https://www.moddb.com/mods/the-pink-valley"),
+    ("Zombies Doomed: My Neighbors Mod", "Zombies Ate My Neighbors in Doom.",
+     "zombies-doomed", "DOOM2.WAD",
+     "https://www.moddb.com/mods/zombies-doomed-my-neighbors-mod"),
+    ("Doom City Collision", "City-scale Doom map pack / total conversion.",
+     "doom-city-collision", "DOOM2.WAD", ""),
+    # Bloom is the one entry here that arrived already installed: it came as a
+    # zip on the operator's desktop and its pk3 was lifted straight into
+    # mods\bloom\. It stays in this list rather than GAMES because GAMES sources
+    # every mod from an operator folder, and Bloom has none -- the pack copy IS
+    # the only copy. Listed here, the card survives the file being deleted: it
+    # degrades to MISSING and names its drop folder instead of vanishing.
+    #
+    # Doom 2 only. Bloom is a Doom/Blood crossover built on ZBloodX and its
+    # CREDITS is explicit about needing a registered DOOM2.WAD (it warns that
+    # FREEDOOM.WAD breaks the keys), so there is no Doom 1 variant to offer.
+    ("Bloom", "Doom/Blood crossover: Blood's weapons, monsters and voxels in "
+     "Doom. 14 maps, runs on GZDoom. Doom 2 only.",
+     "bloom", "DOOM2.WAD",
+     "https://www.moddb.com/mods/bloom-doomblood-crossover"),
+    # Xim's Star Wars Doom is 15 maps (MAP01-MAP15) with UMAPINFO, a DeHackEd
+    # patch and MBF21 actors in a single wad -- no pk3 to load beside it. All of
+    # that is understood by the pack's default engine, so it needs no GZDoom
+    # routing: verified by loading it on runtime\doom.exe, where the log shows
+    # "Adding dehacked patch StarWarsDoom-Xim.wad:DEHACKED / Patch installed"
+    # and a clean boot to P_Init. Doom 2 only (MAP## naming, D_DM2TTL).
+    ("Xim's Star Wars Doom", "Star Wars total conversion: 15 levels from the "
+     "original trilogy and Dark Forces. Doom 2 only.",
+     "star-wars-doom-xim", "DOOM2.WAD",
+     "https://www.moddb.com/mods/xims-star-wars-doom"),
+    # Halo: Doom Evolved is a WEAPON mod, so it ships no maps at all (9,178
+    # lumps, 123 zscript files, 227 models, zero map lumps) and is meant to be
+    # played over Doom 2's own levels. The build's mapless-mod warning fires on
+    # it by design -- unlike the Aliens case it warns about, this is not a
+    # missing companion file, so leave the NOTE alone rather than hunting for a
+    # mapset to stack underneath. Its own release notes pin it to "GZDoom 4.14
+    # at minimum", hence the gzdoom routing in ZSCRIPT_MOD_PATTERNS.
+    ("Halo: Doom Evolved", "Halo's weapons, enemies and Spartans as a weapon "
+     "mod over Doom 2's maps. Needs GZDoom 4.14 or newer.",
+     "hde", "DOOM2.WAD",
+     "https://www.moddb.com/mods/halo-doom-evolved"),
+]
+
+PENDING_MOD_EXTS = (".pk3", ".pk7", ".ipk3", ".wad")
+
+# Cover art for browser-source cards, keyed by slug (filenames in art\).
+#
+# art_map() matches art filenames against mod stems, so it can never resolve a
+# card whose folder is still empty -- the card would draw a generated poster
+# even though the roster knows exactly which game it is. These were taken from
+# each mod's own ModDB page (see fetch_art.py for how, given ModDB's 403), and
+# are replaced automatically by the mod's TITLEPIC once the files land.
+PENDING_ART = {
+    "ashes-2063": "ashes-2063.png",
+    "zelda-tc": "zelda-tc.png",
+    "breach2": "breach2.png",
+    "tiberian-fury": "tiberian-fury.png",
+    "total-chaos": "total-chaos.png",
+    "recurring-nightmare": "recurring-nightmare.png",
+    "zombies-doomed": "zombies-doomed.png",
+}
+
+
+def pending_files(slug):
+    """Mod files the player has dropped into mods\\<slug>\\, in load order.
+
+    A pk3 before a wad, because a loose wad in one of these folders is normally
+    a mapset riding on top of the mod. Anything else -- a .zip in particular --
+    is ignored: ZDoom silently drops a zip passed to -file, so counting one
+    here would produce a launcher that looks complete and loads nothing.
+    """
+    folder = os.path.join(PACK, "mods", slug)
+    if not os.path.isdir(folder):
+        return []
+    names = [n for n in sorted(os.listdir(folder))
+             if os.path.splitext(n)[1].lower() in PENDING_MOD_EXTS
+             and os.path.isfile(os.path.join(folder, n))]
+    pk = [n for n in names if os.path.splitext(n)[1].lower() != ".wad"]
+    wad = [n for n in names if os.path.splitext(n)[1].lower() == ".wad"]
+    return pk + wad
 
 
 def sync_gzdoom_engine():
@@ -522,6 +737,13 @@ GZDOOM_ENGINE_FILES = (
 
 ZSCRIPT_MOD_PATTERNS = (
     "bdbe",                      # Brutal Doom Black Edition
+    "ashes",                     # Ashes series: ZScript-heavy, GZDoom-only
+    "wolfenstein",               # Brutal Wolfenstein 3D
+    "zmc-bw",                    # ...whose release file is ZMC-BWV7.2.pk3
+    "pink",                      # The Pink Valley
+    "city",                      # Doom City Collision
+    "bloom",                     # Bloom: 3D models, voxels and .gl shaders
+    "hde",                       # Halo: Doom Evolved, documented GZDoom >= 4.14
 )
 
 
@@ -619,7 +841,10 @@ def write_bat(bat, title, iwad, mods, note, engine=ENGINE_DEFAULT,
         "",
         line,
         "",
-        f"rem {note}",
+        # One line only: a note is a paragraph now, and a raw newline here would
+        # emit the rest of the text as uncommented batch lines that run as
+        # commands. Separator keeps the sentence readable in the file.
+        f"rem {' '.join(note.split())}",
         "",
     ]
     with open(out, "w", encoding="utf-8", newline="") as f:
@@ -802,6 +1027,32 @@ def build():
         if entry["actions"]:
             manifest["games"].append(entry)
 
+    # Browser-source roster: games whose files the player supplies by hand. The
+    # entry is emitted even with an empty folder, so it shows up as a MISSING
+    # card naming its own drop folder instead of silently not existing -- the
+    # failure mode that made Sonic Robo Blast 2 look deleted.
+    for name, note, slug, iwad, page in PENDING:
+        entry = {"name": name, "note": note, "page": page, "actions": []}
+        files = pending_files(slug)
+        if not files:
+            entry["actions"].append({
+                "bat": "", "iwad": iwad, "hd": False, "label": "",
+                "art": PENDING_ART.get(slug, ""),
+                "mods": [], "pending": True, "slug": slug,
+            })
+            manifest["games"].append(entry)
+            continue
+        mods = [(slug, f) for f in files]
+        bat = f"{slugify(name)}.bat"
+        write_bat(bat, name, iwad, mods, note,
+                  engine=ENGINE_GZDOOM if needs_gzdoom(mods) else ENGINE_DEFAULT)
+        entry["actions"].append({
+            "bat": bat, "iwad": iwad, "hd": False, "label": "", "art": "",
+            "mod": f"mods\\{mods[0][0]}\\{mods[0][1]}",
+            "mods": [f"mods\\{s}\\{f}" for s, f in mods],
+        })
+        manifest["games"].append(entry)
+
     for name, note, wdir, exe, *rest in STANDALONE:
         # A standalone game may live INSIDE the pack (a bundled engine, given
         # as a path relative to PACK) or outside it (an absolute path to an
@@ -810,9 +1061,14 @@ def build():
         # while the manifest keeps the path RELATIVE so the pack stays
         # relocatable -- serve.py resolves it against PACK at load time.
         exe_chk = exe if os.path.isabs(exe) else os.path.join(PACK, exe)
+        # Never drop the entry. A standalone whose exe is absent used to be
+        # skipped entirely, so its card vanished with no explanation and the
+        # game read as deleted rather than broken -- it is how Sonic Robo Blast
+        # 2 disappeared when its operator folder was emptied. Record it as
+        # missing and still emit it: serve.py reports exists:false, the card
+        # shows MISSING, and a launch is refused with the reason.
         if not os.path.isfile(exe_chk):
             manifest["missing"].append(f"standalone {name}: {exe}")
-            continue
         # Optional 5th element sets the card art.
         #
         # Standalone games point at an exe outside the pack and have no mods,
@@ -903,7 +1159,12 @@ def _has_map_lumps(path):
             import zipfile
             with zipfile.ZipFile(path) as z:
                 names = z.namelist()
-            pat = re.compile(r"(maps?/map\d\d|^map\d\d|/\w\d\d\.wad$)", re.I)
+            # Any wad/pk3 sitting under maps/ is map content, whatever it is
+            # called: The Pink Valley ships A_NEW_DAY.wad, MONONO.wad and
+            # friends, so a MAP##-only pattern called it mapless and made
+            # the build warn about a total conversion that has 21 maps.
+            pat = re.compile(
+                r"^maps?/[^/]+\.(?:wad|pk3|pk7)$|^map\d\d|/\w\d\d\.wad$", re.I)
             return any(pat.search(n) for n in names)
         if s == ".wad":
             with open(path, "rb") as f:
@@ -1015,12 +1276,22 @@ def check():
                 problems.append(f"runtime -norun exited {r.returncode}")
         except subprocess.TimeoutExpired:
             problems.append("runtime -norun hung")
-    expected = sum(len(a) for _, _, a in GAMES)
-    have = sum(len(g["actions"]) for g in man["games"])
+    expected = (sum(len(a) for _, _, a in GAMES)
+                + sum(1 for _n, _no, slug, _i, _p in PENDING
+                      if pending_files(slug)))
+    # Pending (browser-source) rows are roster entries, not launchers: their file
+    # is not here yet, so counting them against GAMES would report a phantom
+    # mismatch on every checkout that has not hand-installed them.
+    have = sum(1 for g in man["games"] for a in g["actions"]
+               if not a.get("pending"))
     if expected != have:
         problems.append(f"launcher count: script implies {expected}, manifest has {have}")
     for g in man["games"]:
         for a in g["actions"]:
+            if a.get("pending"):
+                # Nothing to verify: the card exists precisely because the
+                # player has not supplied the file yet.
+                continue
             # On-demand entries (the two games installer.py fetches) emit a
             # different action shape: no "mod" key, because the file is not in
             # the pack to be checked. They carry "needs_install" instead, and

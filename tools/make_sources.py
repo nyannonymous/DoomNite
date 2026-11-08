@@ -71,8 +71,26 @@ def sha256(path, chunk=1024 * 1024):
     return h.hexdigest()
 
 
+def _pending_slugs():
+    """mods/<slug> folders that are still EMPTY and filled in by hand.
+
+    Those mods live only on ModDB, which refuses scripted downloads, so an empty
+    folder is nothing we can publish -- listing it would hand every clone a URL
+    that 404s and a pack that calls itself corrupt. Once a file is dropped in,
+    it is ordinary pack content and must be hashed and hosted like any other
+    mod, so the slug leaves this set on its own.
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from build import PENDING, pending_files
+        return {slug for _, _, slug, _, _ in PENDING if not pending_files(slug)}
+    except Exception:
+        return set()
+
+
 def collect():
     """Every file under ROOTS, keyed by its pack-relative posix path."""
+    pending = _pending_slugs()
     out = {}
     for root in ROOTS:
         base = os.path.join(PACK, root)
@@ -97,6 +115,8 @@ def collect():
                 if os.path.islink(full) or not os.path.isfile(full):
                     continue
                 rel = os.path.relpath(full, PACK).replace("\\", "/")
+                if any(rel.startswith("mods/" + s + "/") for s in pending):
+                    continue        # hand-supplied, never published
                 out[rel] = {"size": os.path.getsize(full), "sha256": None}
     return out
 

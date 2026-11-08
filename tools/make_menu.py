@@ -52,6 +52,12 @@ def entries(manifest):
         # Only spell out the IWAD when there is an actual choice.
         variants = {a["iwad"] for a in acts}
         for a in acts:
+            # A pending (browser-source) card has no launcher until its file is
+            # dropped in and build.py runs again. Numbering it would shift every
+            # entry below and point a menu pick at a batch file that is not
+            # there.
+            if a.get("pending"):
+                continue
             n += 1
             label = g["name"]
             if len(acts) > 1 and len(variants) > 1:
@@ -63,6 +69,21 @@ def entries(manifest):
     return rows
 
 
+def standalone_base(manifest):
+    """How many menu rows come before the first standalone game.
+
+    Pending (browser-source) cards are skipped by entries() because they have
+    no launcher yet, so they must not be counted here either. Counting every
+    action made this number too high by the number of pending cards -- seven
+    at the time of writing -- so run_standalone.cmd waited for 54 while the
+    menu dispatched 47, and picking any Duke game or SRB2 from the console did
+    nothing at all. Clicks in the UI were unaffected (they go through
+    serve.py), which is why it went unnoticed.
+    """
+    return sum(1 for g in manifest.get("games", [])
+               for a in g.get("actions", []) if not a.get("pending"))
+
+
 def standalone_launcher(manifest):
     """Emit tools\\run_standalone.cmd, used for the non-ZDoom entries.
 
@@ -71,7 +92,7 @@ def standalone_launcher(manifest):
     the real start line to dryrun.log instead, so a verification pass can
     resolve every entry's files, not just the pack launchers.
     """
-    base = sum(len(g.get("actions", [])) for g in manifest.get("games", []))
+    base = standalone_base(manifest)
     L = []
     a = L.append
     a("@echo off")
@@ -80,7 +101,15 @@ def standalone_launcher(manifest):
     a("")
     for i, s in enumerate(manifest.get("standalone_games", []), start=1):
         n = base + i
-        cmd = f'start "" /D "{s["wdir"]}" "{s["exe"]}"'
+        # Extra args are part of the launch, not decoration. Duke Nukem Forever
+        # is an EDuke32 total conversion: without -gDNF.GRP and -xDNFGAME.con
+        # the engine boots plain Duke3D from duke3d.grp and the mod never
+        # appears, and SRB2 needs -window plus an explicit size because SDL
+        # otherwise falls back to a silent no-display mode. Dropping them here
+        # meant the console menu launched a different game than the .bat/
+        # serve.py path did.
+        extra = " ".join(s.get("args") or ())
+        cmd = f'start "" /D "{s["wdir"]}" "{s["exe"]}"' + (f" {extra}" if extra else "")
         a(f'if "%n%"=="{n}" (')
         a('  if /I "%DOOMNITE_DRYRUN%"=="1" (')
         a(f'    echo {cmd}>>"%~dp0..\\dryrun.log"')
@@ -123,7 +152,11 @@ def build_cmd(rows):
     for n, label, bat, note in rows:
         a(f"echo  {n:2}. {label}")
         if note:
-            a(f"echo        {note}")
+            # A note may be a paragraph now (the Ashes cards list their whole
+            # saga so their order is visible). The menu is one line per entry,
+            # so fold to the headline -- otherwise the remaining lines land as
+            # stray text between rows and the numbering reads as broken.
+            a(f"echo        {note.splitlines()[0]}")
     a("echo.")
     a("echo   0. Exit")
     a("echo.")
@@ -188,10 +221,11 @@ def main():
                 if bat:
                     print(f"{n}. {label}\n   call launchers\\{bat}")
                 else:
-                    base = sum(len(g.get("actions", []))
-                               for g in manifest.get("games", []))
+                    base = standalone_base(manifest)
                     s = manifest["standalone_games"][args.dryrun - base - 1]
-                    print(f"{n}. {label}\n   start \"\" /D \"{s['wdir']}\" \"{s['exe']}\"")
+                    extra = " ".join(s.get("args") or ())
+                    print(f"{n}. {label}\n   start \"\" /D \"{s['wdir']}\" "
+                          f"\"{s['exe']}\"" + (f" {extra}" if extra else ""))
                 return
         sys.exit(f"no entry numbered {args.dryrun}")
 
