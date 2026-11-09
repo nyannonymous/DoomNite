@@ -27,9 +27,29 @@
    "sha256": "f3f5cbafd0ee6ae8a66753c0664cd13c932cd5c3db7c3c702b1814ccd8547d80",
    "size": 122421810
   },
+  "mods/ashes-2063/Ashes2063Enriched2_23.pk3": {
+   "sha256": "fbb218dc0efadd76080247ff3466bbf5b6b32e8bed694585ad43b5c71408dfb4",
+   "size": 124205442
+  },
+  "mods/ashes-2063/AshesSAMenu.pk3": {
+   "sha256": "04f22efd9c6d2ab44f0629684d337214988ca6a09b79404dd70aa62c832d0e14",
+   "size": 9286
+  },
+  "mods/ashes-2063/lightmodepatch.pk3": {
+   "sha256": "375139a58596b70d286337698a1209aad482b9a5f998a9fdb7f75d5b2c5e4bb3",
+   "size": 237
+  },
   "mods/ashes-afterglow/AshesAfterglow1_16.pk3": {
    "sha256": "4fdc69e7a55b9c002c8191e723a55050974c0216e4a1c2ca40a6b24f6ef3f8a5",
    "size": 262811533
+  },
+  "mods/ashes-afterglow/AshesSAMenu.pk3": {
+   "sha256": "04f22efd9c6d2ab44f0629684d337214988ca6a09b79404dd70aa62c832d0e14",
+   "size": 9286
+  },
+  "mods/ashes-afterglow/lightmodepatch.pk3": {
+   "sha256": "375139a58596b70d286337698a1209aad482b9a5f998a9fdb7f75d5b2c5e4bb3",
+   "size": 237
   },
   "mods/ashes-blackwater/AshesBlackwater.pk3": {
    "sha256": "af078fab322be816dfc79d50f3ca487f4de27a12384791799be45995add3b2bb",
@@ -38,6 +58,14 @@
   "mods/ashes-hard-reset/AshesHardReset_105.pk3": {
    "sha256": "cdfe9f32d85c338bed60d7b414adc6b3c8dbbdab79f6f974191c710cb956e122",
    "size": 275594199
+  },
+  "mods/ashes-hard-reset/AshesSAMenu.pk3": {
+   "sha256": "04f22efd9c6d2ab44f0629684d337214988ca6a09b79404dd70aa62c832d0e14",
+   "size": 9286
+  },
+  "mods/ashes-hard-reset/lightmodepatch.pk3": {
+   "sha256": "375139a58596b70d286337698a1209aad482b9a5f998a9fdb7f75d5b2c5e4bb3",
+   "size": 237
   },
   "mods/bd-black-editionv3-35-weaponsounds/BD_Black_Editionv3.35_WeaponSounds.pk3": {
    "sha256": "d6a1f1a506b7a0fb9068abf2ba9a1f04bad446d46c9d2bd78ed3ba377aa7c4c3",
@@ -54,6 +82,10 @@
   "mods/bloom/Bloom.pk3": {
    "sha256": "74426bb922657f4a33c6815b49717c641ae6102da08ff3610f0623d531f9b4f5",
    "size": 368395986
+  },
+  "mods/breach2/breach2.pk3": {
+   "sha256": "c11c3c7d86bcf9605e017871c50c2ac1774f57027a3bebe35373c98f8d4e468d",
+   "size": 93361324
   },
   "mods/brutal-wolfenstein-3d/ZMC-BWV7.2.pk3": {
    "sha256": "88d4dc6adcb833945f2478ca6c2e0f767b69a904faab1a5fa3691efce4fc135c",
@@ -103,6 +135,10 @@
    "sha256": "26f149aa6245bb115b6a9ad8f40b116727468526d7741992ee82fa56e6269b87",
    "size": 104056094
   },
+  "mods/fate-tc/FATEDOOM.ipk3": {
+   "sha256": "45f4284dc26f76619cdf377b6d0ba65f6531facab4c2d179c270d9671678dba9",
+   "size": 17703139
+  },
   "mods/h-pbr-v461/h_PBR_v461.pk3": {
    "sha256": "695e22cfc47e8cf2e7ea13190ec3ccab8a2577643a82b455d24c516e11da1f57",
    "size": 686638484
@@ -127,6 +163,18 @@
    "sha256": "f2b9a2dc47557f02864ab91929183ef475a88ef31261c50f45d11334a930f089",
    "size": 84907510
   },
+  "mods/lasting-light/ral_light_v4.1.pk3": {
+   "sha256": "00f4f9012611e8a71a93c4d582330b06d8b82f0909a55e496a35665f3fe37a1d",
+   "size": 46508748
+  },
+  "mods/legend-of-doom/LegendOfDoom-1.1.0.pk3": {
+   "sha256": "87edff6aacaff65879e099af959097e32c6cd0c7fc15f1513a7c07a7a85f72e9",
+   "size": 8638823
+  },
+  "mods/minecraft-doom/minecraftdoom.pk3": {
+   "sha256": "f8ac385958faf86a116037a2f8192667e2d60ee8f97be8b0ac0d0038ecdfddd8",
+   "size": 45033646
+  },
   "mods/moon-man-v1-3-1/moon_man_v1_3_1.pk3": {
    "sha256": "05d1e78ef9490605f65e92010bc5d61f5abbef0f7f39604650a315e9f792b053",
    "size": 21440115
@@ -138,6 +186,10 @@
   "mods/myhouse/myhouse.wad": {
    "sha256": "ccc713ef2e5a9de77a95ca709d2a403fdcef7d4ce2e754090bab844a3eb39024",
    "size": 3732286
+  },
+  "mods/pirate-doom/Pirates!.wad": {
+   "sha256": "aec871df2d8473f894304a04ee970c946bf56992e6fd447571492bc2e995cb21",
+   "size": 42383239
   },
   "mods/quakindoomt3de/QuakinDoomT3DE.pk3": {
    "sha256": "c957c68651281844959c288b7ef1643771d36a4758bb067069bf6eec9e33e340",
@@ -179,6 +231,10 @@
    "sha256": "875dc2b479eae0ed1f92fa82a86b3d7fac9fc0237c00f3294e65e65b0a666e62",
    "size": 191739591
   },
+  "mods/tiberian-fury/Tiberian Fury.wad": {
+   "sha256": "0bdb98a9a9de0d7ebfd52caed022e5151aa44f1e42d608945155e823bfb874c1",
+   "size": 690133797
+  },
   "mods/total-chaos/totalchaos.pk3": {
    "sha256": "d9d40096848da66aec30a7cd41d65aff89a133ec4bab4c07df42982313a2d29f",
    "size": 418096896
@@ -186,6 +242,10 @@
   "mods/ulsimpdm/ulsimpdm.wad": {
    "sha256": "422e45435395ca1389980ce171f1a2397c123816780332768f081a1e54e4e7f4",
    "size": 11232612
+  },
+  "mods/zelda-tc/WeAreUNIT.wad": {
+   "sha256": "5c4dfec88d7adb20d2f108ce06de5e44c6c0e3f931f7da8d791e1f21b1331bc6",
+   "size": 68237705
   },
   "runtime/brightmaps.pk3": {
    "sha256": "cb769c1d4a9e180b1e80a138df461285ca8ce78290a5acca4769fe0095208198",
@@ -310,10 +370,6 @@
   "runtime/eduke32/duke3d/duke3d.grp": {
    "sha256": "5eaee377b4d4bc3d541555f216032fbe22444a20d80108923fba97e5144c2fba",
    "size": 44356548
-  },
-  "runtime/eduke32/duke3d/eduke32.cfg": {
-   "sha256": "1d04901c80505fb51caa090757ed12b859c58abf307c3aebd09277cc9c864487",
-   "size": 5618
   },
   "runtime/eduke32/duke3d/eduke32.exe": {
    "sha256": "1898cce1dbaa540d5a20e405ebbcca32ba739fc4738b56de074ee076df332290",
@@ -16587,6 +16643,10 @@
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
    "size": 0
   },
+  "runtime/eduke32/duke64/duke64/textures.cache": {
+   "sha256": "5ffd1056fc7d7409f12fccebfed86ae5a88e2139976b9f1afb82330c9eab7819",
+   "size": 55
+  },
   "runtime/eduke32/duke64/duke64/textures.def": {
    "sha256": "19a20bea43a7b7835f9974cbebb6d90b3c0f27e9053f6f8ffb961adfaa963cc5",
    "size": 118559
@@ -19847,10 +19907,6 @@
    "sha256": "afd2260675581f3336247913cf2f7a6feaa0fce540647433788af1d48fa8c82e",
    "size": 8876
   },
-  "runtime/eduke32/duke64/eduke32.cfg": {
-   "sha256": "797f2b72940a4ad312d93ad3f1feb3a552c4fc5ee891b3a67ae7df43ec05ce34",
-   "size": 6459
-  },
   "runtime/eduke32/duke64/eduke32.exe": {
    "sha256": "ba0eaf587b819a36991c87c9208ec55a3b96f4dd378634ed9860b0ade76f6a1c",
    "size": 3742222
@@ -19863,6 +19919,10 @@
    "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
    "size": 18092
   },
+  "runtime/eduke32/duke64/grpfiles.cache": {
+   "sha256": "77f0bc2e6dd1e2e3e5709caaf0fb07bdada85f51bccada51ca625975be0f3f1e",
+   "size": 44
+  },
   "runtime/eduke32/duke64/m32help.hlp": {
    "sha256": "68513fcc33d493f86c6e85f52fbbbc818e9d1761970764b16b9d8851c4479494",
    "size": 15992
@@ -19870,6 +19930,10 @@
   "runtime/eduke32/duke64/names.h": {
    "sha256": "704aef53f9bff22d115af677c83f106714ef97b2b97ea962d33f7aeced87a5fa",
    "size": 18676
+  },
+  "runtime/eduke32/duke64/settings.cfg": {
+   "sha256": "5e0921866bad371a96c5cd4609440105aed843350c81a75037ec0f9e3b0cf672",
+   "size": 2512
   },
   "runtime/eduke32/duke64/tiles.cfg": {
    "sha256": "25e20cb39783f41627767d5840d05ec830b79be73dedd36fd1321c752e854d86",
@@ -20006,10 +20070,6 @@
   "runtime/eduke32/kickass/duke3d_KADHRP_polymost.def": {
    "sha256": "2b89844d35ac7f2fbad727f4c2883f7bc6ac1cdef025da9848279bebe634957c",
    "size": 1686
-  },
-  "runtime/eduke32/kickass/eduke32.cfg": {
-   "sha256": "18b081d81bfdb1acb8df03ccd6663a947a52888676e1030c884baa57d76691d9",
-   "size": 5923
   },
   "runtime/eduke32/kickass/eduke32.exe": {
    "sha256": "04337c2e38239f755a22c2364ff166a2812a5e00c21a46740f434958630dba81",
@@ -44271,10 +44331,6 @@
    "sha256": "5eaee377b4d4bc3d541555f216032fbe22444a20d80108923fba97e5144c2fba",
    "size": 44356548
   },
-  "runtime/eduke32/legacy/eduke32.cfg": {
-   "sha256": "83ba3eb56e9055411257173484957edaeb08afc3bd7e92f54ec87c2e2dccc399",
-   "size": 803
-  },
   "runtime/eduke32/legacy/eduke32.exe": {
    "sha256": "c7f71a5872756fbc32ac363f6e2c1c87e41b306954986a323d80729e046b5353",
    "size": 5488128
@@ -47078,10 +47134,6 @@
   "runtime/zandronum/skulltag_actors.pk3": {
    "sha256": "3f270becdb0e2df670e93dd4acd6fbc2a57e82a1244915672bc386b034b44e99",
    "size": 57280
-  },
-  "runtime/zandronum/zandronum-Serge.ini": {
-   "sha256": "fcec8a1d06544b2d7dbdf32c4576e1f8548174ca02729ffae7d2e9f72beff332",
-   "size": 21994
   },
   "runtime/zandronum/zandronum.exe": {
    "sha256": "65e25ce229b967c49b8a5f7ffa6b3c40812ec331efd6f09219465bd360693067",

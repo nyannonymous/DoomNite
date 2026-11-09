@@ -266,6 +266,14 @@ def _launch_duke(idx, entry, mode, raw):
             tunnel.stop()
             return 500, {"error": "The Duke engine did not open a network "
                                   "port, so internet hosting cannot start."}
+        # Announce the room in the shared lobby, same as the Doom relay
+        # host path: a Duke host shows up in everyone's "Open games" list,
+        # so a friend joins by CLICKING instead of typing a code someone
+        # read out. mode "duke" keeps the two engines' rooms apart. The
+        # heartbeat thread also removes the room when the engine dies.
+        import lobby as _lobby
+        _lobby.keep_announced(tunnel.room, entry.get("label", ""), "duke",
+                              tunnel.alive)
 
     sharing = None
     if mode == "host":

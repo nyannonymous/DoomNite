@@ -328,9 +328,17 @@ export default function Tile({
       title={`${group.label}${multi ? ` — ${group.cfgs.length} builds` : ""}\nClick to pin · Right-click for builds`}
     >
       <Cover group={group} />
-      {/* Notch glow, revealed on hover so it snaps into place rather than
-          always being present. */}
-      <span className="tile-jag" aria-hidden="true" />
+      {/* The old .tile-jag notch glow lived here. It painted a toxic-green
+          wash and a 22-26px inner blur across the artwork on hover/selection,
+          which is the opposite of what the frame is for now. Hover and
+          selection are the red bezel light plus the reticle. */}
+      {/* State light on the bezel itself. Sits above the cover but only ever
+          paints the 7px frame, so hover/selection can get much brighter
+          without tinting the artwork. */}
+      <span className="tile-rim" aria-hidden="true" />
+      {/* HUD lock brackets, shown on hover/focus by CSS. Pure state chrome:
+          it never takes a pointer event, so the play button stays reachable. */}
+      <span className="tile-reticle" aria-hidden="true" />
 
       <span className="tile-body">
               {/* data-text is what .d-glitch's pseudo-elements copy. Without it the

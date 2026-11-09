@@ -88,6 +88,26 @@ def _pending_slugs():
         return set()
 
 
+def per_user_config(rel):
+    """True for engine files that belong to whoever last ran the engine.
+
+    Zandronum writes zandronum-<name>.ini holding that machine's IWAD paths;
+    EDuke32 writes eduke32.cfg holding the player's name, keys and video mode.
+    Publishing either one hands every other install a stranger's settings, and
+    it is also the one manifest entry guaranteed to change: the moment anyone
+    plays, the local file no longer matches the copy in the bucket, so its
+    checksum fails on download and the launcher reports "the pack did not
+    finish downloading" on every start. The engine recreates both itself, so
+    neither belongs in this manifest at all.
+    """
+    base = os.path.basename(rel).lower()
+    if rel.startswith("runtime/zandronum/"):
+        return base.startswith("zandronum-") and base.endswith(".ini")
+    if rel.startswith("runtime/eduke32/"):
+        return base == "eduke32.cfg"
+    return False
+
+
 def collect():
     """Every file under ROOTS, keyed by its pack-relative posix path."""
     pending = _pending_slugs()
@@ -117,6 +137,8 @@ def collect():
                 rel = os.path.relpath(full, PACK).replace("\\", "/")
                 if any(rel.startswith("mods/" + s + "/") for s in pending):
                     continue        # hand-supplied, never published
+                if per_user_config(rel):
+                    continue        # the engine's own, per-machine state
                 out[rel] = {"size": os.path.getsize(full), "sha256": None}
     return out
 

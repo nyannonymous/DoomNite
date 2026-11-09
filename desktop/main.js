@@ -18,8 +18,19 @@ const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
 
-const PORT = 8765;
-const ORIGIN = `http://127.0.0.1:${PORT}`;
+// Preferred port, not a fixed one. Another local server (LISA, uvicorn, a
+// second checkout of this project) can already own 8765, and the original code
+// connected to whatever was listening there and showed it in the DoomNite
+// window -- launching this app opened a different application's UI. So the port
+// is chosen at startup (first free one at or above this) and the server that
+// answers on it is verified to be serve.py before the window loads it.
+const PREFERRED_PORT = 8765;
+const PORT_TRIES = 20;
+
+// Set by startServer() once a port has been picked. Anything that compares
+// against the launcher origin must read this, never a constant.
+let PORT = PREFERRED_PORT;
+let ORIGIN = `http://127.0.0.1:${PORT}`;
 
 // serve.py and everything it imports live in the pack root, one level up from
 // this file in a dev checkout. A packaged build cannot use that shortcut -- the
@@ -118,6 +129,61 @@ function findPython(packRoot) {
     }
   }
   return null;
+}
+
+// True when nothing is listening on this port yet. Binding rather than
+// connecting is the test: a refused connection could also mean a firewall, but
+// a successful bind means the port is genuinely free for serve.py.
+function portIsFree(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, "127.0.0.1");
+  });
+}
+
+async function findFreePort(start = PREFERRED_PORT) {
+  for (let port = start; port < start + PORT_TRIES; port++) {
+    if (await portIsFree(port)) return port;
+  }
+  throw new Error(`no free port between ${start} and ${start + PORT_TRIES - 1}`);
+}
+
+// Is the thing on this port actually serve.py? /api/entries exists only there.
+// A different app answering (401, a login page, any HTML) returns false, and
+// that is the difference between "started" and "someone else is listening".
+function servesDoomNite(port) {
+  return new Promise((resolve) => {
+    const req = http.get(
+      { host: "127.0.0.1", port, path: "/api/entries", timeout: 4000 },
+      (res) => {
+        if (res.statusCode !== 200) {
+          res.resume();
+          resolve(false);
+          return;
+        }
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (d) => {
+          body += d;
+          if (body.length > 4 * 1024 * 1024) req.destroy();
+        });
+        res.on("end", () => {
+          try {
+            resolve(Array.isArray(JSON.parse(body).entries));
+          } catch {
+            resolve(false);
+          }
+        });
+      }
+    );
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
 }
 
 // Wait for the port rather than sleeping a fixed amount. serve.py is fast but
@@ -638,6 +704,16 @@ async function startServer(packRoot, py) {
     }
   }
 
+  // Serve on a port nobody else has. The old fixed 8765 meant that when LISA
+  // (or any other local dev server) held it, this app attached to LISA's UI.
+  try {
+    PORT = await findFreePort();
+    ORIGIN = `http://127.0.0.1:${PORT}`;
+  } catch (error) {
+    fail("No free port for the launcher server.", error.message);
+    return false;
+  }
+
   try {
     server = spawn(py.cmd, [...py.args, servePy, "--no-open", "--port", String(PORT)], {
       cwd: packRoot,
@@ -687,6 +763,18 @@ async function startServer(packRoot, py) {
     );
     return false;
   }
+  // A port can be taken between the free-port probe and the bind, and then the
+  // TCP wait above would succeed against the OTHER process. Ask the server who
+  // it is before letting a window load it.
+  if (!(await servesDoomNite(PORT))) {
+    fail(
+      "Another program answered on the launcher's port.",
+      `Port ${PORT} is in use by something that is not serve.py. Close it and try again.\n\n` +
+        (log.join("\n") || "serve.py reported no output.")
+    );
+    return false;
+  }
+
   // The server can exit immediately after opening the port but before this
   // continuation runs. Do not report startup success in that race.
   if (earlyExit || server.exitCode !== null) {
@@ -716,6 +804,10 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       preload: path.join(__dirname, "preload.js"),
+      // The origin the preload guard compares against. Passed in because the
+      // port is picked per launch (PREFERRED_PORT, above) and preload.js cannot
+      // import main.js's state.
+      additionalArguments: [`--doomnite-origin=${ORIGIN}`],
     },
   });
 

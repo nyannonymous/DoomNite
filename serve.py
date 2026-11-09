@@ -320,6 +320,41 @@ def load_entries():
         def _own(a):
             return a["iwad"] if len(iwads) > 1 else None
         for a in acts:
+            if a.get("pending"):
+                # Browser-source entry: the roster knows the mod exists, but
+                # ModDB (Cloudflare) refuses scripted downloads, so the files
+                # cannot be fetched or hosted. Report it missing and name the
+                # folder to drop them into -- the folder watch flips the card
+                # as soon as they land and build.py regenerates the launcher.
+                # The wildcard file list is what Panel prints; without it the
+                # hint reads "put  in mods\\<slug>".
+                built.append({
+                    "kind": "pack",
+                    "label": g["name"],
+                    "note": g.get("note", ""),
+                    "iwad": a.get("iwad", ""),
+                    "mods": [],
+                    "bat": "",
+                    "size": 0,
+                    "exists": False,
+                    "art": a.get("art") or None,
+                    "group": g["name"],
+                    "variant": "",
+                    "hd": False,
+                    "needs_install": None,
+                    "downloadable": False,
+                    "fetchable": False,
+                    "manual": {
+                        "folder": os.path.join("mods", a.get("slug") or ""),
+                        "files": ["*.pk3", "*.pk7", "*.ipk3", "*.wad"],
+                        "hosted": False,
+                    },
+                    "slug": a.get("slug") or "",
+                    "standalone": False,
+                    "primary": False,
+                    "pending": True,
+                })
+                continue
             mods = [os.path.basename(m) for m in a.get("mods", [])]
             label = g["name"]
             if len(acts) > 1 and len(iwads) > 1:
@@ -536,6 +571,11 @@ def reveal_folder_for(idx):
     if entry["kind"] == "standalone":
         wdir = entry.get("wdir") or ""
         return wdir if os.path.isdir(wdir) else None
+    if entry.get("pending"):
+        # Nothing is installed yet, but the drop folder is the useful place to
+        # open: it is where the player has to put the file.
+        folder = os.path.join(PACK, "mods", entry.get("slug") or "")
+        return folder if os.path.isdir(folder) else None
     bat = entry.get("bat")
     if not bat:
         return None
@@ -573,6 +613,9 @@ def reveal_folder_for(idx):
 def command_for(entry):
     """The command that entry runs, as a string, for display."""
     if entry["kind"] == "pack":
+        if not entry.get("bat"):
+            # Pending card: there is no launcher until the file is supplied.
+            return ""
         bat = os.path.join(PACK, "launchers", entry["bat"])
         return f'cmd /c "{bat}"'
     args = " ".join(entry.get("args") or ())

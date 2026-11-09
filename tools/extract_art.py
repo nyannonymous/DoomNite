@@ -139,10 +139,6 @@ def from_pk3(path):
 
 def main():
     ART.mkdir(exist_ok=True)
-    for old in ART.iterdir():
-        if old.is_file() and old.name != ".gitkeep":
-            old.unlink()
-
     donors = {}
     for p in sorted(MODS.rglob("*")):
         if not p.is_file():
@@ -155,12 +151,28 @@ def main():
         else:
             continue
         for name, blob in got:
+            # A title lump can be a stub rather than art: The Pink Valley ships
+            # a 132-byte placeholder PNG. Writing that over the real cover from
+            # fetch_art.py is worse than shipping nothing, so ignore it.
+            if len(blob) < 1000:
+                continue
             if RANK[name] > donors.get(p.stem, (0,))[0]:
                 donors[p.stem] = (RANK[name], name, blob)
 
+    # This script writes cover art; it does NOT own the directory. A blanket
+    # delete used to run here and it erased 21 covers in one go: every ModDB
+    # cover fetch_art.py names by slug, plus hand-placed art for mods that ship
+    # no usable title lump (Lasting Light has none, The Pink Valley's is a
+    # 132-byte stub). Nothing here can regenerate those, so nothing here may
+    # remove them. The only file this script replaces is its own earlier
+    # extraction of the same mod under a different extension.
     for key, (_, name, blob) in sorted(donors.items()):
         ext = extension(blob)
         dest = ART / f"{key}.{ext}"
+        for old in ART.iterdir():
+            if (old.is_file() and old != dest and old.stem == key
+                    and old.suffix.lower() in (".png", ".jpg", ".gif")):
+                old.unlink()
         dest.write_bytes(blob)
         print(f"  {key:46} {name:9} .{ext} {len(blob) // 1024:5} KB")
 

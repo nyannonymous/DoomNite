@@ -51,3 +51,10 @@ desktop/build/pack/
 
 # Duke3D game data (copyrighted, 44 MB) - never commit
 *.grp
+
+# Total Chaos official standalone builds: bundled engines and ~2 GB of game
+# data, launched in place by build.py's STANDALONE roster.
+totalchaos_retro_1000/
+totalchaos_standalone_1000b/
+totalchaos_retro_1000.zip
+totalchaos_standalone_1000b.zip

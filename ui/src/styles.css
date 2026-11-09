@@ -1801,6 +1801,11 @@ kbd {
   margin: 6px 0 0;
   font-size: 12.5px;
   color: var(--fg-dim);
+  /* Descriptions can be paragraphs now -- the Ashes cards list their whole
+     saga under the blurb. Without this the newlines collapse and that list
+     arrives as one run-on sentence. pre-line keeps the typed-in line breaks
+     while still wrapping long lines to the panel width. */
+  white-space: pre-line;
 }
 
 .panel-section h3 {
@@ -3405,6 +3410,744 @@ kbd {
 
 .panel-play:active:not(:disabled) {
   transform: translateY(0);
+}
+
+/* ===================================================================
+   Metal cartridge cards.
+
+   The grid already had the palette and the CRT overlay, but a card was
+   still a rectangle of glass: a 1px border, a flat cover and a caption.
+   Side by side, thirteen of those read as a web gallery, which is the
+   "cheap" part -- nothing on screen looked like an object.
+
+   So the tile is now built as a physical thing, in this order from the
+   outside in:
+
+     plate   a chunky brushed-steel bezel, lit from the top-left, chamfered
+             by the existing d-jagged clip-path, with four corner rivets
+     well    the artwork sits INSIDE that plate, recessed, behind a faint
+             screen texture (scanlines + inner shadow)
+     plate   an engraved nameplate strip along the bottom
+
+   Every layer is gradients and shadows -- no PNGs -- because the app is
+   shipped as a self-contained bundle that has to work offline. The bevel
+   convention is the same one the DOS-era chrome uses: light top-left,
+   dark bottom-right, so the whole grid faces one light source.
+
+   Framer still owns transform (entrance spring, hover lift); the pointer
+   tilt lives on .cover/.tile-body. Nothing here touches transform.
+   =================================================================== */
+
+.tile {
+  /* The bezel is real padding, so the cover and nameplate are INSET into
+     the card rather than drawn on top of it. 7px reads as a machined edge
+     at the 190-340px card widths; 4px looked like a border, 12px shrank the
+     art too much. */
+  padding: 7px;
+  background:
+    /* Brushed steel, vertical grain: 1px light lines every 4px. */
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.028) 0 1px,
+      transparent 1px 4px
+    ),
+    /* The plate itself: hot top-left corner, cold bottom-right. */
+    linear-gradient(
+      148deg,
+      #3d382f 0%,
+      #26221c 26%,
+      #17140f 58%,
+      #2b261f 100%
+    );
+  border: 1px solid #030202;
+  box-shadow:
+    /* Cast shadow: the card sits ON the plate. */
+    0 12px 22px -12px rgba(0, 0, 0, 0.95),
+    0 2px 0 rgba(0, 0, 0, 0.85),
+    /* Outer bevel. */
+    inset 1px 1px 0 rgba(255, 228, 195, 0.24),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.9),
+    /* Darkening where the well is cut into the plate. */
+    inset 0 0 14px rgba(0, 0, 0, 0.6);
+  transition:
+    border-color 120ms steps(2, end),
+    box-shadow 120ms steps(2, end),
+    background-color 120ms steps(2, end);
+}
+
+/* Rivets. Four, in the four corners of the bezel. The selected card's
+   deeper notch (d-jagged-lg) cuts 18px out of the bottom corners, so the
+   bottom pair sits at 12px instead of 7px and stays on the plate. */
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  /* Each rivet: bright head, a machined shoulder, a black seat. Three
+     stops is what makes it read as a screw rather than a dot. */
+  background:
+    radial-gradient(circle at 7px 7px, #ded3bd 0 0.9px, #9c9280 1px 1.8px, #2a251d 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 7px) 7px, #ded3bd 0 0.9px, #9c9280 1px 1.8px, #2a251d 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at 12px calc(100% - 12px), #c9bfa9 0 0.9px, #8b8271 1px 1.8px, #26221b 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #c9bfa9 0 0.9px, #8b8271 1px 1.8px, #26221b 1.9px 2.4px, transparent 2.6px);
+}
+
+/* Hover: the plate catches the red emergency lighting. Snap, not fade --
+   a machine switching state, not a web card easing in.
+
+   The red is all OUTSIDE the card (a ring plus a spill onto the deck) and on
+   the bezel via .tile-rim. It used to include an inset shadow over the whole
+   card, which is the one thing that made the glow hide the art: the cover sat
+   under a red wash instead of sitting in a lit frame. */
+.tile:hover {
+  border-color: #5a4632;
+  box-shadow:
+    0 18px 30px -14px rgba(0, 0, 0, 0.98),
+    0 2px 0 rgba(0, 0, 0, 0.9),
+    inset 1px 1px 0 rgba(255, 228, 195, 0.3),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.9);
+}
+
+/* Selected: the rim does all of the close work, hotter than hover. No shadow
+   over the cover, and no filter on the card -- see the rim note below. */
+.tile.is-sel {
+  border-color: #7d2016;
+  box-shadow:
+    0 18px 30px -14px rgba(0, 0, 0, 0.98),
+    inset 1px 1px 0 rgba(255, 200, 170, 0.32),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.9);
+}
+
+/* The bezel light itself.
+
+   This is a MASKED FRAME, not a shadow, because the card's clip-path clips
+   every paint operation outside its silhouette -- box-shadow AND filter
+   both measured zero red in the gap between cards. A glow drawn outside a
+   clipped card is simply not possible without a wrapper element, so the
+   light is painted where there is room: on the 7px frame.
+
+   border (2px) = the hot edge of the plate; padding (5px) = the tinted
+   plate behind it. The mask punches out the content box, so nothing can
+   reach the artwork no matter how bright the state gets. That is the whole
+   point: the glow got stronger, the cover did not.
+
+   State via border-color + background only, so it transitions with steps()
+   and cannot be overpainted by the old inset shadows. */
+.tile-rim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  border: 2px solid transparent;
+  padding: 5px;
+  background: transparent;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transition:
+    border-color 120ms steps(2, end),
+    background 120ms steps(2, end);
+}
+
+.tile:hover .tile-rim {
+  border-color: rgba(255, 124, 92, 0.9);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 100, 70, 0.5) 0%,
+    rgba(224, 42, 28, 0.16) 40%,
+    rgba(224, 42, 28, 0.14) 62%,
+    rgba(255, 90, 60, 0.4) 100%
+  );
+}
+
+.tile.is-sel .tile-rim {
+  border-color: rgba(255, 150, 120, 1);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 112, 80, 0.92) 0%,
+    rgba(224, 42, 28, 0.34) 38%,
+    rgba(224, 42, 28, 0.3) 62%,
+    rgba(255, 96, 64, 0.82) 100%
+  );
+}
+
+/* Pinned is brass, and it has to win the rim when a card is both pinned and
+   selected, otherwise the amber ring would sit around a red frame. */
+.tile.is-pin .tile-rim {
+  border-color: rgba(255, 196, 120, 0.95);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 176, 88, 0.8) 0%,
+    rgba(200, 110, 20, 0.26) 40%,
+    rgba(200, 110, 20, 0.24) 62%,
+    rgba(255, 154, 60, 0.7) 100%
+  );
+}
+
+/* The nameplate's top edge is the power rail for the state above it. */
+.tile:hover .tile-body {
+  border-top-color: rgba(255, 110, 80, 0.5);
+}
+
+.tile.is-sel .tile-body {
+  border-top-color: rgba(255, 90, 60, 0.95);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.022) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(180deg, #2d1a13 0%, #1a120d 55%, #120c08 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 120, 90, 0.4),
+    inset 0 -12px 16px -14px rgba(0, 0, 0, 0.95),
+    inset 0 -10px 18px -12px rgba(224, 42, 28, 0.3);
+}
+
+.tile.is-pin .tile-body {
+  border-top-color: rgba(255, 176, 72, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 196, 120, 0.4),
+    inset 0 -12px 16px -14px rgba(0, 0, 0, 0.95);
+}
+
+/* The well. The cover gets a hard 1px edge and a screen overlay: inset
+   shadow, a top/bottom falloff and 1-in-3 scanlines, all at low alpha so
+   the artwork is still the subject. */
+.tile .cover {
+  border: 1px solid #050403;
+  background: #030202;
+}
+
+.tile .cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* Pulled back from the first pass: the cover is the thing you are choosing,
+     and 0.38/0.50 of black top and bottom was grading the artwork darker than
+     the source. The frame and the nameplate carry legibility now, so this is
+     only a screen texture. */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 225, 190, 0.1),
+    inset 0 0 30px rgba(0, 0, 0, 0.38),
+    inset 0 12px 18px -14px rgba(0, 0, 0, 0.85);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.24) 0%,
+      transparent 15%,
+      transparent 82%,
+      rgba(0, 0, 0, 0.32) 100%
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.09) 0 1px,
+      transparent 1px 3px
+    );
+}
+
+/* The chosen cartridge is also lit from inside the screen, very slightly --
+   enough that the art reads as ON rather than as merely framed. Kept under
+   the hover values so hovering still visibly brightens. */
+.tile.is-sel .cover img {
+  filter: saturate(1.12) brightness(1.08) contrast(1.06);
+}
+
+.tile.is-sel:hover .cover img {
+  filter: saturate(1.2) brightness(1.16) contrast(1.09);
+}
+
+/* Nameplate: a separate strip of darker, finer metal, screwed to the
+   front of the bezel. Engraved text gets a hard black shadow and a 1px
+   highlight above it. */
+.tile-body {
+  margin-top: 7px;
+  padding: 7px 10px 8px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.022) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(180deg, #2a251e 0%, #191510 55%, #12100c 100%);
+  border: 1px solid #050403;
+  border-top-color: rgba(255, 226, 190, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.13),
+    inset 0 -12px 16px -14px rgba(0, 0, 0, 0.95);
+}
+
+.tile-name {
+  font-family: var(--d-head);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: #e6dccb;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 12px rgba(0, 0, 0, 0.9);
+}
+
+.tile:hover .tile-name {
+  color: #fff3e4;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 14px rgba(224, 42, 28, 0.45);
+}
+
+/* Targeting reticle. Four corner brackets, drawn as eight gradient bars
+   (two per corner). Only present while hovered/focused, and it blinks on
+   a step() schedule so it reads as a HUD lock, not a loading pulse. */
+.tile-reticle {
+  position: absolute;
+  inset: 13px;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  --rc: var(--d-blood-400);
+  background:
+    linear-gradient(var(--rc), var(--rc)) left top / 15px 2px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) left top / 2px 15px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) right top / 15px 2px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) right top / 2px 15px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) left bottom / 15px 2px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) left bottom / 2px 15px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) right bottom / 15px 2px no-repeat,
+    linear-gradient(var(--rc), var(--rc)) right bottom / 2px 15px no-repeat;
+  filter: drop-shadow(0 0 4px rgba(224, 47, 47, 0.85));
+  transition: opacity 90ms steps(2, end);
+}
+
+.tile:hover .tile-reticle,
+.tile:focus-within .tile-reticle {
+  opacity: 0.95;
+  animation: reticle-lock 1.1s steps(2, end) infinite;
+}
+
+@keyframes reticle-lock {
+  0%, 58% { opacity: 0.95; }
+  59%, 100% { opacity: 0.4; }
+}
+
+/* Selection ignition: the nameplate flashes like a filament striking, then
+   settles. Runs when is-sel is applied, i.e. once per selection change. */
+.tile.is-sel .tile-name {
+  animation: plate-ignite 420ms steps(4, end);
+}
+
+@keyframes plate-ignite {
+  0% {
+    color: #fff;
+    text-shadow: 0 0 20px rgba(255, 90, 60, 0.95), 0 1px 0 #000;
+  }
+  35% { opacity: 0.35; }
+  55% { opacity: 1; }
+  72% { opacity: 0.6; }
+  100% {
+    opacity: 1;
+    color: #ffd9c6;
+    text-shadow: 0 0 10px rgba(224, 42, 28, 0.5), 0 1px 0 #000;
+  }
+}
+
+/* The deck the cards sit on. Brushed sheet metal at very low alpha over the
+   hero art, so the selected game's background still shows through -- this
+   is a texture, not a fill. */
+.grid-wrap {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.016) 0 1px,
+      transparent 1px 6px
+    ),
+    radial-gradient(
+      130% 80% at 50% -10%,
+      rgba(160, 112, 70, 0.07),
+      transparent 62%
+    );
+}
+
+/* Reduced motion: no reticle blink, no ignition flicker. The reticle still
+   appears (it is state, not decoration) but holds steady. */
+@media (prefers-reduced-motion: reduce) {
+  .tile:hover .tile-reticle,
+  .tile:focus-within .tile-reticle,
+  .tile.is-sel .tile-name {
+    animation: none !important;
+  }
+}
+
+/* ===================================================================
+   Details sidebar: the console the cartridge plugs into.
+
+   The cards got a plate; the sidebar was still a translucent purple slab
+   with a purple header. That mismatch was visible in one glance -- artwork
+   in a metal frame on the left, floaty glass on the right.
+
+   Rather than adding padding to .panel, the bezel is painted INSIDE the
+   panel's own edge as a masked overlay. Padding would have narrowed a
+   fixed 330px column and squeezed the config rows and the play button;
+   this changes no layout at all. The only thing that moves is the
+   scrollbar, which gets margin-right: 7px so it sits inside the bezel
+   instead of under it -- and the right padding is reduced by the same 7px,
+   so text still starts 16px from the panel edge.
+   =================================================================== */
+
+.panel {
+  /* Opaque plate, same value family as the card bezel so the two read as
+     the same alloy. backdrop-filter is dropped: it was blurring a moving
+     ember canvas behind a now-opaque surface -- pure GPU cost, no image. */
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.014) 0 1px,
+      transparent 1px 5px
+    ),
+    linear-gradient(
+      168deg,
+      #2c2721 0%,
+      #1d1915 30%,
+      #14110e 62%,
+      #221d18 100%
+    );
+  border-left: 1px solid #050403;
+  backdrop-filter: none;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 228, 195, 0.16),
+    inset 1px 1px 0 rgba(255, 228, 195, 0.1),
+    inset -1px 0 0 rgba(0, 0, 0, 0.75),
+    -18px 0 44px -22px rgba(0, 0, 0, 0.95);
+  /* Warm-neutral text and hairlines inside the console. The global tokens
+     carry a purple cast that was fine on glass but reads as a hue clash on
+     brown metal. Scoped here so the rest of the app is untouched. */
+  --fg: #f2e9dc;
+  --fg-dim: #b4a795;
+  --fg-faint: #8a7e6d;
+  --line: #3b342b;
+  --line-2: #554a3c;
+}
+
+/* The bezel ring. A 7px transparent border, filled with the metal gradient
+   and masked down to the border area -- so the centre stays a hole and the
+   panel's content shows through untouched. */
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  border: 7px solid transparent;
+  /* Outer bevel lines, drawn as two 1px strips that the mask then clips to
+     the ring (a box-shadow would be clipped away with the centre hole). */
+  background-image:
+    linear-gradient(rgba(255, 235, 205, 0.22), rgba(255, 235, 205, 0)),
+    linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      transparent 1px 5px
+    ),
+    linear-gradient(
+      158deg,
+      #4a4337 0%,
+      #2a241d 26%,
+      #17130f 58%,
+      #322c24 100%
+    );
+  background-size: 100% 1px, 100% 1px, auto, auto;
+  background-position: 0 0, 0 100%, 0 0, 0 0;
+  background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+  background-origin: border-box;
+  background-clip: border-box;
+  /* Two mask layers + exclude = keep only the 7px border, punch out the
+     padding box, so panel content is untouched underneath. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* Rivets, one per corner of the ring, matching the cards. */
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 8px 8px, #ded3bd 0 0.9px, #9c9280 1px 1.8px, #2a251d 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 8px) 8px, #ded3bd 0 0.9px, #9c9280 1px 1.8px, #2a251d 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at 12px calc(100% - 12px), #c9bfa9 0 0.9px, #8b8271 1px 1.8px, #26221b 1.9px 2.4px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #c9bfa9 0 0.9px, #8b8271 1px 1.8px, #26221b 1.9px 2.4px, transparent 2.6px);
+}
+
+/* Clear the right bezel: the scrollbar moves 7px inward, and the padding
+   shrinks by the same amount so the text column is unchanged. */
+.panel-scroll {
+  margin-right: 7px;
+  padding-right: 9px;
+}
+
+/* The cover is the screen set into the console: same recessed treatment as
+   the cards, so a cover reads the same whether it is in the grid or here. */
+.panel-cover {
+  border-bottom: 1px solid #050403;
+}
+
+.panel-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 225, 190, 0.1),
+    inset 0 0 42px rgba(0, 0, 0, 0.55),
+    inset 0 14px 22px -16px rgba(0, 0, 0, 0.95),
+    inset 0 -16px 24px -18px rgba(0, 0, 0, 0.95);
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.1) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.3) 0%,
+      transparent 18%,
+      transparent 78%,
+      rgba(0, 0, 0, 0.4) 100%
+    );
+}
+
+/* Header becomes the engraved nameplate rail under the screen. Warmer and
+   machined, with the title cut into it rather than printed on glass. */
+.panel-head {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.024) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(180deg, #2a251e 0%, #191510 55%, #12100b 100%);
+  border-bottom: 1px solid #050403;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 200, 0.15),
+    inset 0 -14px 18px -16px rgba(0, 0, 0, 0.95);
+}
+
+.panel-title {
+  font-size: 16.5px;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: #efe4d2;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 16px rgba(0, 0, 0, 0.85);
+}
+
+/* Section captions are stamped into the plate too -- they were the last
+   purple-tinted text on the panel, and the hue clash was small but constant. */
+.panel-section h3 {
+  color: #a2967f;
+  text-shadow: 0 1px 0 #000;
+}
+
+/* The Play rail sits in the same alloy: a brass-ish divider above it keeps
+   the primary action from looking pasted onto the nameplate. */
+.panel-actions {
+  border-top: 1px solid rgba(255, 226, 190, 0.1);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.55);
+  padding-top: 9px;
+  margin-top: 9px;
+}
+
+/* Config rows become recessed slots stamped into the console, instead of
+   rounded glass pills floating on it. Square corners and a top-inner shadow
+   do the work: the row sits BELOW the plate, the plate does not sit above
+   the row. */
+.cfg {
+  border-radius: 0;
+  border: 1px solid #0a0806;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.012) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(180deg, #141109 0%, #1a1611 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.85),
+    inset 0 3px 7px -3px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 0 rgba(255, 228, 195, 0.07);
+}
+
+/* Hover keeps the mechanical 3px step and adds a red edge marker, the same
+   "target acquired" cue the cards use. */
+.cfg:hover {
+  border-color: #4a3a2b;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.018) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(180deg, #1d1912 0%, #241f18 100%);
+  box-shadow:
+    inset 2px 0 0 rgba(224, 42, 28, 0.85),
+    inset 0 1px 0 rgba(0, 0, 0, 0.8),
+    inset 0 3px 7px -3px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(255, 228, 195, 0.1);
+}
+
+.cfg.is-on {
+  border-color: #6b1a12;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.014) 0 1px,
+      transparent 1px 4px
+    ),
+    linear-gradient(180deg, #2a120d 0%, #1c0d09 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(224, 42, 28, 0.35),
+    inset 2px 0 0 #e02a1c,
+    inset 0 3px 8px -3px rgba(0, 0, 0, 0.8),
+    0 0 18px -8px rgba(224, 42, 28, 0.7);
+}
+
+/* The IWAD tag is a stamped metal plate, not a rounded chip. */
+.cfg-iwad {
+  border-radius: 0;
+  border: 1px solid #0a0806;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.8), inset 0 -1px 0 rgba(255, 228, 195, 0.06);
+}
+
+/* Per-row launch key: a small milled keycap beside the slot. */
+.cfg-go {
+  border-radius: 0;
+  border: 1px solid #0a0806;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.02) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(180deg, #241f18 0%, #15120e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 195, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* ===================================================================
+   Boot: the tube warming up.
+
+   A CRT does not fade in. It snaps a single bright scanline across the
+   middle of the screen, that line opens vertically into a flash, and the
+   picture resolves as the phosphor settles. That is the whole sequence here:
+
+     0-120ms    a 2px line draws outward from the centre
+     120-200ms  the line holds, glowing
+     200-470ms  it opens vertically into a full-screen flash
+     470-900ms  the phosphor decays, with one quick dip as it settles
+
+   Mounted by App on the first non-empty entry list, so the flash covers the
+   cards' own entrance rather than an empty grid. Gated on .crt-on, which is
+   the same switch Ctrl+Alt+C uses -- a user who has turned the CRT treatment
+   off does not get a CRT boot. No pointer events: it must never eat a click.
+   =================================================================== */
+
+.crt-boot {
+  display: none;
+}
+
+.crt-on .crt-boot {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  background:
+    /* Scanlines inside the flash, so even the white is a screen. */
+    repeating-linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.18) 0 1px,
+      transparent 1px 3px
+    ),
+    /* Phosphor bloom: white core, green shoulders, dark green edges. */
+    radial-gradient(
+      ellipse 120% 90% at 50% 50%,
+      #f6fffa 0%,
+      #dcffe8 32%,
+      #93e6ad 68%,
+      #3f7f52 100%
+    );
+  box-shadow:
+    0 0 36px 6px rgba(168, 255, 198, 0.55),
+    0 0 120px 24px rgba(72, 190, 112, 0.22);
+  animation: crt-power-on 900ms cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+@keyframes crt-power-on {
+  0% {
+    transform: scale(0, 0.002);
+    opacity: 0;
+  }
+  5% {
+    transform: scale(0.2, 0.002);
+    opacity: 1;
+  }
+  13% {
+    /* Fully drawn 1.6px line (0.002 of the viewport height). */
+    transform: scale(1, 0.002);
+    opacity: 1;
+  }
+  22% {
+    transform: scale(1, 0.002);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1.012, 0.5);
+    opacity: 0.95;
+  }
+  52% {
+    transform: scale(1, 1);
+    opacity: 0.88;
+  }
+  62% {
+    transform: scale(1, 1);
+    opacity: 0.3;
+  }
+  /* One settle dip: the tube catching, not a smooth fade. */
+  66% {
+    transform: scale(1, 1);
+    opacity: 0.55;
+  }
+  74% {
+    transform: scale(1, 1);
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(1, 1);
+    opacity: 0;
+  }
+}
+
+/* No boot for reduced-motion users. A full-screen flash is exactly the kind
+   of thing the setting exists to suppress. */
+@media (prefers-reduced-motion: reduce) {
+  .crt-on .crt-boot {
+    display: none;
+  }
 }
 
 

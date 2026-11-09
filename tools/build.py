@@ -439,6 +439,35 @@ STANDALONE = [
      os.path.join("runtime", "isodoom"),
      os.path.join("runtime", "isodoom", "IsoDoom.exe"),
      "ISODoom.png"),
+    # Total Chaos ships as two official standalone builds, each with its own
+    # GZDoom 3.6 and a stub doom.wad, because the mod's ZScript gameplay (and
+    # its shaders) is built against that engine. They live in place at the pack
+    # root -- both are far too big to copy into mods/ -- and are two SEPARATE
+    # cards, not two builds of one card: the names differ so the UI's
+    # group-by-label rule keeps them apart.
+    #
+    # The bundled launcher .exe is not used: it only rewrites its own mod list
+    # before starting gamedata\gzdoom.exe, so the pack starts that engine
+    # directly and skips a second window the player would have to click.
+    # -iwad is explicit because the 51 KB doom.wad is a stub, not a real Doom
+    # IWAD, and nothing else in the pack should ever be searched for it.
+    ("Total Chaos (Retro)", "Survival horror total conversion for GZDoom. "
+     "The 418 MB retro build (low-res assets) on its own GZDoom 3.6.",
+     os.path.join("totalchaos_retro_1000", "gamedata"),
+     os.path.join("totalchaos_retro_1000", "gamedata", "gzdoom.exe"),
+     "total-chaos.png",
+     ["-iwad", "doom.wad", "-file", "totalchaos.pk3"]),
+    ("Total Chaos (Standalone)", "Survival horror total conversion for "
+     "GZDoom. The full 1.5 GB standalone build on its own GZDoom 3.6.",
+     os.path.join("totalchaos_standalone_1000b", "gamedata"),
+     os.path.join("totalchaos_standalone_1000b", "gamedata", "gzdoom.exe"),
+     # The Standalone card keeps the ORIGINAL title-screen extract
+     # (tools/extract_art.py wrote it to totalchaos.png from the mod's own
+     # TITLEPIC). Pointing it at "total-chaos.png" would wrongly give it the
+     # Retro card's replacement art, because the two cards otherwise share
+     # that filename.
+     "totalchaos.png",
+     ["-iwad", "doom.wad", "-file", "totalchaos.pk3"]),
 ]
 
 # Mods that belong in the roster but whose files are NOT in the pack yet.
@@ -452,6 +481,19 @@ STANDALONE = [
 #
 # Nothing listed here is added to sources.json while its folder is empty: a URL
 # that 404s would make every clone report a corrupt pack.
+#
+# Three of the four Ashes cards stopped being empty when the official stand-alone
+# bundle (AshesStandalone_V1_51) was fetched once from its ModDB start page and
+# the episode pk3s were lifted into mods\<slug>\. Those three are ordinary
+# hosted downloads now -- the PENDING rows are kept so a deleted pk3 degrades to
+# a MISSING card that names its folder instead of silently dropping the game,
+# and each boots to its own first map on runtime\gzdoom 4.14.2:
+#   ashes-2063        MAP01 Outskirts,     Ashes2063Enriched2_23.pk3
+#   ashes-afterglow   MAP01 Entryway,      AshesAfterglow1_16.pk3
+#   ashes-hard-reset  MAP01 Night School,  AshesHardReset_105.pk3
+# The bundle's own GZDoom 4.12.2 and Freedoom are NOT shipped: DOOM2.WAD is the
+# IWAD here, so only the three episode pk3s plus AshesSAMenu.pk3 and
+# lightmodepatch.pk3 (see PENDING_LOAD_FIRST) are kept.
 #
 # The Ashes saga ships as four separate downloads that play in order, and the
 # cards gave no way to tell which one came first: "Ashes: Blackwater" reads like
@@ -504,21 +546,28 @@ PENDING = [
      "Not an episode: a darker remix of Afterglow's maps by Ykarion. Play it last."),
      "ashes-blackwater", "DOOM2.WAD",
      "https://www.moddb.com/mods/ashes-2063/downloads"),
-    ("Zelda TC", "The Legend of Zelda as a Doom total conversion.",
-     "zelda-tc", "DOOM2.WAD", "https://www.moddb.com/mods/zelda-tc"),
+    # The slot that used to be "Zelda TC" now carries We Are UNIT (unrelated
+    # Doctor Who total conversion): same slug so the card keeps its place in the
+    # roster, new name/note/art. Its txt says "Tested in GZDoom", so the "unit"
+    # ZSCRIPT_MOD_PATTERNS entry routes it to runtime\gzdoom.
+    ("We Are UNIT", "Doctor Who total conversion: join UNIT and fight the "
+     "Daleks. 10 maps, plays on GZDoom.",
+     "zelda-tc", "DOOM2.WAD", ""),
     ("Breach 2", "Sci-fi tactical total conversion.",
      "breach2", "DOOM2.WAD", "https://www.moddb.com/mods/breach2"),
     ("Tiberian Fury", "Command & Conquer flavoured total conversion.",
      "tiberian-fury", "DOOM2.WAD",
      "https://www.moddb.com/mods/tiberian-fury"),
-    ("Total Chaos", "Survival horror total conversion for GZDoom.",
-     "total-chaos", "DOOM2.WAD", "https://www.moddb.com/mods/total-chaos"),
     ("Brutal Wolfenstein 3D", "Wolfenstein 3D rebuilt Brutal Doom style.",
      "brutal-wolfenstein-3d", "DOOM2.WAD",
      "https://www.moddb.com/mods/brutal-wolfenstein-3d"),
-    ("Recurring Nightmare", "Dream-logic horror total conversion.",
-     "recurring-nightmare", "DOOM2.WAD",
-     "https://www.moddb.com/mods/recurring-nightmare"),
+    # Fate replaces Recurring Nightmare in the same card slot (operator sent
+    # FATEDOOM2_1.zip). Its ipk3 carries zscript.txt, so "fate" is in
+    # ZSCRIPT_MOD_PATTERNS to route it to runtime\gzdoom.
+    ("Fate: A Doom Total Conversion", "The unreleased 1996 Build-engine game "
+     "reborn: 9 weapons, 14 enemies, 23 maps. GZDoom only.",
+     "fate-tc", "DOOM2.WAD",
+     "https://www.moddb.com/mods/fate-a-doom-total-conversion"),
     ("The Pink Valley", "Surreal, pink-themed total conversion.",
      "the-pink-valley", "DOOM2.WAD",
      "https://www.moddb.com/mods/the-pink-valley"),
@@ -547,6 +596,9 @@ PENDING = [
     # routing: verified by loading it on runtime\doom.exe, where the log shows
     # "Adding dehacked patch StarWarsDoom-Xim.wad:DEHACKED / Patch installed"
     # and a clean boot to P_Init. Doom 2 only (MAP## naming, D_DM2TTL).
+     # Its card art is PENDING_ART's DOOMWARS.jpg, not the wad's own TITLEPIC:
+     # that lump is a 320x200 static-noise placeholder, so an extracted cover
+     # would look broken.
     ("Xim's Star Wars Doom", "Star Wars total conversion: 15 levels from the "
      "original trilogy and Dark Forces. Doom 2 only.",
      "star-wars-doom-xim", "DOOM2.WAD",
@@ -562,6 +614,41 @@ PENDING = [
      "mod over Doom 2's maps. Needs GZDoom 4.14 or newer.",
      "hde", "DOOM2.WAD",
      "https://www.moddb.com/mods/halo-doom-evolved"),
+    # Four downloads that arrived as zips on the operator's desktop and were
+    # lifted straight into mods\<slug>\. They stay in PENDING (like Bloom) so
+    # deleting one degrades to a MISSING card that names its drop folder
+    # instead of silently dropping the game.
+    #
+    # Every one of them was started here, not assumed: each boots to its first
+    # map on the pack's own UZDoom 4.14.3 with DOOM2.WAD. That is also why
+    # none of them needs a ZSCRIPT_MOD_PATTERNS entry -- their HUDs (Minecraft
+    # Doom's SBARINFO bar, Legend of Doom's ZeldaHud) render on the default
+    # engine as verified.
+    ("Lasting Light", "Blackout horror: a lantern, its fuel, and the Screecher "
+     "stalking Doom 2's own maps.",
+     "lasting-light", "DOOM2.WAD", ""),
+    ("Pirate Doom", "Pirate-themed total conversion: flintlocks, cutlasses and "
+     "11 maps of booty.",
+     "pirate-doom", "DOOM2.WAD", ""),
+    # MINECRAFT DOOM IS PATCHED ON DISK. Its pk3 ships both Modeldef.txt and a
+    # leftover Modeldef.stuff.txt from a 2011 build; modern engines parse every
+    # MODELDEF lump, and the stale one dies on its first line:
+    #
+    #   Script error, "minecraftdoom.pk3:modeldef.stuff.txt" line 4:
+    #   MODELDEF: Unknown actor type '0'
+    #
+    # which is a fatal error ("Execution could not continue"), not a warning.
+    # The pack copy has that one lump removed and boots to The Valley. The
+    # mod's own GZDoom 1.5.6 is not bundled: it is a 2011 engine and the demo
+    # runs fine on the pack runtime. If a fresh original zip is ever dropped
+    # over mods\minecraft-doom\, strip Modeldef.stuff.txt again or the card
+    # will fail at startup with the error above.
+    ("Minecraft Doom", "Minecraft in Doom: blocks, creepers and three demo "
+     "maps, with MD2 models for the mobs.",
+     "minecraft-doom", "DOOM2.WAD", ""),
+    ("Legend of Doom", "The NES Legend of Zelda rebuilt as a GZDoom total "
+     "conversion: 10 maps, items, and a Zelda HUD.",
+     "legend-of-doom", "DOOM2.WAD", ""),
 ]
 
 PENDING_MOD_EXTS = (".pk3", ".pk7", ".ipk3", ".wad")
@@ -575,12 +662,30 @@ PENDING_MOD_EXTS = (".pk3", ".pk7", ".ipk3", ".wad")
 # are replaced automatically by the mod's TITLEPIC once the files land.
 PENDING_ART = {
     "ashes-2063": "ashes-2063.png",
-    "zelda-tc": "zelda-tc.png",
+    # The zelda-tc slug now hosts We Are UNIT, whose own 1998x1456 title
+    # screen is the card art (extracted from the wad by extract_art.py).
+    "zelda-tc": "WeAreUNIT.png",
     "breach2": "breach2.png",
     "tiberian-fury": "tiberian-fury.png",
     "total-chaos": "total-chaos.png",
-    "recurring-nightmare": "recurring-nightmare.png",
     "zombies-doomed": "zombies-doomed.png",
+    # Xim's Star Wars Doom ships a 320x200 static-noise TITLEPIC, not art, so
+    # its card is pointed at the supplied DOOMWARS cover instead.
+    "star-wars-doom-xim": "DOOMWARS.jpg",
+}
+
+
+# Files that must load BEFORE the rest of a pending game's mods.
+#
+# Alphabetical order is not load order. Each Ashes standalone launcher passes
+# "AshesSAMenu.pk3 lightmodepatch.pk3 <episode>.pk3" in that order, and the
+# last -file wins on a name clash -- so sorting the folder by name would put
+# the episode first and the tiny menu/lightmode patches on top of it, the
+# exact reverse of what the release ships.
+PENDING_LOAD_FIRST = {
+    "ashes-2063": ("AshesSAMenu.pk3", "lightmodepatch.pk3"),
+    "ashes-afterglow": ("AshesSAMenu.pk3", "lightmodepatch.pk3"),
+    "ashes-hard-reset": ("AshesSAMenu.pk3", "lightmodepatch.pk3"),
 }
 
 
@@ -598,6 +703,9 @@ def pending_files(slug):
     names = [n for n in sorted(os.listdir(folder))
              if os.path.splitext(n)[1].lower() in PENDING_MOD_EXTS
              and os.path.isfile(os.path.join(folder, n))]
+    first = PENDING_LOAD_FIRST.get(slug, ())
+    rank = {n: i for i, n in enumerate(first)}
+    names.sort(key=lambda n: (rank.get(n, len(rank)), n))
     pk = [n for n in names if os.path.splitext(n)[1].lower() != ".wad"]
     wad = [n for n in names if os.path.splitext(n)[1].lower() == ".wad"]
     return pk + wad
@@ -744,6 +852,8 @@ ZSCRIPT_MOD_PATTERNS = (
     "city",                      # Doom City Collision
     "bloom",                     # Bloom: 3D models, voxels and .gl shaders
     "hde",                       # Halo: Doom Evolved, documented GZDoom >= 4.14
+    "unit",                      # We Are UNIT: readme pins it to GZDoom
+    "fate",                      # Fate TC: zscript.txt, GZDoom-only
     "totalchaos",                # Total Chaos: ZScript-heavy survival TC, GZDoom-only
 )
 
@@ -1048,7 +1158,11 @@ def build():
         write_bat(bat, name, iwad, mods, note,
                   engine=ENGINE_GZDOOM if needs_gzdoom(mods) else ENGINE_DEFAULT)
         entry["actions"].append({
-            "bat": bat, "iwad": iwad, "hd": False, "label": "", "art": "",
+            "bat": bat, "iwad": iwad, "hd": False, "label": "",
+            # An explicit cover still wins once the files land: Xim's Star Wars
+            # Doom's own TITLEPIC is noise, not art. Everything else leaves
+            # this empty and resolves through art_map() on the mod stem.
+            "art": PENDING_ART.get(slug, ""),
             "mod": f"mods\\{mods[0][0]}\\{mods[0][1]}",
             "mods": [f"mods\\{s}\\{f}" for s, f in mods],
         })

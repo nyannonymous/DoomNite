@@ -495,6 +495,11 @@ export default function App() {
         </>
       )}
       <CRTOverlay />
+      {/* The tube warming up. Mounted on the first non-empty entry list, so it
+          plays over the first real paint of the cards instead of over an empty
+          grid -- and because the node then stays mounted, it never replays on
+          a filter change. Decorative only: fixed, no pointer events. */}
+      {raw.length > 0 && <span className="crt-boot" aria-hidden="true" />}
       {flashing && <LaunchFlash onDone={() => setFlashing(false)} />}
       <EmberField />
       <div className="vignette" aria-hidden="true" />

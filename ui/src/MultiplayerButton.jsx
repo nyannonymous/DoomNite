@@ -373,20 +373,23 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   has to see any of that. Hosting here lists the game for
                   anyone with DoomNite open; joining is one click. No
                   address, no port, no VPN, on either side.
-                  NOT OFFERED for Duke: the lobby LIST only announces
-                  Zandronum servers; Duke hosts share their relay code by
-                  hand instead. The relay tunnel itself is offered to both
-                  engines further down. */}
-              {phase === "ready" && !isDuke && (
+                  Offered to BOTH engines: Duke relay hosts announce with
+                  mode "duke", Doom hosts with anything else, and each
+                  panel only shows its own engine's rooms -- a Duke joiner
+                  must not see Zandronum rooms they cannot join. */}
+              {phase === "ready" && (() => {
+                const visibleRooms = lobbyRooms.filter((r) =>
+                  isDuke ? r.mode === "duke" : r.mode !== "duke");
+                return (
                 <section className="mp-section mp-lobby">
                   <h3>Open games</h3>
-                  {lobbyRooms.length === 0 ? (
+                  {visibleRooms.length === 0 ? (
                     <p className="mp-hint">
                       No one's hosting right now — be the first.
                     </p>
                   ) : (
                     <ul className="mp-lobby-list">
-                      {lobbyRooms.map((r) => (
+                      {visibleRooms.map((r) => (
                         <li key={r.room} className="mp-lobby-row">
                           <span className="mp-lobby-label">{r.label || "Doom"}</span>
                           <span className="mp-lobby-players">
@@ -446,7 +449,8 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     </button>
                   </div>
                 </section>
-              )}
+                );
+              })()}
 
               {phase === "ready" && (
                 <section className="mp-section mp-choose">
@@ -513,9 +517,10 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                       arrive in the tunnel. The tunnel carries them through
                       DoomNite's Cloudflare worker to the host, exactly the
                       SkyJump3D/Zandronum relay path. Both sides make only
-                      OUTBOUND connections, so any NAT works. No lobby list
-                      here: the code is handed from host to joiner directly,
-                      which is also why no fingerprint checks exist. */}
+                      OUTBOUND connections, so any NAT works. Duke relay
+                      hosts ARE listed in the lobby above (mode "duke");
+                      this tier remains for the case the list can't cover --
+                      a code handed over voice chat. */}
                   {isDuke && (
                     <>
                       <div className="mp-row mp-choice mp-internet">
