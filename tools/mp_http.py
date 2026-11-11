@@ -433,6 +433,8 @@ def _launch(handler, resolve, mode):
                 # No learning step needed -- the host's engine port is
                 # already known, so point the tunnel at it directly.
                 tunnel.set_engine_target("127.0.0.1", port)
+            elif want_stun and relay:
+                relay.set_engine_target("127.0.0.1", port)
         elif want_relay:
             # A relay join has no address to parse at all: there is
             # nothing routable to paste, only the room code the host
@@ -488,8 +490,9 @@ def _launch(handler, resolve, mode):
         else:
             relay_payload = {"room": tunnel.room, "connect": "127.0.0.1:%d" % tunnel.local_port, "mode": "relay"}
 
-    if want_stun:
+    if want_stun and relay:
         import punch as _punch
+        relay.start()
         if mode == "host":
             # Only the HOST can be firewalled for inbound on the punch
             # socket (the joiner's replies ride its outbound flow). Windows

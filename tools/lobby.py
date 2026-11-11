@@ -19,15 +19,19 @@ import urllib.request
 
 
 def _ssl_context() -> ssl.SSLContext:
-    """Same fix as wsrelay.py's _ca_bundle(): this machine's Python ships a
-    stale default CA bundle that rejects a perfectly live Cloudflare cert as
-    expired. Prefer certifi's bundle when installed; certifi stays optional,
-    not a new hard dependency."""
+    """Prefer certifi's bundle, then the bundle shipped with the pack
+    (tools/cacert.pem), then the system default. A fresh install has no pip
+    packages, so without the shipped bundle announce() silently fails and a
+    hosted game never appears in anyone's list -- including the host's."""
     try:
         import certifi
         return ssl.create_default_context(cafile=certifi.where())
     except ImportError:
-        return ssl.create_default_context()
+        pass
+    bundled = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+    if os.path.exists(bundled):
+        return ssl.create_default_context(cafile=bundled)
+    return ssl.create_default_context()
 
 # Same account/deploy as wsrelay.DEFAULT_RELAY_URL; kept separate rather
 # than imported from there so this module has no dependency on the tunnel
@@ -97,8 +101,17 @@ def keep_announced(room: str, label: str, mode: str, is_alive) -> threading.Thre
     round trip to hand the player their game."""
 
     def _run():
-        if not announce(room, label, mode):
-            return  # couldn't even announce; nothing to heartbeat or clean up
+        # Retry the first announce: a transient Cloudflare/SSL failure on a
+        # fresh install must not silently drop the room from everyone's list
+        # (including the host's) for the whole session.
+        announced = False
+        for _ in range(3):
+            if announce(room, label, mode):
+                announced = True
+                break
+            time.sleep(1.0)
+        if not announced:
+            return  # couldn't announce; nothing to heartbeat or clean up
         while is_alive():
             time.sleep(HEARTBEAT_INTERVAL)
             if is_alive():

@@ -90,7 +90,11 @@ def _ca_bundle() -> str | None:
         import certifi
         return certifi.where()
     except ImportError:
-        return None
+        pass
+    bundled = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+    if os.path.exists(bundled):
+        return bundled
+    return None
 
 
 class _WebSocketClient:

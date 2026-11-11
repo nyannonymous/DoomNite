@@ -155,85 +155,156 @@ def pack_mod_registry():
     return per_game, owners
 
 
-def pack_mod_status(name):
-    """Install status for one baked-in game, or None if it has no mods/ at
-    all (an on-demand entry, or a standalone exe outside the pack)."""
-    per_game, owners = pack_mod_registry()
-    folders = per_game.get(name)
-    if folders is None:
+# Top-level pack dirs that are shared infrastructure, never a standalone bundle.
+_STANDALONE_SKIP_ROOTS = {
+    "runtime", "mods", "iwads", "art", "app", "tools", "launchers", "keys",
+    "manuals", "downloads", "desktop",
+}
+
+def standalone_defs():
+    """Return {name: {topdir, exe_rel, all_rels}} for fetchable standalone bundles.
+
+    Only includes standalones whose exe is relative to the pack and whose
+    top-level directory is a dedicated bundle folder (not shared infrastructure
+    like runtime/) with file records in sources.json. Absolute-path standalone
+    installs (e.g. an external Doom Half-Life copy) are never fetchable here.
+    """
+    man = _load_manifest() or {}
+    records = fetcher.load() or {}
+    out = {}
+    for sg in man.get("standalone_games", []):
+        name = sg.get("name")
+        raw_exe = sg.get("exe") or ""
+        if os.path.isabs(raw_exe):
+            continue
+        exe_rel = raw_exe.replace("\\", "/").lstrip("/")
+        parts = [p for p in exe_rel.split("/") if p]
+        if not name or not parts:
+            continue
+        topdir = parts[0]
+        if topdir.lower() in _STANDALONE_SKIP_ROOTS:
+            continue
+        all_rels = [r for r in records if r == topdir or r.startswith(topdir + "/")]
+        if not all_rels:
+            continue
+        out[name] = {"topdir": topdir, "exe_rel": exe_rel, "all_rels": all_rels}
+    return out
+
+
+def standalone_status(name):
+    """Install status for one standalone game, or None if unknown."""
+    defs = standalone_defs()
+    d = defs.get(name)
+    if not d:
         return None
-    present = [f for f in folders
-               if os.path.isdir(os.path.join(PACK, "mods", f))]
-    shared = sorted(f for f in folders if len(owners.get(f, ())) > 1)
-    exclusive = sorted(f for f in folders if f not in shared)
+    exe_abs = os.path.join(PACK, d["exe_rel"].replace("/", os.sep))
+    installed_ok = os.path.isfile(exe_abs)
+    top_abs = os.path.join(PACK, d["topdir"].replace("/", os.sep))
     freed = 0
-    for f in folders:
-        d = os.path.join(PACK, "mods", f)
-        if os.path.isdir(d):
-            for root, _dirs, files in os.walk(d):
-                for fn in files:
-                    try:
-                        freed += os.path.getsize(os.path.join(root, fn))
-                    except OSError:
-                        pass
+    if os.path.isdir(top_abs):
+        for root, _dirs, files in os.walk(top_abs):
+            for fn in files:
+                try:
+                    freed += os.path.getsize(os.path.join(root, fn))
+                except OSError:
+                    pass
+    present = 0
+    total = len(d["all_rels"])
+    for rel in d["all_rels"]:
+        if os.path.isfile(os.path.join(PACK, rel.replace("/", os.sep))):
+            present += 1
     return {
         "name": name,
-        "folders": sorted(folders),
-        "exclusive": exclusive,
-        "shared": shared,
-        "installed": bool(folders) and len(present) == len(folders),
-        "partial": 0 < len(present) < len(folders),
+        "folders": [d["topdir"]],
+        "exclusive": [d["topdir"]],
+        "shared": [],
+        "standalone": True,
+        "installed": installed_ok and (total == 0 or present == total),
+        "partial": (not installed_ok and present > 0) or (installed_ok and total > 0 and 0 < present < total),
         "size_h": _human(freed) if freed else None,
+        "files_total": total,
+        "files_present": present,
     }
 
 
+def standalone_status_all():
+    defs = standalone_defs()
+    return [st for n in defs if (st := standalone_status(n))]
+
+
+def pack_mod_status(name):
+    """Install status for one baked-in game or standalone bundle, or None if
+    it has no mods/ at all and is not a known standalone."""
+    per_game, owners = pack_mod_registry()
+    folders = per_game.get(name)
+    if folders is not None:
+        present = [f for f in folders
+                   if os.path.isdir(os.path.join(PACK, "mods", f))]
+        shared = sorted(f for f in folders if len(owners.get(f, ())) > 1)
+        exclusive = sorted(f for f in folders if f not in shared)
+        freed = 0
+        for f in folders:
+            d = os.path.join(PACK, "mods", f)
+            if os.path.isdir(d):
+                for root, _dirs, files in os.walk(d):
+                    for fn in files:
+                        try:
+                            freed += os.path.getsize(os.path.join(root, fn))
+                        except OSError:
+                            pass
+        return {
+            "name": name,
+            "folders": sorted(folders),
+            "exclusive": exclusive,
+            "shared": shared,
+            "installed": bool(folders) and len(present) == len(folders),
+            "partial": 0 < len(present) < len(folders),
+            "size_h": _human(freed) if freed else None,
+        }
+    st = standalone_status(name)
+    if st is not None:
+        return st
+    return None
+
+
 def download_pack_mod(name):
-    """Fetch one baked-in game's mods from the hosted bucket.
+    """Fetch one baked-in game's mods, or a standalone bundle, from hosted URLs.
 
-    This is the missing half of pack_mod_status(). That function could already
-    report that a game's folders were absent, and the server already knew which
-    of the manifest's files were fetchable (`fetchable`), but nothing ever asked
-    fetcher.py for them. So a fresh install had the launcher shell, the manifest
-    and the UI, and no way to acquire the 66 files between it and a playable
-    game -- INSTALL existed for exactly two hand-written SPECS entries.
+    For pack games the file list comes from pack-manifest.json's `mods` paths.
+    For standalone games (e.g. Total Chaos builds) the file list is every
+    sources.json record whose rel lives under that standalone's top-level
+    directory. In both cases the download itself is fetcher.fetch_one, which
+    resolves per-file `urls` (used for archive.org-hosted standalones) or the
+    bucket base_url, and verifies sha256 before anything is moved into place.
 
-    Nothing new is invented here. The file list comes from pack-manifest.json's
-    own `mods` paths (the same source pack_mod_registry uses), and the download
-    itself is fetcher.fetch_one, which already resolves URLs, percent-encodes
-    paths, retries unverified when a machine's certificate store is broken, and
-    verifies sha256 before anything is moved into place.
-
-    Only ever called with a name from the manifest. Like every other write path
-    here, the folders come from pack_mod_registry() -- never from the request.
+    Only ever called with a name from the manifest. The paths come from
+    manifest/sources data -- never from the request.
 
     Returns the per-file results so the UI can show progress and, on failure,
     which file is missing rather than just "it did not work".
     """
     per_game, _owners = pack_mod_registry()
     folders = per_game.get(name)
-    # A SET of folder names, and sets are unordered -- never index it. The
-    # first version did `per_game[name][0]` and died with "set object is not
-    # subscriptable" for every game.
-    if not folders:
-        raise KeyError(name)
-
-    manifest = _load_manifest() or {}
-    # Per-file records (size, sha256, urls, no_host) come from sources.json --
-    # the manifest only knows which mods a game loads, not where they live, so
-    # reading it here made every game look like it had no host. fetcher.load()
-    # returns that dict.
     records = fetcher.load() or {}
-    wanted = []
-    for g in manifest.get("games", []):
-        if g.get("name") != name:
-            continue
-        for a in g.get("actions", []):
-            if a.get("needs_install"):
-                continue          # an on-demand SPECS entry; install() owns it
-            for m in a.get("mods", []):
-                rel = m.replace("\\", "/")
-                if rel not in wanted:
-                    wanted.append(rel)
+    if folders:
+        manifest = _load_manifest() or {}
+        wanted = []
+        for g in manifest.get("games", []):
+            if g.get("name") != name:
+                continue
+            for a in g.get("actions", []):
+                if a.get("needs_install"):
+                    continue          # an on-demand SPECS entry; install() owns it
+                for m in a.get("mods", []):
+                    rel = m.replace("\\", "/")
+                    if rel not in wanted:
+                        wanted.append(rel)
+    else:
+        sdefs = standalone_defs()
+        sd = sdefs.get(name)
+        if not sd:
+            raise KeyError(name)
+        wanted = list(sd.get("all_rels") or [])
 
     results = []
     for rel in wanted:
@@ -249,46 +320,52 @@ def download_pack_mod(name):
             results.append({"rel": rel, "status": "error", "detail": str(e)})
     return results
 
-
 def remove_pack_mod(name):
-    """Delete the mods/<slug> folders a baked-in game owns EXCLUSIVELY.
+    """Delete a baked-in game's exclusively-owned mods/<slug> folders, or a
+    standalone bundle's top-level directory.
 
-    Mirrors remove() above: the only paths ever touched are
-    PACK/mods/<slug>, and <slug> only ever comes from pack_mod_registry(),
-    which is built from pack-manifest.json on the server -- never from
-    anything a request supplied. An unknown game name is rejected exactly
-    like an unknown SPECS name is.
-
-    A slug shared with another game is skipped, not deleted, and reported
-    back in "skipped" so the UI can say why nothing (or only part) of it was
-    removed. There is no reinstall button for these: the pack's own copy was
-    a build-time copy from the operator's source drive, so getting it back
-    is `python tools\\build.py` -- the files are not re-fetched from a URL
-    the way the two on-demand total conversions are. serve.py's load_entries()
-    re-checks the filesystem on every /api/entries request, so the tile
-    immediately reflects the removal as "missing" with no rebuild needed for
-    that part.
+    The only paths ever touched come from pack_mod_registry()/standalone_defs(),
+    which are built from pack-manifest.json on the server -- never from
+    anything a request supplied. An unknown game name is rejected.
     """
     per_game, owners = pack_mod_registry()
     folders = per_game.get(name)
-    if folders is None:
-        raise KeyError(name)
-    mods_root = os.path.join(PACK, "mods")
-    removed, skipped, freed = [], [], 0
-    for f in sorted(folders):
-        if len(owners.get(f, ())) > 1:
-            skipped.append(f)
-            continue
-        dest = os.path.join(mods_root, f)
-        # Defence in depth even though f is never client-supplied: refuse
-        # anything that is not a direct child of mods\, and never follow a
-        # symlink -- same two guards remove() uses for the on-demand case.
-        if os.path.dirname(os.path.abspath(dest)) != os.path.abspath(mods_root):
-            continue
-        if os.path.islink(dest):
-            continue
-        if not os.path.isdir(dest):
-            continue
+    if folders is not None:
+        mods_root = os.path.join(PACK, "mods")
+        removed, skipped, freed = [], [], 0
+        for f in sorted(folders):
+            if len(owners.get(f, ())) > 1:
+                skipped.append(f)
+                continue
+            dest = os.path.join(mods_root, f)
+            # Defence in depth: refuse anything not a direct child of mods\.
+            if os.path.dirname(os.path.abspath(dest)) != os.path.abspath(mods_root):
+                continue
+            if os.path.islink(dest):
+                continue
+            if not os.path.isdir(dest):
+                continue
+            for root, _dirs, files in os.walk(dest):
+                for fn in files:
+                    try:
+                        freed += os.path.getsize(os.path.join(root, fn))
+                    except OSError:
+                        pass
+            shutil.rmtree(dest)
+            removed.append(f)
+        return {"name": name, "removed": removed, "skipped": skipped, "freed": freed}
+    sdefs = standalone_defs()
+    sd = sdefs.get(name)
+    if sd:
+        topdir = sd["topdir"]
+        dest = os.path.join(PACK, topdir)
+        pack_root = os.path.abspath(PACK)
+        # Defence in depth: only a direct child of the pack root, never a symlink.
+        if os.path.dirname(os.path.abspath(dest)) != pack_root:
+            raise KeyError(name)
+        if os.path.islink(dest) or not os.path.isdir(dest):
+            return {"name": name, "removed": [], "skipped": [], "freed": 0}
+        freed = 0
         for root, _dirs, files in os.walk(dest):
             for fn in files:
                 try:
@@ -296,8 +373,8 @@ def remove_pack_mod(name):
                 except OSError:
                     pass
         shutil.rmtree(dest)
-        removed.append(f)
-    return {"name": name, "removed": removed, "skipped": skipped, "freed": freed}
+        return {"name": name, "removed": [topdir], "skipped": [], "freed": freed}
+    raise KeyError(name)
 
 
 def _human(n):

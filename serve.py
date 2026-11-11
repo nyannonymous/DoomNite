@@ -60,7 +60,8 @@ if _PACK_DIR not in sys.path:
     sys.path.insert(0, _PACK_DIR)
 
 import installer as _inst      # noqa: E402  (needs _PACK_DIR on sys.path first)
-import iwadfinder as _iwad     # noqa: E402
+import iwadfinder as _iwad
+import fetcher     # noqa: E402
 
 # Multiplayer's HTTP surface. Imported as a top-level module because it lives
 # in tools\ alongside the other multiplayer helpers, and imported lazily inside
@@ -467,6 +468,29 @@ def load_entries():
         wdir = s.get("wdir", "")
         if wdir and not os.path.isabs(wdir):
             wdir = os.path.join(PACK, wdir)
+        exe_rel = s["exe"].replace("\\", "/").lstrip("/")
+        top_parts = [p for p in exe_rel.split("/") if p]
+        sa_fetchable = False
+        sa_manual = None
+        _skip_roots = {"runtime","mods","iwads","art","app","tools","launchers",
+                       "keys","manuals","downloads","desktop"}
+        if top_parts and not os.path.isabs(s["exe"]):
+            topdir = top_parts[0]
+            if topdir.lower() not in _skip_roots:
+                # Fetchable when sources.json has at least one hostable record for
+                # this bundle (per-file urls, e.g. archive.org, or base_url).
+                _sf = _sources_files()
+                sa_files = [r for r in _sf
+                            if r == topdir or r.startswith(topdir + "/")]
+                sa_fetchable = bool(sa_files) and all(
+                    fetcher.urls_for(r, _sf.get(r) or {})
+                    for r in sa_files)
+                if sa_fetchable and not os.path.isfile(exe):
+                    # Shape matches what the built Panel UI expects (manual.hosted,
+                    # manual.folder/files) so a DOWNLOAD button appears with no UI
+                    # rebuild. downloadPackMod(group.label) handles standalones.
+                    sa_manual = {"hosted": True, "folder": topdir,
+                                 "files": [f"{len(sa_files)} files (full bundle)"]}
         built.append({
             "kind": "standalone",
             "label": s["name"],
@@ -484,14 +508,8 @@ def load_entries():
             # build.py, ignored here, and the tiles fell back to a generated
             # poster.
             "art": s.get("art") or "",
-            # Present on every entry, not just pack ones. A standalone game has
-            # no mods, so there is nothing sources.json could host for it, but
-            # leaving the key off made the UI read .fetchable on an entry that
-            # did not have it.
-            "fetchable": False,
-            # Same reasoning: a standalone game ships its own exe and has no
-            # mods folder to hand-place anything into.
-            "manual": None,
+            "fetchable": sa_fetchable,
+            "manual": sa_manual,
             # The engine tag, so the UI and the multiplayer path can tell an
             # EDuke32 game -- which plays its OWN native netcode -- from a
             # Zandronum pack entry. Absent ("") for the older standalone games.
@@ -760,15 +778,14 @@ def handler_factory():
                 # download runs, so it must be cheap and never block.
                 return self._send(200, _json.dumps({"entries": _inst.status()}))
             if path == "/api/packmods":
-                # Install status for every BAKED-IN game, derived live from
-                # pack-manifest.json + what is actually on disk -- see
-                # installer.pack_mod_registry(). Cheap: no hashing, just
-                # os.path.isdir on each mod folder, so this is as pollable as
-                # /api/install.
+                # Install status for every BAKED-IN game and fetchable standalone
+                # bundle, derived live from manifests/sources.json + what is on
+                # disk. Cheap (isdir/isfile), so pollable like /api/install.
                 per_game, _owners = _inst.pack_mod_registry()
-                return self._send(200, _json.dumps({
-                    "entries": [_inst.pack_mod_status(n) for n in per_game]
-                }))
+                entries = [_inst.pack_mod_status(n) for n in per_game]
+                if hasattr(_inst, "standalone_status_all"):
+                    entries.extend(_inst.standalone_status_all())
+                return self._send(200, _json.dumps({"entries": entries}))
             if path == "/api/dryrun":
                 q = _up.parse_qs(_up.urlparse(self.path).query)
                 try:

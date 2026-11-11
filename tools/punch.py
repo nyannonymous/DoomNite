@@ -88,8 +88,19 @@ class PunchRelay:
         self.nat: str | None = None
 
         self.snapshot = {"in_from_engine": 0, "in_from_peer": 0,
+                         "out_to_engine": 0, "out_to_peer": 0,
                          "keepalives_sent": 0, "forwarded_bad": 0}
+        self.last_error = None
+        self._last_traffic_time = None
         self._stop = threading.Event()
+        self._threads = []
+
+    def start(self) -> None:
+        """Start the background packet-processing threads. MUST be called
+        after STUN discovery completes, so STUN responses are not consumed
+        by the serve thread."""
+        if self._threads:
+            return
         self._threads = [threading.Thread(target=self._serve, daemon=True),
                          threading.Thread(target=self._keepalive, daemon=True)]
         for t in self._threads:
@@ -113,14 +124,22 @@ class PunchRelay:
         self.peer = (ip, int(port))
         self.peer_locked = bool(lock)
 
+    def set_engine_target(self, ip: str, port: int) -> None:
+        """Set the destination where the local engine is listening."""
+        self.engine_src = (ip, int(port))
+
     def status(self) -> dict:
+        age_s = int(time.time() - self.created)
+        idle_s = int(time.time() - self._last_traffic_time) if self._last_traffic_time else None
         return {
             "local_port": self.local_port,
             "mapped": list(self.mapped) if self.mapped else None,
             "nat": self.nat,
             "peer": list(self.peer) if self.peer else None,
             "engine_src": list(self.engine_src) if self.engine_src else None,
-            "age_s": int(time.time() - self.created),
+            "age_s": age_s,
+            "idle_s": idle_s,
+            "last_error": self.last_error,
             **self.snapshot,
         }
 
@@ -165,6 +184,7 @@ class PunchRelay:
           the sender is the peer we were given -- a joiner should not accept
           game packets from strangers.
         """
+        self._last_traffic_time = time.time()
         # ---- keepalive from the internet? Learn, drop the payload.
         if data.startswith(PUNCH_MAGIC) and not _is_loopback(src[0]):
             self._learn_peer(src)
@@ -183,6 +203,7 @@ class PunchRelay:
             if self.peer:
                 try:
                     self.sock.sendto(data, self.peer)
+                    self.snapshot["out_to_peer"] += 1
                 except OSError:
                     pass
                 self.snapshot["in_from_engine"] += 1
@@ -193,11 +214,18 @@ class PunchRelay:
         if not allowed:
             self.snapshot["forwarded_bad"] += 1
             return
+
+        # STUN responses are never game peers. A delayed response arriving after
+        # the threads start must not poison the peer address.
+        if len(data) >= 20 and data[4:8] == b"\x21\x12\xA4\x42":
+            return
+
         self._learn_peer(src)
         self.snapshot["in_from_peer"] += 1
         if self.engine_src:
             try:
-                self.sock.sendto(data, self.engine_src if isinstance(self.engine_src, tuple) else tuple(self.engine_src))
+                self.sock.sendto(data, self.engine_src)
+                self.snapshot["out_to_engine"] += 1
             except OSError:
                 pass
 

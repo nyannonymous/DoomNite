@@ -133,6 +133,7 @@ else:
 
 if PEER_IP:
     relay = P.PunchRelay()
+    relay.start()
     engine = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     engine.bind(("127.0.0.1", 0))
     peer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -261,6 +262,12 @@ class _Rec:
 
     def set_peer(self, ip, port, lock=True):
         self.peer = (ip, port, lock)
+
+    def start(self):
+        pass
+
+    def set_engine_target(self, ip, port):
+        pass
 
     def stop(self):
         self.stopped = True
