@@ -160,9 +160,24 @@ def keep_announced(room: str, label: str, mode: str, is_alive,
             return  # couldn't announce; nothing to heartbeat or clean up
         while is_alive():
             time.sleep(HEARTBEAT_INTERVAL)
-            if is_alive():
+            if not is_alive():
+                break
+            # A failed heartbeat means the listing may have lapsed; the
+            # next cycle re-ANNOUNCES instead (an idempotent upsert) so a
+            # transient Cloudflare blip self-heals rather than quietly
+            # dropping the room for everyone. Success clears the flag,
+            # which is also what tells the UI "listed again, warning off".
+            if status is not None and status.get("last_heartbeat_error"):
+                ok, err = announce_ex(room, label, mode)
+            else:
                 ok, err = heartbeat_ex(room)
-                if status is not None and not ok:
+            if status is not None:
+                if ok:
+                    status["last_heartbeat_error"] = None
+                    if not status.get("announced"):
+                        status["announced"] = True
+                        status["listed_at"] = time.time()
+                else:
                     status["last_heartbeat_error"] = err
         remove(room)
 

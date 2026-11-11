@@ -482,21 +482,38 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   >
                     Host — let anyone find it
                   </button>
-                  {relayInfo && relayInfo.room && !relayInfo.connect && (
-                    <p className="mp-hint">
-                      {relayInfo.listed === false ? (
-                        <>Your game could NOT be added to the public list
-                          ({relayInfo.list_error || "unknown error"}). A friend
-                          can still join by typing this code: <code>{relayInfo.room}</code>
-                        </>
-                      ) : (
-                        <>Your game is listed above now. If a friend's list is
-                          slow to update, they can also join by typing this
-                          code: <code>{relayInfo.room}</code>
-                        </>
-                      )}
-                    </p>
-                  )}
+                  {/* Listed status is DERIVED, not stored: the initial
+                      launch response may already be stale (its announce
+                      failed but keep_announced's background retry
+                      succeeded), so prefer the live relay-status poll's
+                      lobby verdict and fall back to the launch response
+                      only until the first poll lands. The room-code
+                      fallback stays visible in every case. */}
+                  {relayInfo && relayInfo.room && !relayInfo.connect && (() => {
+                    const lobby = (tunnelState && tunnelState.lobby) || null;
+                    // announced: true/false/null — null means no verdict yet.
+                    const announced = lobby
+                      ? lobby.announced
+                      : (relayInfo.listed === false ? false : null);
+                    const lerr = lobby
+                      ? (lobby.error || lobby.last_heartbeat_error)
+                      : relayInfo.list_error;
+                    return (
+                      <p className="mp-hint">
+                        {announced === false ? (
+                          <>Your game could NOT be added to the public list
+                            ({lerr || "unknown error"}). A friend can still
+                            join by typing this code: <code>{relayInfo.room}</code>
+                          </>
+                        ) : (
+                          <>Your game is listed above now. If a friend's list is
+                            slow to update, they can also join by typing this
+                            code: <code>{relayInfo.room}</code>
+                          </>
+                        )}
+                      </p>
+                    );
+                  })()}
                   {relayInfo && relayInfo.room && !relayInfo.connect && tunnelState && (
                     <p className={tunnelState.peer_seen ? "mp-ok" : "mp-hint"}>
                       {tunnelState.state === "connected"

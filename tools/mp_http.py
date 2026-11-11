@@ -587,6 +587,13 @@ def _launch(handler, resolve, mode):
         # claim "it's listed" for a room the directory never accepted.
         import lobby as _lobby
         listed, list_err = _lobby.announce_ex(tunnel.room, entry.get("label", ""), "doom")
+        # Record the SYNC verdict in the tunnel's lobby_status too: the
+        # background thread overwrites it with the same (re-announced)
+        # verdict moments later, but between the response and that thread's
+        # first cycle, relay-status must agree with what we just told the UI.
+        tunnel.lobby_status.update({
+            "announced": listed, "error": list_err,
+            "listed_at": time.time() if listed else None})
         _lobby.keep_announced(tunnel.room, entry.get("label", ""), "doom", tunnel.alive,
                               status=tunnel.lobby_status)
         relay_payload = {"room": tunnel.room, "mode": "relay",

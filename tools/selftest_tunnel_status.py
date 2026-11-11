@@ -58,7 +58,9 @@ try:
         check("the Worker's peer-left frame clears peer_connected",
               not t2.peer_connected)
         t2.snapshot["in_from_relay"] = 1
-        check("relay traffic also proves a peer (old-Worker fallback)",
+        t2._reset_peer_session()   # forget the authoritative frame above: old-Worker world
+        t2.last_relay_traffic = time.time()
+        check("recent relay traffic also proves a peer (old-Worker fallback)",
               t2.peer_seen())
         t2._handle_control(b"not json at all")
         t2._handle_control(b'["array","garbage"]')
@@ -66,6 +68,53 @@ try:
               not t2.peer_connected, str(t2.peer_connected))
     finally:
         t2.stop()
+
+    # ---- peer presence: authoritative frames vs the legacy fallback
+    t3 = W.RelayTunnel("stattest-room3")
+    try:
+        check("fresh tunnel reports no peer (presence tiers)", not t3.peer_seen())
+
+        # 3. binary traffic without control frames: legacy recency fallback
+        t3.last_relay_traffic = time.time()
+        check("recent relay traffic alone implies a peer (legacy fallback)",
+              t3.peer_seen() and not t3.peer_status_known, str(t3.peer_status_known))
+
+        # 5. ...but only inside the inactivity window
+        t3.last_relay_traffic = time.time() - (W.PEER_INACTIVITY_S + 5)
+        check("relay traffic older than the inactivity window implies no peer",
+              not t3.peer_seen())
+
+        # 4. authoritative connected:false overrides ANY traffic history
+        t3.last_relay_traffic = time.time()      # traffic says "here"
+        t3.snapshot["in_from_relay"] = 99        # counters are diagnostics only
+        t3._handle_control(b'{"t":"peer","connected":false}')
+        check("an authoritative peer-left overrides traffic and counters",
+              not t3.peer_seen() and t3.peer_status_known, str(t3.peer_status_known))
+
+        # 2. ...and authoritative connected:true re-establishes presence
+        t3._handle_control(b'{"t":"peer","connected":true}')
+        check("an authoritative peer-joined sets presence",
+              t3.peer_seen() and t3.peer_connected)
+
+        # 7. malformed / unknown / wrongly-typed control frames change nothing
+        before = (t3.peer_connected, t3.peer_status_known)
+        t3._handle_control(b"not json at all")
+        t3._handle_control(b'["array","garbage"]')
+        t3._handle_control(b'{"t":"other","connected":false}')
+        t3._handle_control(b'{"t":"peer","connected":"yes"}')   # non-bool: ignored
+        check("malformed/unknown/non-bool control frames leave peer state alone",
+              (t3.peer_connected, t3.peer_status_known) == before,
+              str((t3.peer_connected, t3.peer_status_known)))
+
+        # 6. a reconnect must not carry stale presence into the new session
+        t3._reset_peer_session()
+        check("a reconnect drops authoritative state back to the fallback",
+              not t3.peer_status_known and not t3.peer_connected)
+        t3.last_relay_traffic = time.time()
+        check("after a reconnect, presence again follows recent traffic",
+              t3.peer_seen() and not t3.peer_status_known)
+    finally:
+        t3.stop()
 
     # ---- status() exposes what the panel's relay-status endpoint serves
     st = t2.status()

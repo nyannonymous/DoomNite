@@ -60,6 +60,13 @@ from urllib.parse import urlsplit
 # DOOMNITE_RELAY_URL env var if it ever moves to a custom route.
 DEFAULT_RELAY_URL = os.environ.get("DOOMNITE_RELAY_URL", "wss://doomnite-relay.chimske.workers.dev/relay")
 
+# Legacy fallback only (Workers that send no peer control frames): relay
+# traffic younger than this counts as "peer present". Generous enough to
+# ride out a lull between game ticks, tight enough that a disconnect is
+# noticed well inside a loading screen. Superseded the moment the Worker
+# sends an authoritative {"t":"peer"} frame.
+PEER_INACTIVITY_S = 18.0
+
 MAX_FRAME = 65535          # Zandronum packets are well under this (~1400B typical)
 IDLE_PING_INTERVAL = 20.0  # keep Cloudflare's own idle timeout from closing us
 RATE_IDLE_STOP = 15 * 60   # no engine traffic in 15 minutes -> give up the socket
@@ -250,6 +257,10 @@ class RelayTunnel:
         self.engine_src: tuple[str, int] | None = None
         self.connected = False          # ws to the Worker is up right now
         self.peer_connected = False     # Worker told us the other seat joined
+        # Set once the Worker has said ANYTHING authoritative about peer
+        # presence. Until then peer_seen() falls back to recent relay
+        # traffic (older Workers send no control frames).
+        self.peer_status_known = False
         self.closed_reason: str | None = None  # why the last ws attempt ended
         self.last_error: str | None = None
         self.last_engine_traffic = None
@@ -288,11 +299,23 @@ class RelayTunnel:
         return "connecting"
 
     def peer_seen(self) -> bool:
-        """The other seat is (or was recently) in the room. Two sources, on
-        purpose: the Worker's peer-joined control frame is authoritative on
-        NEW deploys, but in_from_relay is the ground truth that survives
-        talking to an older Worker that sends no control frames."""
-        return self.peer_connected or self.snapshot["in_from_relay"] > 0
+        """Is the other seat in the room RIGHT NOW (or, without an
+        authoritative Worker, very recently)? Three tiers, in order:
+
+        1. A Worker control frame ({"t":"peer",...}) is authoritative and
+           WINS: `connected: false` must override any amount of past
+           traffic -- the cumulative counters never go back down, so the
+           old counter-based check kept claiming "your friend is here"
+           long after they left.
+        2. No authoritative frame yet (older deployed Worker): fall back to
+           RECENCY of relay traffic, not the counter -- a peer that went
+           quiet for PEER_INACTIVITY_S is treated as gone.
+        3. Nothing at all: no peer.
+        """
+        if self.peer_status_known:
+            return self.peer_connected
+        last = self.last_relay_traffic
+        return last is not None and (time.time() - last) <= PEER_INACTIVITY_S
 
     def set_engine_target(self, ip: str, port: int) -> None:
         """Host side only: punch.py's PunchRelay *learns* the engine's
@@ -312,6 +335,7 @@ class RelayTunnel:
             "state": self.state,
             "connected": self.connected,
             "peer_connected": self.peer_connected,
+            "peer_status_known": self.peer_status_known,
             "peer_seen": self.peer_seen(),
             "closed_reason": self.closed_reason,
             "engine_src": list(self.engine_src) if self.engine_src else None,
@@ -386,8 +410,20 @@ class RelayTunnel:
             return
         if not isinstance(msg, dict):
             return
-        if msg.get("t") == "peer":
-            self.peer_connected = bool(msg.get("connected"))
+        if msg.get("t") == "peer" and isinstance(msg.get("connected"), bool):
+            # Authoritative: from here on, traffic recency is diagnostics,
+            # not presence. An explicit connected:false wins over counters.
+            self.peer_connected = msg["connected"]
+            self.peer_status_known = True
+
+    def _reset_peer_session(self) -> None:
+        """A fresh ws connection is a fresh room session: the Worker will
+        tell us (or not) who is in the room NOW. Carrying a stale
+        connected:true across a reconnect would claim a peer is here on the
+        strength of the PREVIOUS connection, so drop back to the legacy
+        traffic-recency fallback until a control frame arrives."""
+        self.peer_connected = False
+        self.peer_status_known = False
 
     def _ws_loop(self) -> None:
         """Relay -> engine, with reconnect: a Worker-side idle close or a
@@ -409,6 +445,7 @@ class RelayTunnel:
             self.connected = True
             self.last_error = None
             backoff = 1.0
+            self._reset_peer_session()
             self.snapshot["reconnects"] += 1 if self.snapshot["in_from_engine"] else 0
 
             try:
