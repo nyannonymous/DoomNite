@@ -329,9 +329,10 @@ got, err = H._int({}, "index", default=0)
 check("defaults an optional index to 0", err is None and got == 0)
 
 # The route table covers exactly these endpoints, and nothing else.
-check("routes are setup/host/join/lobby only",
+check("routes are setup/host/join/lobby/relay-status only",
       sorted(H.ROUTES) == ["/api/multiplayer/host", "/api/multiplayer/join",
-                           "/api/multiplayer/lobby", "/api/multiplayer/setup"],
+                           "/api/multiplayer/lobby", "/api/multiplayer/relay-status",
+                           "/api/multiplayer/setup"],
       str(sorted(H.ROUTES)))
 check("an unknown multiplayer path is not handled",
       not H.handles("/api/multiplayer/rooms"))

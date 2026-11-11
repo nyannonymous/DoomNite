@@ -1,5 +1,13 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+// The launcher UI shows the pack version in the topbar, under the logo.
+// Baked at build time from the Electron app's package.json -- the single
+// place the version lives -- so dev, the packaged app and the served bundle
+// can never disagree about what is running.
+const desktopPkg = JSON.parse(
+  readFileSync(new URL("../desktop/package.json", import.meta.url), "utf8"));
 
 // Built assets go to ../app, NOT ../dist.
 //
@@ -17,6 +25,9 @@ import react from "@vitejs/plugin-react";
 // base is relative so the bundle works from /app without rewriting asset URLs.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(desktopPkg.version),
+  },
   base: "./",
   build: {
     outDir: "../app",

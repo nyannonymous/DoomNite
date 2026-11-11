@@ -49,6 +49,14 @@ class _FakeTunnel:
     def set_engine_target(self, ip, port):
         self.engine_target = (ip, port)
 
+    # Real RelayTunnel attributes the new mp_http contract reads. A fake
+    # tunnel presents the same face a connected one does: ws up, no peer.
+    connected = True
+    state = "connected"
+    last_error = None
+    lobby_status = {"announced": None, "error": None, "listed_at": None,
+                    "last_heartbeat_error": None}
+
     def stop(self):
         self.stopped = True
 
@@ -69,10 +77,22 @@ _spawned = []
 _lobby_calls = []
 
 
-def _stub_keep_announced(room, label, mode, is_alive):
+def _stub_keep_announced(room, label, mode, is_alive, status=None):
     # No real network, no background thread: record what mp_http.py would
     # have announced, same spirit as the argv/Popen stubs above.
     _lobby_calls.append((room, label, mode))
+
+
+def _stub_announce_ex(room, label, mode, players=1):
+    # The host path now announces SYNCHRONOUSLY; stub it so the test never
+    # touches the live Worker, and record separately from the heartbeat
+    # thread's re-announce.
+    _sync_announces.append((room, label, mode))
+    return _announce_result
+
+
+_announce_result = (True, None)
+_sync_announces = []
 
 
 def _stub_host_argv(idx, port, **kw):
@@ -103,6 +123,13 @@ try:
     _m.join_argv = _stub_join_argv
     _m._fingerprint_cached = lambda idx: "STUBFING"
     _m.compare_fingerprint = lambda idx, given: (None, "STUBFING")
+    # The fake engine "binds" its port instantly, and the fake lobby
+    # announces instantly: the readiness gate and sync announce must not
+    # touch a real socket or the live Worker from a unit test.
+    _real_port_taken = H._udp_port_taken
+    _real_announce_ex = L.announce_ex
+    H._udp_port_taken = lambda port: True
+    L.announce_ex = _stub_announce_ex
     W.start_tunnel = _stub_start_tunnel
     W.TUNNELS.clear()
     L.keep_announced = _stub_keep_announced
@@ -155,13 +182,33 @@ try:
 
     check("the stubbed launch for the last join carried the tunnel's loopback address",
           _spawned[-1][-1] == "127.0.0.1:34567", str(_spawned[-1]))
+
+    # ---- the host response states the announce verdict, not just hope
+    rp = (body.get("relay") or {})
+    status, body = H.host(_FakeHandler({"index": 0, "relay": True}), resolve)
+    rp = body.get("relay") or {}
+    check("relay host payload reports listed: true when the announce worked",
+          rp.get("listed") is True, str(rp))
+
+    # ---- a failed announce is REPORTED, never dressed up as success
+    _announce_result = (False, "HTTP 503")
+    _sync_announces.clear()
+    status, body = H.host(_FakeHandler({"index": 0, "relay": True}), resolve)
+    _announce_result = (True, None)
+    rp = body.get("relay") or {}
+    check("a failed lobby announce reaches the host as listed: false",
+          status == 200 and rp.get("listed") is False, str((status, rp)))
+    check("the failed announce names its reason",
+          "HTTP 503" in str(rp.get("list_error")), str(rp))
 finally:
     _subprocess.Popen = _real_popen
     _m.host_argv, _m.join_argv = _real_host_argv, _real_join_argv
     _m._fingerprint_cached, _m.compare_fingerprint = _real_fp, _real_cmp
+    H._udp_port_taken = _real_port_taken
     W.start_tunnel = _real_start_tunnel
     W.TUNNELS.clear()
     L.keep_announced = _real_keep_announced
+    L.announce_ex = _real_announce_ex
 
 print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
 raise SystemExit(1 if FAIL else 0)

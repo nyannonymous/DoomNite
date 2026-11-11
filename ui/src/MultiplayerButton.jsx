@@ -76,6 +76,15 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   // for the one case polling can't cover: the host's room not showing up
   // yet (network hiccup, or they only just announced it).
   const [lobbyRooms, setLobbyRooms] = useState([]);
+  // Directory health, deliberately separate from the list itself: a failed
+  // fetch must read as "can't reach the game list", never as a healthy
+  // "No one's hosting right now". Kept between polls so one bad response
+  // marks the list stale instead of erasing it.
+  const [lobbyOk, setLobbyOk] = useState(true);
+  const [lobbyError, setLobbyError] = useState(null);
+  // Live tunnel state for the host's own room ("waiting for your friend"
+  // vs "your friend is in"), from /api/multiplayer/relay-status.
+  const [tunnelState, setTunnelState] = useState(null);
   const [roomCode, setRoomCode] = useState("");
 
   /* Which entries can be played online.
@@ -140,9 +149,18 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
         });
         if (!r.ok) return;
         const d = await r.json();
-        if (!cancelled) setLobbyRooms(Array.isArray(d.rooms) ? d.rooms : []);
+        if (cancelled) return;
+        // d.lobby_ok === false means the DIRECTORY failed (bad response /
+        // unreachable Worker), which is a different world from "the
+        // directory answered and it is empty". The old code flattened both
+        // into [] and the panel lied "No one's hosting" during an outage.
+        setLobbyRooms(Array.isArray(d.rooms) ? d.rooms : []);
+        setLobbyOk(d.lobby_ok !== false);
+        setLobbyError(d.lobby_ok === false ? (d.lobby_error || "the game list is unreachable") : null);
       } catch {
-        /* a dropped lobby fetch should not clear what was already shown */
+        /* a dropped lobby fetch should not clear what was already shown --
+           it marks it stale on the next poll only if failures persist */
+        if (!cancelled) setLobbyOk(false);
       }
     };
     poll();
@@ -152,6 +170,38 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
       clearInterval(id);
     };
   }, [open]);
+
+  // While THIS machine is hosting a relay room, poll the tunnel's real
+  // state so the panel can say "waiting for your friend" vs "your friend
+  // is in" instead of a one-time toast that may have been optimistic.
+  useEffect(() => {
+    const hosting = open && relayInfo && relayInfo.room && !relayInfo.connect;
+    if (!hosting) {
+      setTunnelState(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/multiplayer/relay-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!cancelled && d.host) setTunnelState(d.host);
+      } catch {
+        /* status is advisory; the next poll retries */
+      }
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [open, relayInfo]);
 
   /* One call does the hidden setup: junctions + preset. Runs every time the
      panel opens, because it is idempotent and because the alternative is the
@@ -229,13 +279,20 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
           setPunch(d.punch || null);
           setRelayInfo(d.relay || null);
           setMismatch(null);
-          toast(
-            opts.relay
-              ? `Hosting ${d.label} — it's now listed above for anyone to join.`
-              : opts.stun
-              ? `Punched an internet path for ${d.label}. Send the internet line to your friend.`
-              : `Hosting ${d.label}. Share the address with your friends.`
-          );
+          // The relay host response now carries the lobby's actual verdict.
+          // The old toast said "it's now listed above" unconditionally --
+          // exactly the false claim this file was built to stop making.
+          if (opts.relay && d.relay && d.relay.listed === false) {
+            toast(`Hosting ${d.label}, but the public game list could not be reached (${d.relay.list_error || "unknown error"}). Your friend can still join with the code.`, true);
+          } else {
+            toast(
+              opts.relay
+                ? `Hosting ${d.label} — it's now listed above for anyone to join.`
+                : opts.stun
+                ? `Punched an internet path for ${d.label}. Send the internet line to your friend.`
+                : `Hosting ${d.label}. Share the address with your friends.`
+            );
+          }
         } else {
           if (opts.stun) setPunch(d.punch || null);
           if (opts.relay) setRelayInfo(d.relay || null);
@@ -383,10 +440,22 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                 return (
                 <section className="mp-section mp-lobby">
                   <h3>Open games</h3>
-                  {visibleRooms.length === 0 ? (
-                    <p className="mp-hint">
-                      No one's hosting right now — be the first.
+                  {!lobbyOk && (
+                    <p className="mp-warn">
+                      Can't reach the game list{lobbyError ? ` (${lobbyError})` : ""}.
+                      The list below may be out of date.
                     </p>
+                  )}
+                  {visibleRooms.length === 0 ? (
+                    lobbyOk ? (
+                      <p className="mp-hint">
+                        No one's hosting right now — be the first.
+                      </p>
+                    ) : (
+                      <p className="mp-hint">
+                        No rooms shown (the game list is unreachable).
+                      </p>
+                    )
                   ) : (
                     <ul className="mp-lobby-list">
                       {visibleRooms.map((r) => (
@@ -415,9 +484,26 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                   </button>
                   {relayInfo && relayInfo.room && !relayInfo.connect && (
                     <p className="mp-hint">
-                      Your game is listed above now. If a friend's list is
-                      slow to update, they can also join by typing this
-                      code: <code>{relayInfo.room}</code>
+                      {relayInfo.listed === false ? (
+                        <>Your game could NOT be added to the public list
+                          ({relayInfo.list_error || "unknown error"}). A friend
+                          can still join by typing this code: <code>{relayInfo.room}</code>
+                        </>
+                      ) : (
+                        <>Your game is listed above now. If a friend's list is
+                          slow to update, they can also join by typing this
+                          code: <code>{relayInfo.room}</code>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {relayInfo && relayInfo.room && !relayInfo.connect && tunnelState && (
+                    <p className={tunnelState.peer_seen ? "mp-ok" : "mp-hint"}>
+                      {tunnelState.state === "connected"
+                        ? tunnelState.peer_seen
+                          ? "Your friend has joined the room — you should both be in the game now."
+                          : "Waiting for your friend to join… (room is open and reachable)"
+                        : `Relay status: ${tunnelState.state}${tunnelState.last_error ? ` — ${tunnelState.last_error}` : ""}`}
                     </p>
                   )}
                   {/* Fallback for the one gap polling can't cover: a room

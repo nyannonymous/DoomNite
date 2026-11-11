@@ -10,6 +10,10 @@ import EmberField from "./EmberField";
 import VariantMenu from "./VariantMenu";
 import CRTOverlay, { LaunchFlash } from "./CRTOverlay";
 import { createPortal } from "react-dom";
+// Baked by vite.config.js from desktop/package.json -- the running pack's
+// version, shown under the logo in the topbar.
+const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "";
+import logoUrl from "./assets/logo.png";
 
 function Toast({ msg, bad }) {
   if (!msg) return null;
@@ -505,9 +509,15 @@ export default function App() {
       <div className="vignette" aria-hidden="true" />
             <header className="topbar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-text">
-            DOOM<span>NITE</span>
+          {/* The real logo, not the generic text mark: the site's own
+              brand asset, scaled to the topbar. The version sits under it
+              so "what build am I running?" is answerable at a glance. */}
+          <img className="brand-logo" src={logoUrl} alt="DoomNite" />
+          <span className="brand-stack">
+            <span className="brand-text">
+              DOOM<span>NITE</span>
+            </span>
+            {APP_VERSION && <span className="brand-version">v{APP_VERSION}</span>}
           </span>
         </div>
 

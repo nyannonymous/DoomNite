@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import socket
 import ssl
@@ -247,8 +248,17 @@ class RelayTunnel:
         self.created = time.time()
 
         self.engine_src: tuple[str, int] | None = None
-        self.connected = False
+        self.connected = False          # ws to the Worker is up right now
+        self.peer_connected = False     # Worker told us the other seat joined
+        self.closed_reason: str | None = None  # why the last ws attempt ended
         self.last_error: str | None = None
+        self.last_engine_traffic = None
+        self.last_relay_traffic = None
+        # Filled by lobby.keep_announced() when the host path hands one in:
+        # the UI polls this via /api/multiplayer/relay-status to know whether
+        # the room is actually in the public list.
+        self.lobby_status: dict = {"announced": None, "error": None,
+                                   "listed_at": None, "last_heartbeat_error": None}
 
         self.snapshot = {"in_from_engine": 0, "in_from_relay": 0, "reconnects": 0}
         self._stop = threading.Event()
@@ -263,6 +273,27 @@ class RelayTunnel:
             t.start()
 
     # ------------------------------------------------------------------ api
+    @property
+    def state(self) -> str:
+        """The distinct lifecycle states callers (the panel, mp_http.py)
+        must not conflate: 'connecting' (ws attempt in flight), 'connected'
+        (ws up to the Worker), 'reconnecting' (ws down, retry loop running),
+        'stopped' (locally closed -- not the same as the Worker side)."""
+        if self._stop.is_set():
+            return "stopped"
+        if self.connected:
+            return "connected"
+        if self.last_error:
+            return "reconnecting"
+        return "connecting"
+
+    def peer_seen(self) -> bool:
+        """The other seat is (or was recently) in the room. Two sources, on
+        purpose: the Worker's peer-joined control frame is authoritative on
+        NEW deploys, but in_from_relay is the ground truth that survives
+        talking to an older Worker that sends no control frames."""
+        return self.peer_connected or self.snapshot["in_from_relay"] > 0
+
     def set_engine_target(self, ip: str, port: int) -> None:
         """Host side only: punch.py's PunchRelay *learns* the engine's
         loopback source from its first reply, which only works because
@@ -278,9 +309,16 @@ class RelayTunnel:
         return {
             "room": self.room,
             "local_port": self.local_port,
+            "state": self.state,
             "connected": self.connected,
+            "peer_connected": self.peer_connected,
+            "peer_seen": self.peer_seen(),
+            "closed_reason": self.closed_reason,
             "engine_src": list(self.engine_src) if self.engine_src else None,
             "age_s": int(time.time() - self.created),
+            "last_engine_traffic": self.last_engine_traffic,
+            "last_relay_traffic": self.last_relay_traffic,
+            "lobby": dict(self.lobby_status),
             "last_error": self.last_error,
             **self.snapshot,
         }
@@ -325,6 +363,7 @@ class RelayTunnel:
             if self.engine_src != src:
                 continue
             last_traffic = time.time()
+            self.last_engine_traffic = last_traffic
             self.snapshot["in_from_engine"] += 1
             with self._ws_lock:
                 ws = self._ws
@@ -335,6 +374,21 @@ class RelayTunnel:
                     pass
 
     # ------------------------------------------------------------- relay ws
+    def _handle_control(self, payload: bytes) -> None:
+        """Worker control frames are small JSON text frames ({"t": "peer",
+        ...}). They are status ONLY: never forwarded to the engine, and a
+        malformed/unknown one must never break the ws loop. This is what
+        makes 'waiting for player' vs 'peer in room' a real, reported state
+        instead of tunnel.alive() guesswork."""
+        try:
+            msg = json.loads(payload.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return
+        if not isinstance(msg, dict):
+            return
+        if msg.get("t") == "peer":
+            self.peer_connected = bool(msg.get("connected"))
+
     def _ws_loop(self) -> None:
         """Relay -> engine, with reconnect: a Worker-side idle close or a
         network blip should not permanently kill the tunnel while the UI
@@ -364,9 +418,28 @@ class RelayTunnel:
                         continue
                     opcode, payload = frame
                     if opcode == 0x8:  # close
+                        # RFC 6455 close bodies are "code(2) reason". A
+                        # 'room full' close is TERMINAL -- retrying forever
+                        # is exactly the "stuck on Connecting" failure this
+                        # module exists to avoid, so stop and report it.
+                        if len(payload) >= 2:
+                            code = struct.unpack("!H", payload[:2])[0]
+                            reason = payload[2:].decode("utf-8", "replace")
+                            self.closed_reason = f"{code} {reason}".strip()
+                            if "full" in reason.lower():
+                                self.last_error = "relay room is full"
+                                self.stop()
+                                return
+                        else:
+                            self.closed_reason = "closed by relay"
                         break
+                    if opcode == 0x1:  # text: Worker control/status frames
+                        self._handle_control(payload)
+                        continue
                     if opcode != 0x2:  # only binary game data is ever forwarded
                         continue
+                    now = time.time()
+                    self.last_relay_traffic = now
                     self.snapshot["in_from_relay"] += 1
                     if self.engine_src:
                         try:

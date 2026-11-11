@@ -484,11 +484,8 @@ def _launch(handler, resolve, mode):
             _wsrelay.TUNNELS.pop("host" if mode == "host" else "join", None)
         return 500, {"error": str(exc)}
 
-    if want_relay:
-        if mode == "host":
-            relay_payload = {"room": tunnel.room, "mode": "relay"}
-        else:
-            relay_payload = {"room": tunnel.room, "connect": "127.0.0.1:%d" % tunnel.local_port, "mode": "relay"}
+    if want_relay and mode == "join":
+        relay_payload = {"room": tunnel.room, "connect": "127.0.0.1:%d" % tunnel.local_port, "mode": "relay"}
 
     if want_stun and relay:
         import punch as _punch
@@ -522,6 +519,29 @@ def _launch(handler, resolve, mode):
             punch_payload = {"connect": "127.0.0.1:%d" % relay.local_port,
                              "host": f"{host_ip}:{host_port}", "nat": relay.nat}
 
+    if want_relay and mode == "join" and tunnel is not None:
+        # Launch the engine only once THIS side's websocket has actually
+        # reached the Worker (bounded): starting Zandronum toward a relay
+        # that never connected is another silent "Connecting" forever. A
+        # terminal 'room full' close (new client vs old worker both stop
+        # and report it) fails the launch with a clear reason instead.
+        deadline = time.time() + 10.0
+        while not tunnel.connected and tunnel.state not in ("stopped",):
+            if time.time() >= deadline:
+                tunnel.stop()
+                import wsrelay as _wsrelay
+                _wsrelay.TUNNELS.pop("join", None)
+                return 502, {"error": (
+                    "Could not reach the game relay to join that room. "
+                    "Check your connection and try again -- the host's "
+                    "game is probably still up." + (
+                        " (" + tunnel.last_error + ")" if tunnel.last_error else ""))}
+            time.sleep(0.25)
+        if tunnel.state == "stopped" and tunnel.last_error:
+            import wsrelay as _wsrelay
+            _wsrelay.TUNNELS.pop("join", None)
+            return 502, {"error": "Join failed: " + tunnel.last_error}
+
     try:
         # Detached via cmd /c start, so closing DoomNite cannot kill a hosted
         # game -- the same reason launch() does this. /D sets the working
@@ -531,18 +551,46 @@ def _launch(handler, resolve, mode):
             cwd=os.path.dirname(argv[0]), env=mp_session.launch_env(),
             creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
     except OSError as e:
+        # The engine never started: a relay host must not leave a tunnel or
+        # a public listing behind. (The STUN path has nothing registered yet.)
+        if tunnel is not None:
+            import wsrelay as _wsrelay
+            tunnel.stop()
+            _wsrelay.TUNNELS.pop("host" if mode == "host" else "join", None)
         return 500, {"error": str(e)}
 
     if want_relay and mode == "host":
-        # Only now -- the engine actually launched. An entry announced
-        # before this point could outlive a launch that silently failed,
-        # advertising a room nobody could ever join. The heartbeat thread
-        # removes itself when tunnel.alive() goes false (the tunnel is
-        # stopped the same way a fresh host/join request always stops the
-        # previous one -- see start_tunnel()), so a crashed or replaced
-        # tunnel falls out of the lobby within one heartbeat interval.
+        # Bounded engine-readiness gate: Popen of `cmd /c start` proves
+        # nothing, so wait until something is ACTUALLY bound to the engine's
+        # UDP port before declaring the room public. Advertising a room
+        # whose engine never opened its socket is exactly the failure this
+        # file exists to prevent: the joiner clicks, connects to the relay,
+        # and talks to nobody, forever.
+        deadline = time.time() + 12.0
+        while not _udp_port_taken(port):
+            if time.time() >= deadline:
+                import wsrelay as _wsrelay
+                tunnel.stop()
+                _wsrelay.TUNNELS.pop("host", None)
+                return 502, {"error": (
+                    "The game engine started but never opened its network "
+                    "port (%d/UDP). Check the game window for an error "
+                    "dialog, then try hosting again." % port)}
+            time.sleep(0.4)
+
+        # Now -- engine port confirmed bound. The announce is SYNCHRONOUS
+        # (one bounded round trip) so the response can honestly say whether
+        # the room is public; keep_announced then re-announces + heartbeats
+        # in the background and removes the room when the tunnel dies. A
+        # failed first announce is REPORTED (`listed: false`) instead of
+        # firing a daemon thread and hoping -- the host toast must never
+        # claim "it's listed" for a room the directory never accepted.
         import lobby as _lobby
-        _lobby.keep_announced(tunnel.room, entry.get("label", ""), "doom", tunnel.alive)
+        listed, list_err = _lobby.announce_ex(tunnel.room, entry.get("label", ""), "doom")
+        _lobby.keep_announced(tunnel.room, entry.get("label", ""), "doom", tunnel.alive,
+                              status=tunnel.lobby_status)
+        relay_payload = {"room": tunnel.room, "mode": "relay",
+                         "listed": listed, "list_error": list_err}
 
     import mp_session
 
@@ -663,6 +711,25 @@ def _firewall_advisory():
     return out
 
 
+def _udp_port_taken(port: int) -> bool:
+    """True once SOMETHING on this machine is bound to UDP `port` (the
+    engine's listen socket). Probed by attempting a brief bind of our own:
+    a normal UDP socket does not set SO_REUSEADDR, so a second bind of a
+    live engine's port fails immediately. Cheap, Windows-safe, and the only
+    launch-side signal available -- `cmd /c start` detaches, so there is no
+    process handle to poll and a Popen success proves nothing about the
+    engine (see the host path below, which now waits on this)."""
+    import socket as _socket
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return False
+    except OSError:
+        return True
+    finally:
+        s.close()
+
+
 def lobby_list(handler, resolve):
     """POST /api/multiplayer/lobby -- the open-rooms list, proxied server
     side rather than fetched by the browser/renderer directly, so the UI
@@ -670,9 +737,42 @@ def lobby_list(handler, resolve):
     another same-origin call to the pack's own local server, like every
     other /api/ route. Body is ignored (no filters yet); accepts POST only
     to match this file's one route shape (serve.py's table is POST-only).
-    """
+
+    `lobby_ok`/`lobby_error` separate "directory reachable, zero rooms"
+    from "directory unreachable" -- the UI must never show the former's
+    friendly empty state for the latter."""
     import lobby as _lobby
-    return 200, {"ok": True, "rooms": _lobby.list_rooms()}
+    rooms, err = _lobby.list_rooms_ex()
+    return 200, {"ok": True, "rooms": rooms,
+                 "lobby_ok": err is None,
+                 "lobby_error": err,
+                 "checked_at": int(time.time())}
+
+
+def relay_status(handler, resolve):
+    """POST /api/multiplayer/relay-status -- what the active tunnel(s) are
+    ACTUALLY doing, as distinct from "a launch request succeeded once":
+    ws state to the Worker, whether the peer seat has joined, packet
+    counters, last traffic times, and (host side) whether the engine's UDP
+    port is still held. Read-only; absent when a side has no tunnel."""
+    import wsrelay as _wsrelay
+    import punch as _punch
+    out = {}
+    for side in ("host", "join"):
+        t = _wsrelay.TUNNELS.get(side)
+        if t is not None:
+            st = t.status()
+            if side == "host" and t.engine_src:
+                st["engine_port"] = t.engine_src[1]
+                st["engine_bound"] = _udp_port_taken(t.engine_src[1])
+            out[side] = st
+        r = _punch.RELAYS.get(side)
+        if r is not None:
+            try:
+                out[side] = {**out.get(side, {}), "punch": r.status()}
+            except Exception:
+                pass
+    return 200, {"ok": True, **out}
 
 
 # The path -> (method, handler) table serve.py consults. Keeping it explicit
@@ -682,6 +782,7 @@ ROUTES = {
     "/api/multiplayer/host": host,
     "/api/multiplayer/join": join,
     "/api/multiplayer/lobby": lobby_list,
+    "/api/multiplayer/relay-status": relay_status,
 }
 
 

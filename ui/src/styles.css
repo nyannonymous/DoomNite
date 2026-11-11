@@ -1084,29 +1084,30 @@ kbd {
   user-select: none;
 }
 
-.brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  /* An imp-red core rather than the Oracle's gold conic sweep. */
-  background:
-    radial-gradient(circle at 50% 50%, var(--ember), var(--blood) 45%, #3a0a06 100%);
-  box-shadow:
-    0 0 20px rgba(224, 42, 28, 0.65),
-    inset 0 1px 0 rgba(255, 190, 150, 0.35);
-  animation: breathe 3.4s var(--ease-in-out) infinite;
+/* The real brand asset (LOGO.png, 917x410), standing in for the generic
+   text mark. Height matches the old mark's optical size; width follows the
+   asset's own aspect, and a drop-shadow keeps it readable on the dark bar. */
+.brand-logo {
+  height: 30px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(224, 42, 28, 0.45));
 }
 
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  50% {
-    transform: scale(1.08);
-    filter: brightness(1.3);
-  }
+/* Logo text + version, stacked: version directly under the brand, exactly
+   where "what build am I running?" gets asked. */
+.brand-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+
+.brand-version {
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 214, 194, 0.62);
 }
 
 .brand-text {

@@ -40,6 +40,19 @@ export class UdpRoom {
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ slot, lastSeen: Date.now() });
     this.ctx.storage.setAlarm(Date.now() + IDLE_CLOSE_MS).catch(() => {});
+    // Tell both seats where they stand: the newcomer learns the room already
+    // had a peer (or not), and the existing socket learns someone just
+    // joined. Small JSON text frames -- the Python bridge (wsrelay.py) reads
+    // them as status and never forwards them to the engine; an OLD bridge
+    // simply ignores text frames, so this is deploy-order-safe.
+    try {
+      server.send(JSON.stringify({ t: 'peer', connected: live.length > 0 }));
+    } catch {}
+    for (const other of live) {
+      try {
+        other.send(JSON.stringify({ t: 'peer', connected: true }));
+      } catch {}
+    }
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -85,9 +98,14 @@ export class UdpRoom {
   }
 
   webSocketClose(ws) {
+    // Notify BEFORE closing: 'peer left' as a status frame lets the other
+    // seat's UI say "your friend dropped" instead of "connecting...", then
+    // the socket still closes (the reconnect loop will put that client back
+    // in the room as the seat waiting for a new peer).
     for (const other of this.ctx.getWebSockets()) {
       if (other !== ws) {
         try {
+          other.send(JSON.stringify({ t: 'peer', connected: false }));
           other.close(1000, 'peer left');
         } catch {}
       }
