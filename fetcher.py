@@ -353,7 +353,12 @@ def main():
                     help="limit to one root, e.g. mods or iwads")
     ap.add_argument("--jobs", type=int, default=4,
                     help="parallel downloads (default 4)")
+    ap.add_argument("--skip", action="append", default=[],
+                    help="skip this manifest path (repeatable). A skipped file "
+                         "is reported as skipped-user, not as a failure: the "
+                         "user chose to play without it.")
     args = ap.parse_args()
+    skipped = set(args.skip)
 
     files = load()
     if files is None:
@@ -372,9 +377,13 @@ def main():
         state, _ = file_state(rel, rec)
         tally[state] = tally.get(state, 0) + 1
         if state != "ok" or args.force:
-            todo.append((rel, rec))
+            # --skip rides along in the todo list with its own pre-decided
+            # status so the summary still shows one line per gap, but it is
+            # never a failure: the user chose to play without it.
+            todo.append((rel, rec,
+                         "skipped-user" if rel in skipped else None))
 
-    total_bytes = sum(f.get("size") or 0 for _, f in todo)
+    total_bytes = sum(f.get("size") or 0 for _, f, _ in todo)
     print(f"{len(files)} files in manifest")
     print(f"  present  {tally['ok']}")
     print(f"  corrupt  {tally['corrupt']}")
@@ -386,12 +395,12 @@ def main():
         if not todo:
             print("\nnothing to do -- pack is complete.")
         else:
-            nourl = sum(1 for r, rec in todo if not urls_for(r, rec))
+            nourl = sum(1 for r, rec, _ in todo if not urls_for(r, rec))
             if nourl:
                 print(f"{nourl} of these have no hosted URL yet.")
         return 0
 
-    fetchable = [(r, rec) for r, rec in todo if urls_for(r, rec)]
+    fetchable = [(r, rec) for r, rec, pre in todo if pre is None and urls_for(r, rec)]
     # Earlier versions left interrupted, unverified .part files behind. They
     # cannot be resumed safely, so remove them before measuring free space.
     remove_part_files(fetchable)
@@ -413,16 +422,24 @@ def main():
     print(f"fetching with {args.jobs} parallel connections\n")
     done = {"ok": 0, "no-url": 0, "failed": 0, "skipped": 0}
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        futs = {pool.submit(fetch_one, r, c, args.force): r for r, c in todo}
+        # Pre-decided results (--skip) never reach the pool: they are reported
+        # straight away so the numbering stays one line per gap.
+        futs = {pool.submit(fetch_one, r, c, args.force): r
+                for r, c, pre in todo if pre is None}
+        preskip = [(r, pre) for r, _, pre in todo if pre is not None]
         for fut in as_completed(futs):
             rel, status, detail = fut.result()
             done[status] = done.get(status, 0) + 1
-            n = sum(done.values())
+            n = len(preskip) + sum(done.values())
             mark = {"ok": "ok", "fetched": "ok", "no-url": "--",
                     "failed": "!!", "skipped": "--"}.get(status, "  ")
             print(f"[{n:>3}/{len(todo)}] {mark} {rel}"
                   + (f"\n         {detail}"
                      if status in ("failed", "no-url", "skipped") else ""))
+        for rel, status in preskip:
+            done[status] = done.get(status, 0) + 1
+            print(f"[{done[status]:>3}/{len(todo)}] -- {rel}\n"
+                  "         skipped by user request")
 
     if done.get("failed") or done.get("skipped"):
         # Failed downloads are not resumable; discard their unverified temp data
@@ -431,7 +448,8 @@ def main():
 
     failed = done.get("failed", 0) + done.get("skipped", 0)
     print(f"\nfetched {done.get('fetched', 0)}   "
-          f"no-url {done.get('no-url', 0)}   failed {failed}")
+          f"no-url {done.get('no-url', 0)}   "
+          f"skipped {done.get('skipped-user', 0)}   failed {failed}")
     if done.get("skipped"):
         print(f"stopped early: {done['skipped']} file(s) after disk space ran out")
 

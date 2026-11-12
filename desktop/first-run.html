@@ -77,6 +77,19 @@
         word-break: break-all;
       }
       .foot { color: #6b6b7b; font-size: 12px; margin: 14px 0 0; }
+      .skiprow { margin-top: 14px; }
+      #skip {
+        padding: 8px 16px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--text);
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      #skip:hover { border-color: var(--accent); color: var(--accent); }
+      #skip:disabled { opacity: 0.5; cursor: default; }
     </style>
   </head>
   <body>
@@ -93,6 +106,13 @@
       <span id="current"></span>
     </p>
     <pre id="log"></pre>
+    <div class="skiprow">
+      <!-- Shown only while downloads run (state.canSkip): a few manifest
+           entries are hundreds of megabytes from slow mirrors, and nobody
+           should have to wait hours to play. Pressing it skips the big
+           downloads, finishes the small ones, and opens the app. -->
+      <button id="skip" hidden>Play now — skip the big downloads</button>
+    </div>
     <p class="foot">Closing this window cancels. Launching again picks up where it stopped.</p>
 
     <script>

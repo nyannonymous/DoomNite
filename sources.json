@@ -47171,13 +47171,6 @@
     "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/Total%20Chaos%20Launcher.vshost.exe"
    ]
   },
-  "totalchaos_retro_1000/readme.txt": {
-   "sha256": "e8510dd7fb3132dd4aca1b02b1370b2b8fbb96fcfc68444bfe2b822c3f37d55f",
-   "size": 3676,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/readme.txt"
-   ]
-  },
   "totalchaos_retro_1000/gamedata/brightmaps.pk3": {
    "sha256": "dedcf10b1cae56a6c1db85d0032cf994011dded4b2516c78b2f559381ad86305",
    "size": 247578,
@@ -47190,6 +47183,20 @@
    "size": 51824,
    "urls": [
     "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/doom.wad"
+   ]
+  },
+  "totalchaos_retro_1000/gamedata/fm_banks/GENMIDI.GS.wopl": {
+   "sha256": "5c7f27bdd6965c192fe048e04877114abaf2771c300e06ff81143a69adef071d",
+   "size": 118767,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/fm_banks/GENMIDI.GS.wopl"
+   ]
+  },
+  "totalchaos_retro_1000/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn": {
+   "sha256": "488327960374b95dcc302e5586622a62fc21bdda7082f92a40258002ed267f40",
+   "size": 274864,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn"
    ]
   },
   "totalchaos_retro_1000/gamedata/gzdoom.exe": {
@@ -47255,6 +47262,13 @@
     "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/openal32.dll"
    ]
   },
+  "totalchaos_retro_1000/gamedata/soundfonts/gzdoom.sf2": {
+   "sha256": "fca3e514b635a21789d4224e84865d2954a2a914d46b64aa8219ddb565c44869",
+   "size": 3283278,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/soundfonts/gzdoom.sf2"
+   ]
+  },
   "totalchaos_retro_1000/gamedata/tc_loadedmods.ini": {
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
    "size": 0,
@@ -47266,6 +47280,7 @@
    "sha256": "d9d40096848da66aec30a7cd41d65aff89a133ec4bab4c07df42982313a2d29f",
    "size": 418096896,
    "urls": [
+    "https://pub-4107f3f242334e8ebba09603c5b43cb5.r2.dev/totalchaos_retro_1000/gamedata/totalchaos.pk3",
     "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/totalchaos.pk3"
    ]
   },
@@ -47276,25 +47291,11 @@
     "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/zd_extra.pk3"
    ]
   },
-  "totalchaos_retro_1000/gamedata/fm_banks/GENMIDI.GS.wopl": {
-   "sha256": "5c7f27bdd6965c192fe048e04877114abaf2771c300e06ff81143a69adef071d",
-   "size": 118767,
+  "totalchaos_retro_1000/readme.txt": {
+   "sha256": "e8510dd7fb3132dd4aca1b02b1370b2b8fbb96fcfc68444bfe2b822c3f37d55f",
+   "size": 3676,
    "urls": [
-    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/fm_banks/GENMIDI.GS.wopl"
-   ]
-  },
-  "totalchaos_retro_1000/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn": {
-   "sha256": "488327960374b95dcc302e5586622a62fc21bdda7082f92a40258002ed267f40",
-   "size": 274864,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn"
-   ]
-  },
-  "totalchaos_retro_1000/gamedata/soundfonts/gzdoom.sf2": {
-   "sha256": "fca3e514b635a21789d4224e84865d2954a2a914d46b64aa8219ddb565c44869",
-   "size": 3283278,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/gamedata/soundfonts/gzdoom.sf2"
+    "https://archive.org/download/doomnite-tc-retro-1000/totalchaos_retro_1000/readme.txt"
    ]
   },
   "totalchaos_standalone_1000b/Total Chaos Launcher.application": {
@@ -47323,13 +47324,6 @@
    "size": 22696,
    "urls": [
     "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/Total%20Chaos%20Launcher.vshost.exe"
-   ]
-  },
-  "totalchaos_standalone_1000b/readme.txt": {
-   "sha256": "e8510dd7fb3132dd4aca1b02b1370b2b8fbb96fcfc68444bfe2b822c3f37d55f",
-   "size": 3676,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/readme.txt"
    ]
   },
   "totalchaos_standalone_1000b/gamedata/auto0.zds": {
@@ -47367,11 +47361,39 @@
     "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/brightmaps.pk3"
    ]
   },
+  "totalchaos_standalone_1000b/gamedata/custom icons/Icon by MaotisjanPL.ico": {
+   "sha256": "a0d88f072779e5164907393fb4ee207c3bffa3f55f3fb1eb9421101ec7b0a26d",
+   "size": 256034,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/custom%20icons/Icon%20by%20MaotisjanPL.ico"
+   ]
+  },
+  "totalchaos_standalone_1000b/gamedata/custom icons/Icon by ZaliaS.ico": {
+   "sha256": "576e097c066ff0141479b61ae3f5876cf4d0aa7263cc55f2e4bb0b64d6bc83ec",
+   "size": 86057,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/custom%20icons/Icon%20by%20ZaliaS.ico"
+   ]
+  },
   "totalchaos_standalone_1000b/gamedata/doom.wad": {
    "sha256": "2c822f1b2835ac3fec98cc01d1cb95b578fa7c920798c25c50f65978c4c482e7",
    "size": 51824,
    "urls": [
     "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/doom.wad"
+   ]
+  },
+  "totalchaos_standalone_1000b/gamedata/fm_banks/GENMIDI.GS.wopl": {
+   "sha256": "5c7f27bdd6965c192fe048e04877114abaf2771c300e06ff81143a69adef071d",
+   "size": 118767,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/fm_banks/GENMIDI.GS.wopl"
+   ]
+  },
+  "totalchaos_standalone_1000b/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn": {
+   "sha256": "488327960374b95dcc302e5586622a62fc21bdda7082f92a40258002ed267f40",
+   "size": 274864,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn"
    ]
   },
   "totalchaos_standalone_1000b/gamedata/gzdoom.exe": {
@@ -47437,6 +47459,13 @@
     "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/openal32.dll"
    ]
   },
+  "totalchaos_standalone_1000b/gamedata/soundfonts/gzdoom.sf2": {
+   "sha256": "fca3e514b635a21789d4224e84865d2954a2a914d46b64aa8219ddb565c44869",
+   "size": 3283278,
+   "urls": [
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/soundfonts/gzdoom.sf2"
+   ]
+  },
   "totalchaos_standalone_1000b/gamedata/tc_loadedmods.ini": {
    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
    "size": 0,
@@ -47448,6 +47477,7 @@
    "sha256": "496bae60a03f5be1e23ede0e72a469075f30d0a234f491209dfbfe579a924060",
    "size": 1520996704,
    "urls": [
+    "https://pub-4107f3f242334e8ebba09603c5b43cb5.r2.dev/totalchaos_standalone_1000b/gamedata/totalchaos.pk3",
     "https://github.com/nyannonymous/DoomNite/releases/download/v2.5.4/708503612859838190438836"
    ]
   },
@@ -47458,39 +47488,11 @@
     "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/zd_extra.pk3"
    ]
   },
-  "totalchaos_standalone_1000b/gamedata/custom icons/Icon by MaotisjanPL.ico": {
-   "sha256": "a0d88f072779e5164907393fb4ee207c3bffa3f55f3fb1eb9421101ec7b0a26d",
-   "size": 256034,
+  "totalchaos_standalone_1000b/readme.txt": {
+   "sha256": "e8510dd7fb3132dd4aca1b02b1370b2b8fbb96fcfc68444bfe2b822c3f37d55f",
+   "size": 3676,
    "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/custom%20icons/Icon%20by%20MaotisjanPL.ico"
-   ]
-  },
-  "totalchaos_standalone_1000b/gamedata/custom icons/Icon by ZaliaS.ico": {
-   "sha256": "576e097c066ff0141479b61ae3f5876cf4d0aa7263cc55f2e4bb0b64d6bc83ec",
-   "size": 86057,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/custom%20icons/Icon%20by%20ZaliaS.ico"
-   ]
-  },
-  "totalchaos_standalone_1000b/gamedata/fm_banks/GENMIDI.GS.wopl": {
-   "sha256": "5c7f27bdd6965c192fe048e04877114abaf2771c300e06ff81143a69adef071d",
-   "size": 118767,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/fm_banks/GENMIDI.GS.wopl"
-   ]
-  },
-  "totalchaos_standalone_1000b/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn": {
-   "sha256": "488327960374b95dcc302e5586622a62fc21bdda7082f92a40258002ed267f40",
-   "size": 274864,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/fm_banks/gs-by-papiezak-and-sneakernets.wopn"
-   ]
-  },
-  "totalchaos_standalone_1000b/gamedata/soundfonts/gzdoom.sf2": {
-   "sha256": "fca3e514b635a21789d4224e84865d2954a2a914d46b64aa8219ddb565c44869",
-   "size": 3283278,
-   "urls": [
-    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/gamedata/soundfonts/gzdoom.sf2"
+    "https://archive.org/download/doomnite-tc-standalone-1000b/totalchaos_standalone_1000b/readme.txt"
    ]
   }
  },

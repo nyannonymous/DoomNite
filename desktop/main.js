@@ -61,6 +61,13 @@ let quitting = false;
 // yet" from "the user closed the last one", which window-all-closed cannot.
 let starting = true;
 
+// The first-run window's Skip button, wired from its one-function preload.
+// firstRunWindow() sets this to dispatch into the live window's handlers.
+let onFirstRunSkip = null;
+ipcMain.on("dn-skip", () => {
+  if (onFirstRunSkip) onFirstRunSkip();
+});
+
 // Native IWAD chooser. The renderer never receives Node access; it asks through
 // a narrowly-scoped IPC channel and the main process returns one local file path.
 ipcMain.handle("doomnite:browse-iwad", async (event, wad) => {
@@ -403,6 +410,22 @@ function payloadPresent(root) {
 // be able to fetch them (they are upload-vetoed), so counting one as a gap
 // would make needsFetch true on every launch forever, flashing the fetch
 // window each time for a download that can never finish.
+// The record of files the user declined during the first run, written by
+// fetchPack when the Skip button is used: { "path/in/pack": "<manifest sha>" }.
+// A skipped file is a permanent decision for that pack version -- every launch
+// consults it so a declined download never reopens the fetch window. Delete
+// the file to un-skip; a new manifest hash re-arms the gap on its own.
+const SKIP_FILE = "fetch-skip.json";
+
+function loadSkipRecord(root) {
+  try {
+    const doc = JSON.parse(fs.readFileSync(path.join(root, SKIP_FILE), "utf8"));
+    return doc && typeof doc === "object" ? doc : {};
+  } catch {
+    return {};
+  }
+}
+
 function manifestGaps(root) {
   let doc;
   try {
@@ -411,10 +434,18 @@ function manifestGaps(root) {
     return false; // unreadable manifest is not a reason to fetch
   }
   const files = doc.files || {};
+  const skipped = loadSkipRecord(root);
   for (const rel of Object.keys(files)) {
     const rec = files[rel];
     if (!rec || rec.no_host) continue;
-    if (!fs.existsSync(path.join(root, ...rel.split("/")))) return true;
+    if (fs.existsSync(path.join(root, ...rel.split("/")))) continue;
+    // A file the user explicitly skipped during the first run is a decision,
+    // not a gap -- otherwise every launch would reopen the fetch window to
+    // download the very file they declined. The record carries the manifest
+    // hash of what was declined, so a later pack update (new hash, new gap)
+    // comes back as a fetchable gap instead of staying silent.
+    if (skipped[rel] && rec.sha256 === skipped[rel]) continue;
+    return true;
   }
   return false;
 }
@@ -438,9 +469,13 @@ function needsFetch(root, managed) {
 // so its result is scraped out of its own summary line rather than parsed from
 // JSON. Kept next to the reason it exists so the two stay in step.
 function summarise(text) {
-  const m = /fetched (\d+)\s+no-url (\d+)\s+failed (\d+)/.exec(text);
+  // "skipped" is optional and user-driven (the Skip button), so its absence
+  // keeps the regex matching older fetcher output too.
+  const m = /fetched (\d+)\s+no-url (\d+)(?:\s+skipped (\d+))?\s+failed (\d+)/.exec(
+    text
+  );
   if (!m) return null;
-  return { fetched: +m[1], no_url: +m[2], failed: +m[3] };
+  return { fetched: +m[1], no_url: +m[2], skipped: +(m[3] || 0), failed: +m[4] };
 }
 
 // The window that covers a first run: unpacking, then 3.4 GB of downloading.
@@ -460,9 +495,16 @@ function firstRunWindow() {
     current: "",
     bytes: "",
     log: [],
+    // Set (and cleared) by fetchPack: the Skip button is only meaningful while
+    // downloads are running, and only until the user has pressed it once.
+    canSkip: false,
   };
   const cancels = [];
+  const skips = [];
   let w = null;
+  onFirstRunSkip = () => {
+    for (const fn of skips) fn();
+  };
   let pending = null;
   let cancelled = false;
 
@@ -494,6 +536,10 @@ function firstRunWindow() {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        // The only way the renderer has to talk back is the Skip button, so
+        // the sandbox still gets a preload: it exposes exactly one function
+        // and nothing else.
+        preload: path.join(__dirname, "first-run-preload.js"),
       },
     });
     w.once("ready-to-show", () => w.show());
@@ -517,6 +563,9 @@ function firstRunWindow() {
     },
     onCancel(fn) {
       cancels.push(fn);
+    },
+    onSkip(fn) {
+      skips.push(fn);
     },
     phase(head, note) {
       state.head = head;
@@ -544,24 +593,80 @@ function firstRunWindow() {
 // retry. Failing the app outright here would make a flaky network -- or a
 // machine whose certificate store is out of date -- indistinguishable from a
 // broken install.
-async function fetchPack(root, py, ui) {
+async function fetchPack(root, py, ui, preSkip = []) {
   ui.phase(
     "Fetching the pack",
     "The engine, the IWADs and every mod, each file verified against its own " +
       "sha256 as it lands. It happens once."
   );
   const state = ui.state;
+  state.canSkip = true;
+
+  // The Skip button. Some manifest entries are hundreds of megabytes served
+  // from slow mirrors (archive.org, a GitHub release asset) that have taken
+  // hours on real machines; the rest of the pack is minutes. Pressing Skip
+  // stops the fetcher, records which big files are still missing as a decision
+  // the user made, and restarts the fetch with those paths on --skip so the
+  // small files finish and the app opens. The record is what keeps later
+  // launches quiet; deleting <root>/fetch-skip.json un-skips.
+  let skipRequested = false;
+  let skipArgs = [...preSkip];
+  ui.onSkip(() => {
+    if (skipRequested) return;
+    skipRequested = true;
+    state.canSkip = false;
+    state.current = "";
+    kill(child);
+    state.log.push(
+      "skipping the big downloads — the pack will finish without them and " +
+        "the app will open. They are fetched by a later update if a game " +
+        "needs them."
+    );
+    ui.push();
+  });
+
+  // Files still absent and big enough to be worth not waiting for. Only these
+  // become a skip decision; nothing the user already has is touched.
+  const BIG_FILE_BYTES = 200 * 1024 * 1024;
+  const bigMissing = () => {
+    let files = {};
+    try {
+      files = JSON.parse(
+        fs.readFileSync(path.join(root, "sources.json"), "utf8")
+      ).files;
+    } catch {
+      return [];
+    }
+    return Object.keys(files).filter((rel) => {
+      const rec = files[rel];
+      return (
+        rec &&
+        !rec.no_host &&
+        (rec.size || 0) >= BIG_FILE_BYTES &&
+        !fs.existsSync(path.join(root, ...rel.split("/")))
+      );
+    });
+  };
 
   // -u because stdout is a pipe here, not a console, and Python block-buffers
   // a pipe: without it the whole first run would show nothing until the buffer
   // filled, which is the opposite of progress.
   let child;
   try {
-    child = spawn(py.cmd, [...py.args, "-u", path.join(root, "fetcher.py")], {
-      cwd: root,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    child = spawn(
+      py.cmd,
+      [
+        ...py.args,
+        "-u",
+        path.join(root, "fetcher.py"),
+        ...skipArgs.flatMap((rel) => ["--skip", rel]),
+      ],
+      {
+        cwd: root,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
   } catch (error) {
     return {
       ok: false,
@@ -630,6 +735,41 @@ async function fetchPack(root, py, ui) {
   ui.push();
 
   if (ui.cancelled) return { ok: false, cancelled: true };
+
+  // Skip pressed: the fetcher was killed on purpose, so its exit is not an
+  // outcome. Record what is still missing and restart the fetch with those
+  // paths excluded so the small files finish and the app can open. The
+  // recursive run reuses this same progress window and cannot skip again --
+  // the button is hidden from the moment the user pressed it.
+  if (skipRequested && skipArgs.length === 0) {
+    const missing = bigMissing();
+    if (missing.length) {
+      let files = {};
+      try {
+        files = JSON.parse(
+          fs.readFileSync(path.join(root, "sources.json"), "utf8")
+        ).files;
+      } catch {
+        return {
+          ok: false,
+          reason: "fetch-skip: could not re-read sources.json",
+        };
+      }
+      const record = loadSkipRecord(root);
+      for (const rel of missing) {
+        record[rel] = files[rel]?.sha256 || "";
+        skipArgs.push(rel);
+      }
+      fs.writeFileSync(
+        path.join(root, SKIP_FILE),
+        JSON.stringify(record, null, 2),
+        "utf8"
+      );
+      return fetchPack(root, py, ui, skipArgs);
+    }
+    // Nothing big was still missing (the big files had already finished), so
+    // the kill was for nothing -- fall through and read the result normally.
+  }
   if (result.error) {
     return {
       ok: false,
