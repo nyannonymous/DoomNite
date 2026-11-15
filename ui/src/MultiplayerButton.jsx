@@ -86,6 +86,41 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
   // vs "your friend is in"), from /api/multiplayer/relay-status.
   const [tunnelState, setTunnelState] = useState(null);
   const [roomCode, setRoomCode] = useState("");
+  const [rttResult, setRttResult] = useState(null); // { rtt: ms, ticrate: suggested }
+
+  // Gameplay preferences (persisted in localStorage)
+  const [mpVolume, setMpVolume] = useState(() => {
+    try { return parseFloat(localStorage.getItem("doomnite.mp.volume")) || 0.25; } catch { return 0.25; }
+  });
+  const [mpNoHeadBob, setMpNoHeadBob] = useState(() => {
+    try { return localStorage.getItem("doomnite.mp.noHeadBob") === "true"; } catch { return true; }
+  });
+  const [mpRunMode, setMpRunMode] = useState(() => {
+    try { return localStorage.getItem("doomnite.mp.runMode") || "shift"; } catch { return "shift"; }
+  }); // "shift" = shift to sprint, "auto" = always run
+  const [mpWheelWeapons, setMpWheelWeapons] = useState(() => {
+    try { return localStorage.getItem("doomnite.mp.wheelWeapons") !== "false"; } catch { return true; }
+  });
+  const [mpTicrate, setMpTicrate] = useState(() => {
+    try { const v = parseInt(localStorage.getItem("doomnite.mp.ticrate"), 10); return (v >= 10 && v <= 35) ? v : null; } catch { return null; }
+  }); // null = auto (35), or 10-35
+
+  // Persist gameplay preferences
+  useEffect(() => {
+    try { localStorage.setItem("doomnite.mp.volume", String(mpVolume)); } catch {}
+  }, [mpVolume]);
+  useEffect(() => {
+    try { localStorage.setItem("doomnite.mp.noHeadBob", String(mpNoHeadBob)); } catch {}
+  }, [mpNoHeadBob]);
+  useEffect(() => {
+    try { localStorage.setItem("doomnite.mp.runMode", mpRunMode); } catch {}
+  }, [mpRunMode]);
+  useEffect(() => {
+    try { localStorage.setItem("doomnite.mp.wheelWeapons", String(mpWheelWeapons)); } catch {}
+  }, [mpWheelWeapons]);
+  useEffect(() => {
+    try { localStorage.setItem("doomnite.mp.ticrate", mpTicrate ? String(mpTicrate) : ""); } catch {}
+  }, [mpTicrate]);
 
   /* Which entries can be played online.
 
@@ -164,7 +199,7 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
       }
     };
     poll();
-    const id = setInterval(poll, 4000);
+    const id = setInterval(poll, 2000);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -242,6 +277,39 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
     }
   }, [chosen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const testConnection = useCallback(async () => {
+    if (!chosen) return;
+    setBusy(true);
+    setRttResult(null);
+    setErr(null);
+    try {
+      const body = { index: chosen._idx, port: 23513 };
+      const r = await fetch("/api/multiplayer/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      if (d.rtt !== undefined) {
+        // Suggest ticrate based on RTT
+        let suggested = 35;
+        if (d.rtt > 200) suggested = 15;
+        else if (d.rtt > 150) suggested = 20;
+        else if (d.rtt > 100) suggested = 25;
+        else if (d.rtt > 50) suggested = 30;
+        setRttResult({ rtt: d.rtt, ticrate: suggested });
+        setMpTicrate(suggested);
+        toast(`RTT: ${d.rtt}ms — suggested ticrate: ${suggested} Hz`);
+      }
+    } catch (e) {
+      setErr(String(e.message || e));
+      toast(String(e.message || e), true);
+    } finally {
+      setBusy(false);
+    }
+  }, [chosen, toast]);
+
   const start = useCallback(
     // opts: { stun?: bool, relay?: bool, room?: string }. `room` is only
     // meaningful with relay: true on a join -- it comes from a lobby click
@@ -257,6 +325,12 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
         const body = { index: chosen._idx, port: 23513, name };
         if (opts.stun) body.stun = true;
         if (opts.relay) body.relay = true;
+        // Gameplay preferences
+        body.mp_volume = mpVolume;
+        body.mp_movebob = mpNoHeadBob ? 0 : 1;
+        body.mp_cl_run = mpRunMode === "auto" ? 1 : 0;
+        body.mp_wheel_weapons = mpWheelWeapons;
+        if (mpTicrate) body.ticrate = mpTicrate;
         if (which === "host") {
           body.deathmatch = dm;
         } else if (opts.relay) {
@@ -466,7 +540,14 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                           </span>
                           <button
                             className="mp-action mp-action--primary"
-                            onClick={() => start("join", { relay: true, room: r.room })}
+                            onClick={() => {
+                              // Auto-switch to the host's game entry before joining
+                              if (r.entry_slug) {
+                                const matchIdx = playable.findIndex((e) => e.slug === r.entry_slug);
+                                if (matchIdx >= 0) setPick(matchIdx);
+                              }
+                              start("join", { relay: true, room: r.room });
+                            }}
                             disabled={busy || !chosen}
                           >
                             Join
@@ -675,38 +756,51 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     </>
                   )}
                   {/* The STUN punch tier: internet play without router work,
-                      on the same routes with one body flag. Kept VISIBLE
-                      rather than gesture-hidden -- it is the answer to the
-                      question this whole multiplayer feature exists for:
-                      playing with someone NOT on this network. Cost is real
-                      CPU: the host's probe runs first, in place, before the
-                      engine can start, and refuses cleanly rather than
-                      silently. NOT OFFERED for Duke: the punch maps a UDP
-                      port, and EDuke32's netcode exposes no port to map. */}
-                  {!isDuke && (
-                    <div className="mp-row mp-choice mp-internet">
-                      <button
-                        className="mp-action"
-                        onClick={() => start("host", { stun: true })}
-                        disabled={busy || !chosen}
-                      >
-                        Host over the internet
-                      </button>
-                      <button
-                        className="mp-action"
-                        onClick={() => {
-                          if (!addr.trim()) {
-                            setErr("Paste the internet line they gave you -- it works exactly like an address here.");
-                            return;
-                          }
-                          start("join", { stun: true });
-                        }}
-                        disabled={busy || !chosen}
-                      >
-                        Join over the internet
-                      </button>
-                    </div>
-                  )}
+                                        on the same routes with one body flag. Kept VISIBLE
+                                        rather than gesture-hidden -- it is the answer to the
+                                        question this whole multiplayer feature exists for:
+                                        playing with someone NOT on this network. Cost is real
+                                        CPU: the host's probe runs first, in place, before the
+                                        engine can start, and refuses cleanly rather than
+                                        silently. NOT OFFERED for Duke: the punch maps a UDP
+                                        port, and EDuke32's netcode exposes no port to map. */}
+                                    {!isDuke && (
+                                      <div className="mp-row mp-choice mp-internet">
+                                        <button
+                                          className="mp-action"
+                                          onClick={() => start("host", { stun: true })}
+                                          disabled={busy || !chosen}
+                                        >
+                                          Host over the internet
+                                        </button>
+                                        <button
+                                          className="mp-action"
+                                          onClick={() => {
+                                            if (!addr.trim()) {
+                                              setErr("Paste the internet line they gave you -- it works exactly like an address here.");
+                                              return;
+                                            }
+                                            start("join", { stun: true });
+                                          }}
+                                          disabled={busy || !chosen}
+                                        >
+                                          Join over the internet
+                                        </button>
+                                        <button
+                                          className="mp-action mp-action--secondary"
+                                          onClick={testConnection}
+                                          disabled={busy || !chosen}
+                                        >
+                                          Test Connection
+                                        </button>
+                                      </div>
+                                    )}
+                                    {rttResult && !isDuke && (
+                                      <p className="mp-ok">
+                                        RTT: <b>{rttResult.rtt}ms</b> — suggested ticrate: <b>{rttResult.ticrate} Hz</b>
+                                        (auto-applied to ticrate dropdown)
+                                      </p>
+                                    )}
                   {!isDuke && (
                     <p className="mp-hint">
                       Internet play with no router changes and no VPN: DoomNite
@@ -746,16 +840,81 @@ export default function MultiplayerButton({ toast, entries = [], selected = null
                     </p>
                   )}
                   <label className="mp-check">
-                    <input
-                      type="checkbox"
-                      checked={dm}
-                      onChange={(e) => setDm(e.target.checked)}
-                    />
-                    <span>Deathmatch instead of cooperative</span>
-                  </label>
+                                      <input
+                                        type="checkbox"
+                                        checked={dm}
+                                        onChange={(e) => setDm(e.target.checked)}
+                                      />
+                                      <span>Deathmatch instead of cooperative</span>
+                                    </label>
 
-                  
-                </section>
+                                    {/* Gameplay feel preferences */}
+                                    {!isDuke && (
+                                      <section className="mp-section mp-prefs">
+                                        <h3>Gameplay feel</h3>
+                                        <label className="mp-field">
+                                          <span className="mp-label">Sound volume</span>
+                                          <input
+                                            type="range"
+                                            className="mp-input mp-slider"
+                                            min="0"
+                                            max="1"
+                                            step="0.05"
+                                            value={mpVolume}
+                                            onChange={(e) => setMpVolume(parseFloat(e.target.value))}
+                                          />
+                                          <span className="mp-slider-value">{Math.round(mpVolume * 100)}%</span>
+                                        </label>
+                                        <label className="mp-check">
+                                          <input
+                                            type="checkbox"
+                                            checked={mpNoHeadBob}
+                                            onChange={(e) => setMpNoHeadBob(e.target.checked)}
+                                          />
+                                          <span>Disable head bob</span>
+                                        </label>
+                                        <label className="mp-field">
+                                          <span className="mp-label">Run mode</span>
+                                          <select
+                                            className="mp-select"
+                                            value={mpRunMode}
+                                            onChange={(e) => setMpRunMode(e.target.value)}
+                                          >
+                                            <option value="shift">Shift to sprint</option>
+                                            <option value="auto">Always run (auto-run)</option>
+                                          </select>
+                                        </label>
+                                        <label className="mp-check">
+                                          <input
+                                            type="checkbox"
+                                            checked={mpWheelWeapons}
+                                            onChange={(e) => setMpWheelWeapons(e.target.checked)}
+                                          />
+                                          <span>Mouse wheel switches weapons</span>
+                                        </label>
+                                        <label className="mp-field">
+                                          <span className="mp-label">Server ticrate (advanced)</span>
+                                          <select
+                                            className="mp-select"
+                                            value={mpTicrate || "auto"}
+                                            onChange={(e) => setMpTicrate(e.target.value === "auto" ? null : parseInt(e.target.value, 10))}
+                                          >
+                                            <option value="auto">Auto (35 Hz)</option>
+                                            <option value="35">35 Hz (default)</option>
+                                            <option value="30">30 Hz</option>
+                                            <option value="25">25 Hz</option>
+                                            <option value="20">20 Hz (high latency)</option>
+                                            <option value="15">15 Hz (very high latency)</option>
+                                          </select>
+                                        </label>
+                                        <p className="mp-hint">
+                                          Lower ticrate reduces bandwidth but makes movement less responsive.
+                                          Use 20 Hz for connections over 150ms RTT.
+                                        </p>
+                                      </section>
+                                    )}
+
+                                  </section>
               )}
 
               {punch && (

@@ -47,6 +47,7 @@ supplies ever becomes a path or an argument -- `--entry` is an integer index,
 and `--join` is parsed and rebuilt rather than interpolated.
 """
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -111,6 +112,20 @@ _ADDR_FP = re.compile(
 # rather than retyped, because a hand-copied character set drifting out of sync
 # with the alphabet is exactly the bug that made the first alphabet 31 chars.
 _FP_CHARS = set("0123456789ABCDEFGHJKMNPQRSTVWXYZILOU")
+
+
+def _load_mp_config():
+    """Load multiplayer config from pack's config.json."""
+    cfg_path = os.path.join(PACK, "config.json")
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        return cfg.get("multiplayer", {})
+    except Exception:
+        return {}
+
+
+_MP_CONFIG = _load_mp_config()
 
 
 def _port_ok(p):
@@ -498,11 +513,19 @@ def base_argv(idx, hostname="NukemNet"):
              "+set", "snd_musicvolume", "0.25",
              "+set", "vid_defwidth", "1920",
              "+set", "vid_defheight", "1080"]
+    # Gameplay feel from config: no head bob, shift-to-sprint, mouse wheel switches weapons,
+    # comfortable default volume. User can still change in-game.
+    argv += ["+movebob", str(_MP_CONFIG.get("movebob", 0)),
+             "+cl_run", str(_MP_CONFIG.get("cl_run", 0)),
+             "+snd_volume", str(_MP_CONFIG.get("volume", 0.25))]
+    if _MP_CONFIG.get("mouse_wheel_weapons", True):
+        argv += ["+mwheelup", "weapprev",
+                 "+mwheeldown", "weapnext"]
     argv += ["+name", hostname]
     return argv
 
 
-def host_argv(idx, port=DEFAULT_PORT, hostname="NukemNet", deathmatch=False):
+def host_argv(idx, port=DEFAULT_PORT, hostname="NukemNet", deathmatch=False, ticrate=None):
     """The full command line for hosting, exactly as NN would build it."""
     argv = base_argv(idx, hostname)
     argv += ["-private"]
@@ -511,11 +534,13 @@ def host_argv(idx, port=DEFAULT_PORT, hostname="NukemNet", deathmatch=False):
     else:
         argv += ["+Cooperative", "1", "-fast", "-respawn", "-host", "64"]
     argv += ["-port", str(port)]
+    if ticrate:
+        argv += ["+sv_ticrate", str(ticrate)]
     argv += [x.replace("{name}", hostname) for x in HOST_CONVARS]
     return argv
 
 
-def join_argv(idx, addr, hostname="NukemNet"):
+def join_argv(idx, addr, hostname="NukemNet", ticrate=None):
     """The full command line for joining a known address.
 
     `addr` may carry a trailing fingerprint ("1.2.3.4:23513 ABCD1234"); it is
@@ -525,6 +550,8 @@ def join_argv(idx, addr, hostname="NukemNet"):
     """
     host, port, _fp = split_addr_and_fp(addr)
     argv = base_argv(idx, hostname)
+    if ticrate:
+        argv += ["+sv_ticrate", str(ticrate)]
     argv += ["+Connect", f"{host}:{port}"]
     return argv
 

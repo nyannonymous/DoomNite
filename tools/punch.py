@@ -64,6 +64,11 @@ def _is_loopback(ip: str) -> bool:
     return (ip or "").startswith("127.")
 
 
+# =================================================================== SYNC VERSION
+# This is the original synchronous implementation using threads.
+# Kept for selftest_stun.py compatibility and as a fallback.
+# Production code (mp_http) should prefer AsyncPunchRelay below.
+
 class PunchRelay:
     """One punched UDP path for one game, both host and joiner share this."""
 
@@ -256,22 +261,268 @@ class PunchRelay:
             self._stop.wait(wait)
 
 
+# =================================================================== ASYNC VERSION
+# This is the new asyncio-based implementation for production use.
+# Uses asyncio.DatagramProtocol for zero-copy, event-driven packet handling
+# instead of blocking threads. This eliminates the 0.5s timeout polling
+# overhead and scales to many concurrent relays without thread exhaustion.
+
+try:
+    import asyncio
+    _ASYNC_AVAILABLE = True
+except ImportError:
+    _ASYNC_AVAILABLE = False
+
+
+if _ASYNC_AVAILABLE:
+    class AsyncPunchRelay:
+        """One punched UDP path for one game, both host and joiner share this.
+        
+        Uses asyncio.DatagramProtocol for zero-copy, event-driven packet handling
+        instead of blocking threads. This eliminates the 0.5s timeout polling
+        overhead and scales to many concurrent relays without thread exhaustion.
+        """
+
+        def __init__(self):
+            self.local_port: int | None = None
+            self.created = time.time()
+            self.transport: asyncio.DatagramTransport | None = None
+            self.protocol: _RelayProtocol | None = None
+            
+            # The peer's published endpoint. None until set_peer() (join side)
+            # or until the first inbound packet (host side).
+            self.peer: tuple[str, int] | None = None
+            self.peer_locked = False   # True once learned from traffic or pasted
+
+            # Which loopback source the ENGINE sends from. Known for the host
+            # (the engine port is fixed) but unknowable for a joiner before its
+            # first packet, so it is LEARNED from the first loopback sender.
+            self.engine_src: tuple[str, int] | None = None
+
+            # After the mapping, the published external ip:port for this socket.
+            self.mapped: tuple[str, int] | None = None
+            self.nat: str | None = None
+
+            self.snapshot = {"in_from_engine": 0, "in_from_peer": 0,
+                             "out_to_engine": 0, "out_to_peer": 0,
+                             "keepalives_sent": 0, "forwarded_bad": 0}
+            self.last_error: str | None = None
+            self._last_traffic_time: float | None = None
+            self._stop_event = asyncio.Event()
+            self._keepalive_task: asyncio.Task | None = None
+
+        async def start(self, punch_port: int | None = None) -> None:
+            """Start the async UDP listener. MUST be called after STUN discovery
+            completes, so STUN responses are not consumed by the serve loop."""
+            if self.transport is not None:
+                return
+                
+            loop = asyncio.get_running_loop()
+            self.transport, self.protocol = await loop.create_datagram_endpoint(
+                lambda: _RelayProtocol(self),
+                local_addr=("0.0.0.0", punch_port or 0)
+            )
+            sock = self.transport.get_extra_info("socket")
+            self.local_port = sock.getsockname()[1]
+            
+            # Start keepalive task
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+
+        # ------------------------------------------------------------ probing
+        def map_with_stun(self, timeout: float = stun.DEFAULT_TIMEOUT) -> tuple[str, int] | None:
+            """Ask STUN about THIS socket, in place. Called exactly once, before
+            the engine starts, because the answer must be published as the share
+            line and then never change."""
+            # Create a temporary blocking socket on the same port for STUN probe
+            # (stun.probe expects a blocking socket)
+            if self.transport is None:
+                raise RuntimeError("Transport not started")
+            temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            temp_sock.bind(("0.0.0.0", self.local_port))
+            try:
+                results = [m for _srv, m in stun.probe(temp_sock, timeout=timeout)]
+            finally:
+                temp_sock.close()
+            self.mapped = stun.best_mapping(results)
+            self.nat = stun.nat_kind(results)
+            return self.mapped
+
+        # ------------------------------------------------------------ wiring
+        def set_peer(self, ip: str, port: int, lock: bool = True) -> None:
+            """The host's published endpoint (join side), or a host locking the
+            peer explicitly. `lock` prevents later traffic from MOVING a peer
+            the user deliberately gave us."""
+            self.peer = (ip, int(port))
+            self.peer_locked = bool(lock)
+
+        def set_engine_target(self, ip: str, port: int) -> None:
+            """Set the destination where the local engine is listening."""
+            self.engine_src = (ip, int(port))
+
+        def status(self) -> dict:
+            age_s = int(time.time() - self.created)
+            idle_s = int(time.time() - self._last_traffic_time) if self._last_traffic_time else None
+            return {
+                "local_port": self.local_port,
+                "mapped": list(self.mapped) if self.mapped else None,
+                "nat": self.nat,
+                "peer": list(self.peer) if self.peer else None,
+                "engine_src": list(self.engine_src) if self.engine_src else None,
+                "age_s": age_s,
+                "idle_s": idle_s,
+                "last_error": self.last_error,
+                **self.snapshot,
+            }
+
+        def stop(self) -> None:
+            self._stop_event.set()
+            if self._keepalive_task:
+                self._keepalive_task.cancel()
+            if self.transport:
+                self.transport.close()
+            self.transport = None
+            self.protocol = None
+
+        def alive(self) -> bool:
+            return not self._stop_event.is_set()
+
+        # -------------------------------------------------------- internal
+        def _handle_packet(self, data: bytes, src: tuple[str, int]) -> None:
+            """One received packet: punch, engine, or peer. The rules:
+
+            * from the loopback engine (after learning its source): forward to
+              the peer, if the peer is known.
+            * from the loopback (before the first loopback packet): learn that
+              this is the engine's source.
+            * tagged keepalive: learn the sender as the peer, never forward.
+            * from the internet (non-loopback), untagged: (host) learn the peer
+              if unlocked, and forward to the engine. (Joiner) forward ONLY if
+              the sender is the peer we were given -- a joiner should not accept
+              game packets from strangers.
+            """
+            self._last_traffic_time = time.time()
+            
+            # ---- keepalive from the internet? Learn, drop the payload.
+            if data.startswith(PUNCH_MAGIC) and not _is_loopback(src[0]):
+                self._learn_peer(src)
+                self.snapshot["in_from_peer"] += 1
+                return
+
+            # ---- from the engine (or the first loopback sender, who IS it)
+            if _is_loopback(src[0]):
+                if self.engine_src is None:
+                    self.engine_src = src
+                if self.engine_src != src:
+                    # Loopback sender that is neither the engine nor us: ignore,
+                    # it is more likely another UI probe than a second enemy.
+                    self.snapshot["forwarded_bad"] += 1
+                    return
+                if self.peer:
+                    try:
+                        self.transport.sendto(data, self.peer)
+                        self.snapshot["out_to_peer"] += 1
+                    except OSError:
+                        pass
+                    self.snapshot["in_from_engine"] += 1
+                return
+
+            # ---- from the internet
+            allowed = (self.peer is None) or (src == self.peer) or not self.peer_locked
+            if not allowed:
+                self.snapshot["forwarded_bad"] += 1
+                return
+
+            # STUN responses are never game peers. A delayed response arriving after
+            # the threads start must not poison the peer address.
+            if len(data) >= 20 and data[4:8] == b"\x21\x12\xA4\x42":
+                return
+
+            self._learn_peer(src)
+            self.snapshot["in_from_peer"] += 1
+            if self.engine_src:
+                try:
+                    self.transport.sendto(data, self.engine_src)
+                    self.snapshot["out_to_engine"] += 1
+                except OSError:
+                    pass
+
+        def _learn_peer(self, src: tuple[str, int]) -> None:
+            if self.peer_locked and self.peer == src:
+                return
+            if self.peer_locked and self.peer is not None and self.peer != src:
+                return  # the user gave a peer; traffic cannot change it
+            if self.peer != src:
+                self.peer = src
+                self.peer_locked = True   # learned-from-traffic counts as locked
+
+        async def _keepalive_loop(self) -> None:
+            """Punch until the peer exists, then slow down; publish nothing."""
+            while not self._stop_event.is_set():
+                if self.peer:
+                    try:
+                        self.transport.sendto(PUNCH_MAGIC, self.peer)
+                    except OSError:
+                        pass
+                    self.snapshot["keepalives_sent"] += 1
+                
+                if self.snapshot["in_from_peer"]:
+                    wait = PUNCH_INTERVAL_SLOW
+                elif self.peer:
+                    wait = PUNCH_INTERVAL
+                else:
+                    wait = PUNCH_INTERVAL
+                
+                try:
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=wait)
+                except asyncio.TimeoutError:
+                    continue  # timeout is normal, loop continues
+
+
+    class _RelayProtocol(asyncio.DatagramProtocol):
+        """Asyncio protocol that forwards all packets to the relay's handler."""
+        
+        def __init__(self, relay: AsyncPunchRelay):
+            self.relay = relay
+            
+        def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+            self.relay._handle_packet(data, addr)
+            
+        def error_received(self, exc: Exception) -> None:
+            self.relay.last_error = str(exc)
+            
+        def connection_lost(self, exc: Exception | None) -> None:
+            if exc:
+                self.relay.last_error = str(exc)
+
+
 # --------------------------------------------------------------- registry
 # mp_http holds one relay per mode at a time; a fresh host/STUN join request
 # replaces the old one. Keyed by mode, not per request, because the share
 # line the user already handed out names THIS socket's mapping -- replacing
 # the relay under an already-shared line orphans it silently.
-RELAYS: dict[str, PunchRelay] = {}
+RELAYS: dict[str, PunchRelay | AsyncPunchRelay] = {}
 
 
-def get_relay(mode: str) -> PunchRelay | None:
+def get_relay(mode: str) -> PunchRelay | AsyncPunchRelay | None:
     return RELAYS.get(mode)
 
 
 def start_relay(mode: str) -> PunchRelay:
+    """Synchronous start_relay for backwards compatibility (tests, legacy)."""
     old = RELAYS.pop(mode, None)
     if old:
         old.stop()
     r = PunchRelay()
     RELAYS[mode] = r
+    return r
+
+
+async def start_relay_async(mode: str, punch_port: int | None = None) -> AsyncPunchRelay:
+    """Async start_relay for production use (mp_http)."""
+    old = RELAYS.pop(mode, None)
+    if old:
+        old.stop()
+    r = AsyncPunchRelay()
+    RELAYS[mode] = r
+    await r.start(punch_port)
     return r

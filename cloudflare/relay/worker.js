@@ -164,6 +164,7 @@ export class Lobby {
         label: url.pathname === '/lobby/announce' ? String(body?.label || '').slice(0, 80) : existing.label || '',
         mode: url.pathname === '/lobby/announce' ? String(body?.mode || '').slice(0, 40) : existing.mode || '',
         players: Math.max(0, Math.min(99, Number(body?.players) || existing.players || 1)),
+        entry_slug: url.pathname === '/lobby/announce' ? String(body?.entry_slug || '').slice(0, 64) : existing.entry_slug || '',
         ts: Date.now(),
       };
       await this.ctx.storage.put('r:' + room, entry);

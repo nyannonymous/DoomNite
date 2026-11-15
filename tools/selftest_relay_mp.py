@@ -77,17 +77,17 @@ _spawned = []
 _lobby_calls = []
 
 
-def _stub_keep_announced(room, label, mode, is_alive, status=None):
+def _stub_keep_announced(room, label, mode, is_alive, status=None, entry_slug=""):
     # No real network, no background thread: record what mp_http.py would
     # have announced, same spirit as the argv/Popen stubs above.
-    _lobby_calls.append((room, label, mode))
+    _lobby_calls.append((room, label, mode, entry_slug))
 
 
-def _stub_announce_ex(room, label, mode, players=1):
+def _stub_announce_ex(room, label, mode, players=1, entry_slug=""):
     # The host path now announces SYNCHRONOUSLY; stub it so the test never
     # touches the live Worker, and record separately from the heartbeat
     # thread's re-announce.
-    _sync_announces.append((room, label, mode))
+    _sync_announces.append((room, label, mode, entry_slug))
     return _announce_result
 
 

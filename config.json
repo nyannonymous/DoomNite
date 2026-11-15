@@ -3,5 +3,11 @@
     "DOOM.WAD": "Z:\\github\\APP · DOOMNITE-PACK\\iwads\\DOOM.WAD",
     "DOOM2.WAD": "Z:\\github\\APP · DOOMNITE-PACK\\iwads\\DOOM2.WAD",
     "Hexen.wad": "Z:\\github\\APP · DOOMNITE-PACK\\iwads\\Hexen.wad"
+  },
+  "multiplayer": {
+    "volume": 0.25,
+    "movebob": 0,
+    "cl_run": 0,
+    "mouse_wheel_weapons": true
   }
 }

@@ -37,7 +37,7 @@ def _ssl_context() -> ssl.SSLContext:
 # than imported from there so this module has no dependency on the tunnel
 # engine -- a lobby entry and a relay tunnel are related but distinct, and
 # mp_http.py is free to announce a room before (or without) a tunnel.
-LOBBY_BASE = os.environ.get("DOOMNITE_RELAY_URL", "https://doomnite-relay.chimske.workers.dev").replace("wss://", "https://").replace("ws://", "http://").rsplit("/relay", 1)[0]
+LOBBY_BASE = os.environ.get("DOOMNITE_RELAY_URL", "https://doomnite-relay.nyan-anonymous-d45.workers.dev").replace("wss://", "https://").replace("ws://", "http://").rsplit("/relay", 1)[0]
 
 HEARTBEAT_INTERVAL = 20.0   # Worker-side STALE_MS is 45s; this comfortably beats it
 TIMEOUT = 5.0
@@ -73,9 +73,9 @@ def _post_ex(path: str, body: dict) -> tuple[bool, str | None]:
 
 
 def announce_ex(room: str, label: str, mode: str = "doom",
-                players: int = 1) -> tuple[bool, str | None]:
+                players: int = 1, entry_slug: str = "") -> tuple[bool, str | None]:
     return _post_ex("/lobby/announce",
-                    {"room": room, "label": label, "mode": mode, "players": players})
+                    {"room": room, "label": label, "mode": mode, "players": players, "entry_slug": entry_slug})
 
 
 def heartbeat_ex(room: str) -> tuple[bool, str | None]:
@@ -126,7 +126,7 @@ def list_rooms() -> list[dict]:
 
 
 def keep_announced(room: str, label: str, mode: str, is_alive,
-                   status: dict | None = None) -> threading.Thread:
+                   status: dict | None = None, entry_slug: str = "") -> threading.Thread:
     """Announce once, then heartbeat every HEARTBEAT_INTERVAL while
     `is_alive()` is true, then remove(). Runs in a daemon thread so a host
     launch returns immediately -- the panel does not wait on a Cloudflare
@@ -146,7 +146,7 @@ def keep_announced(room: str, label: str, mode: str, is_alive,
         announced = False
         last_err = None
         for _ in range(3):
-            ok, err = announce_ex(room, label, mode)
+            ok, err = announce_ex(room, label, mode, entry_slug=entry_slug)
             if ok:
                 announced = True
                 break
@@ -168,7 +168,7 @@ def keep_announced(room: str, label: str, mode: str, is_alive,
             # dropping the room for everyone. Success clears the flag,
             # which is also what tells the UI "listed again, warning off".
             if status is not None and status.get("last_heartbeat_error"):
-                ok, err = announce_ex(room, label, mode)
+                ok, err = announce_ex(room, label, mode, entry_slug=entry_slug)
             else:
                 ok, err = heartbeat_ex(room)
             if status is not None:

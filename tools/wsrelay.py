@@ -58,7 +58,7 @@ from urllib.parse import urlsplit
 # Deployed 2026-10-29 (`cd cloudflare/relay && npx wrangler deploy`,
 # account Chimske@gmail.com, version 5f27b9d4). Override with the
 # DOOMNITE_RELAY_URL env var if it ever moves to a custom route.
-DEFAULT_RELAY_URL = os.environ.get("DOOMNITE_RELAY_URL", "wss://doomnite-relay.chimske.workers.dev/relay")
+DEFAULT_RELAY_URL = os.environ.get("DOOMNITE_RELAY_URL", "wss://doomnite-relay.nyan-anonymous-d45.workers.dev/relay")
 
 # Legacy fallback only (Workers that send no peer control frames): relay
 # traffic younger than this counts as "peer present". Generous enough to

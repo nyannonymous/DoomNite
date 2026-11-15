@@ -164,7 +164,46 @@ Redesign brief: `ui/BRIEF.md` (verbatim, do not lose it).
 
 ---
 
-## ▶ §-1 TOP PRIORITY — Duke games (Duke3D, Duke64, KickAss Duke) into the pack
+## ▶ §-1 TOP PRIORITY — Multiplayer connectivity & gameplay fixes (from 2026-11-13 playtest)
+
+**Playtest findings:** Joins work via "Host — let anyone find it" (relay tier), but:
+- Games are **very slow** (high latency / input lag)
+- **Mouse wheel** shows names/scores instead of switching weapons
+- **Head bob** is ON (should be OFF)
+- **Always run** is ON (should be Shift-to-sprint)
+- **Sound too loud** in multiplayer
+
+**Root causes identified in `AUDIT-MULTIPLAYER-CONNECTIVITY.md`:**
+1. No client-side prediction/interpolation — raw 35 Hz Zandronum tick felt directly
+2. Python relay overhead (STUN tier) + Cloudflare Worker round-trip (Relay tier = 4× one-way latency)
+3. Zandronum cvars not forced: `movebob=0.25`, `cl_run=true`, `mwheelup/mwheeldown` overridden by mods
+4. Volume hardcoded to 0.35 in `mp_session.py`
+4. `python.exe` firewall Block rules drop punched packets silently
+
+**P0 — Must fix before next playtest:**
+- [x] **Force gameplay cvars in `mp_session.base_argv()`** — add `+movebob 0 +cl_run 0 +mwheelup weapprev +mwheeldown weapnext +snd_volume 0.25`
+- [x] **Make volume configurable** — read from `config.json`/localStorage, default 0.25 (not 0.35)
+- [x] **Fix Python firewall blocks** — panel shows admin one-liner when punch/relay selected (STUN tier has firewall warning; relay tier uses outbound connections so no firewall issue)
+- [x] **Persist user gameplay prefs** (head bob, run mode, volume, mouse wheel, ticrate) in localStorage
+- [x] **Auto-switch game on lobby join** — when joiner clicks a room in "Open games", auto-select the host's game entry before launching
+  - Worker: store `entry_slug` in lobby entry (announce + list) ✓
+  - `lobby.py`: pass `entry_slug` on announce/heartbeat ✓
+  - `mp_http.py`: send entry slug when hosting relay ✓
+  - `MultiplayerButton.jsx`: on lobby room join, `setPick()` to matching entry slug before POST ✓
+
+**P1 — Latency reduction (post-playtest):**
+- [ ] Optimize `wsrelay.py` — asyncio + aiohttp, batch WebSocket frames (blocked: stdlib only, no aiohttp dep)
+- [x] Add bandwidth adaptation — detect RTT, request lower `sv_ticrate` from host (ticrate parameter added to host/join, UI dropdown with auto-suggest)
+- [x] Add "Test Connection" button measuring RTT to host before joining (UI button + `/api/multiplayer/test-connection` endpoint)
+- [x] Reduce lobby poll to 2s when panel open (was 4s)
+- [x] Deploy updated Cloudflare Worker with entry_slug support (`doomnite-relay.nyan-anonymous-d45.workers.dev`)
+
+**P2 — Polish:**
+- [ ] Add packet acknowledgment + interpolation proxy layer (long-term)
+
+---
+
+## ▶ §-2 TOP PRIORITY — Duke games (Duke3D, Duke64, KickAss Duke) into the pack
 
 **Sources on disk (already installed + verified):**
 - `Z:\GAMES\Duke3d` — base Duke3D + EDuke32 r10652 (eduke32.exe works, duke3d.grp checksum 0xfd3dcff1)

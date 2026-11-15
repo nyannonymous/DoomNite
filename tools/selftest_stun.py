@@ -271,6 +271,9 @@ class _Rec:
 
     def stop(self):
         self.stopped = True
+        
+    def alive(self):
+        return not self.stopped
 
 
 _real_start = P.start_relay
@@ -311,7 +314,14 @@ try:
         P.RELAYS[mode] = rec      # the REAL start_relay registers it too
         return rec
 
+    async def fake_start_async(mode, punch_port=None, **kw):
+        rec = _Rec(**kw)
+        created.append(mode)
+        P.RELAYS[mode] = rec
+        return rec
+
     P.start_relay = fake_start
+    P.start_relay_async = fake_start_async
     P.RELAYS.clear()
     status, body = H.host(_FakeHandler({"index": 0, "stun": True}), resolve)
     check("stun host path returns 200", status == 200, str(status))
@@ -338,7 +348,14 @@ try:
         _argv_calls.append(("join", idx, addr, kw))
         return ["ZANDRA.EXE", "+Connect", addr]
 
+    async def fake_join_async(mode, punch_port=None, **kw):
+        rec = _Rec(**kw)
+        created.append(mode)
+        P.RELAYS[mode] = rec
+        return rec
+
     _m.join_argv = rec_join
+    P.start_relay_async = fake_join_async
     status, body = H.join(_FakeHandler({"index": 0, "stun": True,
                                         "addr": "5.6.7.8:12345 ABCDEFGH"}),
                           resolve)
@@ -356,7 +373,15 @@ try:
     P.RELAYS.clear()
     created.clear()
     _spawned.clear()
+    
+    async def fake_symmetric_async(mode, punch_port=None):
+        rec = _Rec(nat="symmetric")
+        created.append(mode)
+        P.RELAYS[mode] = rec
+        return rec
+    
     P.start_relay = lambda mode: (created.append(mode), _Rec(nat="symmetric"))[1]
+    P.start_relay_async = fake_symmetric_async
     status, body = H.host(_FakeHandler({"index": 0, "stun": True}), resolve)
     check("symmetric-NAT host is refused with 400", status == 400, str(status))
     check("refusal explains in owner terms, not STUN jargon",
@@ -370,7 +395,14 @@ try:
     # ---- a JOINER with symmetric NAT is NOT refused: the joiner never
     #      publishes an endpoint, so its own mapping variety is invisible
     P.RELAYS.clear()
+    
+    async def fake_joiner_symmetric_async(mode, punch_port=None):
+        rec = _Rec(nat="symmetric")
+        P.RELAYS[mode] = rec
+        return rec
+    
     _m.join_argv = rec_join
+    P.start_relay_async = fake_joiner_symmetric_async
     status, body = H.join(_FakeHandler({"index": 0, "stun": True,
                                         "addr": "5.6.7.8:12345"}),
                           resolve)
@@ -382,7 +414,15 @@ try:
     # ---- a dead STUN answer (all servers silent) refuses before the engine
     P.RELAYS.clear()
     _spawned.clear()
+    
+    async def fake_dead_stun_async(mode, punch_port=None):
+        rec = _Rec(mapped=None)
+        created.append(mode)
+        P.RELAYS[mode] = rec
+        return rec
+    
     P.start_relay = lambda mode: fake_start(mode, mapped=None)
+    P.start_relay_async = fake_dead_stun_async
     status, body = H.host(_FakeHandler({"index": 0, "stun": True}), resolve)
     check("no-STUN host path refuses with 502", status == 502, str(status))
     check("no-STUN refusal started no engine",
@@ -395,6 +435,9 @@ finally:
     _m.host_argv, _m.join_argv = _real_host, _real_join
     _m._fingerprint_cached, _m.compare_fingerprint = _real_fp, _real_cmp
     P.start_relay = _real_start
+    # Restore the real async version from the punch module
+    import punch as _punch_real
+    P.start_relay_async = _punch_real.start_relay_async
     for _r in P.RELAYS.values():
         try:
             _r.stop()
